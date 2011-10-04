@@ -320,6 +320,8 @@ static int enter_state(suspend_state_t state)
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
 
+	if (state == PM_SUSPEND_FREEZE)
+		freeze_begin();
 
 	printk(KERN_INFO "PM: Syncing filesystems ... ");
 	sys_sync();
@@ -330,11 +332,7 @@ static int enter_state(suspend_state_t state)
 	pm_qos_update_request(&suspend_pm_qos, 0);
 
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
-	error = suspend_prepare();
-
-	if (state == PM_SUSPEND_FREEZE)
-		freeze_begin();
-
+	error = suspend_prepare(state);
 	if (error)
 		goto Unlock;
 
