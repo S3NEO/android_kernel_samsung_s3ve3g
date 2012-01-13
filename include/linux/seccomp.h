@@ -79,6 +79,12 @@ struct seccomp {
 
 extern int __secure_computing(int);
 static inline int secure_computing(int this_syscall)
+struct seccomp {
+	int mode;
+};
+
+extern void __secure_computing(int);
+static inline void secure_computing(int this_syscall)
 {
 	if (unlikely(test_thread_flag(TIF_SECCOMP)))
 		return  __secure_computing(this_syscall);
