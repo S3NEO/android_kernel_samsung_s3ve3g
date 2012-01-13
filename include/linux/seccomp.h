@@ -60,25 +60,12 @@ struct seccomp_data {
 #include <linux/thread_info.h>
 #include <asm/seccomp.h>
 
-struct seccomp_filter;
-/**
- * struct seccomp - the state of a seccomp'ed process
- *
- * @mode:  indicates one of the valid values above for controlled
- *         system calls available to a process.
- * @filter: must always point to a valid seccomp-filter or NULL as it is
- *          accessed without locking during system call entry.
- *
- *          @filter must only be accessed from the context of current as there
- *          is no read locking.
- */
 struct seccomp {
 	int mode;
-	struct seccomp_filter *filter;
 };
 
-extern int __secure_computing(int);
-static inline int secure_computing(int this_syscall)
+extern void __secure_computing(int);
+static inline void secure_computing(int this_syscall)
 {
 	if (unlikely(test_thread_flag(TIF_SECCOMP)))
 		return  __secure_computing(this_syscall);
@@ -104,7 +91,6 @@ static inline int seccomp_mode(struct seccomp *s)
 #include <linux/errno.h>
 
 struct seccomp { };
-struct seccomp_filter { };
 
 static inline int secure_computing(int this_syscall) { return 0; }
 static inline void secure_computing_strict(int this_syscall) { return; }
