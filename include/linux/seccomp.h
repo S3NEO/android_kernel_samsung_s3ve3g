@@ -20,6 +20,9 @@
 /*
  * All BPF programs must return a 32-bit value.
  * The bottom 16-bits are for optional return data.
+/*
+ * All BPF programs must return a 32-bit value.
+ * The bottom 16-bits are reserved for future use.
  * The upper 16-bits are ordered from least permissive values to most.
  *
  * The ordering ensures that a min_t() over composed return values always
@@ -55,6 +58,7 @@ struct seccomp_data {
 
 #define SECCOMP_FILTER_FLAG_MASK	(SECCOMP_FILTER_FLAG_TSYNC)
 
+#ifdef __KERNEL__
 #ifdef CONFIG_SECCOMP
 
 #include <linux/thread_info.h>
@@ -79,8 +83,15 @@ struct seccomp {
 
 extern int __secure_computing(int);
 static inline int secure_computing(int this_syscall)
+ * @filter: The metadata and ruleset for determining what system calls
+ *          are allowed for a task.
+ *
+ *          @filter must only be accessed from the context of current as there
+ *          is no locking.
+ */
 struct seccomp {
 	int mode;
+	struct seccomp_filter *filter;
 };
 
 extern void __secure_computing(int);
@@ -114,6 +125,7 @@ struct seccomp_filter { };
 
 static inline int secure_computing(int this_syscall) { return 0; }
 static inline void secure_computing_strict(int this_syscall) { return; }
+#define secure_computing(x) 0
 
 static inline long prctl_get_seccomp(void)
 {

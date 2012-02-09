@@ -29,6 +29,8 @@
 #include <linux/pid.h>
 #include <linux/ptrace.h>
 #include <linux/security.h>
+#include <linux/security.h>
+#include <linux/slab.h>
 #include <linux/tracehook.h>
 #include <linux/uaccess.h>
 
@@ -62,6 +64,18 @@ struct seccomp_filter {
 
 /* Limit any path through the tree to 256KB worth of instructions. */
 #define MAX_INSNS_PER_PATH ((1 << 18) / sizeof(struct sock_filter))
+
+static void seccomp_filter_log_failure(int syscall)
+{
+	int compat = 0;
+#ifdef CONFIG_COMPAT
+	compat = is_compat_task();
+#endif
+	pr_info("%s[%d]: %ssystem call %d blocked at 0x%lx\n",
+		current->comm, task_pid_nr(current),
+		(compat ? "compat " : ""),
+		syscall, KSTK_EIP(current));
+}
 
 /**
  * get_u32 - returns a u32 offset into data
@@ -365,6 +379,27 @@ static inline void seccomp_sync_threads(void)
  * Returns filter on success or an ERR_PTR on failure.
  */
 static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
+	struct seccomp_filter *f;
+	u32 ret = SECCOMP_RET_KILL;
+	/*
+	 * All filters in the list are evaluated and the lowest BPF return
+	 * value always takes priority.
+	 */
+	for (f = current->seccomp.filter; f; f = f->prev) {
+		ret = sk_run_filter(NULL, f->insns);
+		if (ret != SECCOMP_RET_ALLOW)
+			break;
+	}
+	return ret;
+}
+
+/**
+ * seccomp_attach_filter: Attaches a seccomp filter to current.
+ * @fprog: BPF program to install
+ *
+ * Returns 0 on success or an errno on failure.
+ */
+static long seccomp_attach_filter(struct sock_fprog *fprog)
 {
 	struct seccomp_filter *filter;
 	unsigned long fp_size = fprog->len * sizeof(struct sock_filter);
@@ -374,11 +409,13 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 	if (fprog->len == 0 || fprog->len > BPF_MAXINSNS)
 		return ERR_PTR(-EINVAL);
 	BUG_ON(INT_MAX / fprog->len < sizeof(struct sock_filter));
+		return -EINVAL;
 
 	for (filter = current->seccomp.filter; filter; filter = filter->prev)
 		total_insns += filter->len + 4;  /* include a 4 instr penalty */
 	if (total_insns > MAX_INSNS_PER_PATH)
 		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	/*
 	 * Installing a seccomp filter requires that the task have
@@ -390,12 +427,17 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 	    security_capable_noaudit(current_cred(), current_user_ns(),
 				     CAP_SYS_ADMIN) != 0)
 		return ERR_PTR(-EACCES);
+	if (!current->no_new_privs &&
+	    security_capable_noaudit(current_cred(), current_user_ns(),
+				     CAP_SYS_ADMIN) != 0)
+		return -EACCES;
 
 	/* Allocate a new seccomp_filter */
 	filter = kzalloc(sizeof(struct seccomp_filter) + fp_size,
 			 GFP_KERNEL|__GFP_NOWARN);
 	if (!filter)
 		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 	atomic_set(&filter->usage, 1);
 	filter->len = fprog->len;
 
@@ -422,6 +464,20 @@ fail:
 
 /**
  * seccomp_prepare_user_filter - prepares a user-supplied sock_fprog
+	/*
+	 * If there is an existing filter, make it the prev and don't drop its
+	 * task reference.
+	 */
+	filter->prev = current->seccomp.filter;
+	current->seccomp.filter = filter;
+	return 0;
+fail:
+	kfree(filter);
+	return ret;
+}
+
+/**
+ * seccomp_attach_user_filter - attaches a user-supplied sock_fprog
  * @user_filter: pointer to the user data containing a sock_fprog.
  *
  * Returns 0 on success and non-zero otherwise.
@@ -431,6 +487,10 @@ seccomp_prepare_user_filter(const char __user *user_filter)
 {
 	struct sock_fprog fprog;
 	struct seccomp_filter *filter = ERR_PTR(-EFAULT);
+long seccomp_attach_user_filter(char __user *user_filter)
+{
+	struct sock_fprog fprog;
+	long ret = -EFAULT;
 
 #ifdef CONFIG_COMPAT
 	if (is_compat_task()) {
@@ -493,6 +553,9 @@ static long seccomp_attach_filter(unsigned int flags,
 		seccomp_sync_threads();
 
 	return 0;
+	ret = seccomp_attach_filter(&fprog);
+out:
+	return ret;
 }
 
 /* get_seccomp_filter - increments the reference count of the filter on @tsk */
@@ -543,6 +606,9 @@ static void seccomp_send_sigsys(int syscall, int reason)
 	info.si_syscall = syscall;
 	force_sig_info(SIGSYS, &info, current);
 }
+		kfree(freeme);
+	}
+}
 #endif	/* CONFIG_SECCOMP_FILTER */
 
 /*
@@ -575,6 +641,11 @@ int __secure_computing(int this_syscall)
 	rmb();
 
 	switch (current->seccomp.mode) {
+	int mode = current->seccomp.mode;
+	int exit_sig = 0;
+	int *syscall;
+
+	switch (mode) {
 	case SECCOMP_MODE_STRICT:
 		syscall = mode1_syscalls;
 #ifdef CONFIG_COMPAT
@@ -634,6 +705,14 @@ int __secure_computing(int this_syscall)
 		exit_sig = SIGSYS;
 		break;
 	}
+		break;
+#ifdef CONFIG_SECCOMP_FILTER
+	case SECCOMP_MODE_FILTER:
+		if (seccomp_run_filters(this_syscall) == SECCOMP_RET_ALLOW)
+			return;
+		seccomp_filter_log_failure(this_syscall);
+		exit_sig = SIGSYS;
+		break;
 #endif
 	default:
 		BUG();
@@ -649,6 +728,8 @@ skip:
 	audit_seccomp(this_syscall, exit_sig, ret);
 #endif
 	return -1;
+	audit_seccomp(this_syscall);
+	do_exit(exit_sig);
 }
 
 long prctl_get_seccomp(void)
@@ -658,6 +739,14 @@ long prctl_get_seccomp(void)
 
 /**
  * seccomp_set_mode_strict: internal function for setting strict seccomp
+ * prctl_set_seccomp: configures current->seccomp.mode
+ * @seccomp_mode: requested mode to use
+ * @filter: optional struct sock_fprog for use with SECCOMP_MODE_FILTER
+ *
+ * This function may be called repeatedly with a @seccomp_mode of
+ * SECCOMP_MODE_FILTER to install additional filters.  Every filter
+ * successfully installed will be evaluated (in reverse order) for each system
+ * call the task makes.
  *
  * Once current->seccomp.mode is non-zero, it may not be changed.
  *
@@ -673,6 +762,17 @@ static long seccomp_set_mode_strict(void)
 	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
 
+long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
+{
+	long ret = -EINVAL;
+
+	if (current->seccomp.mode &&
+	    current->seccomp.mode != seccomp_mode)
+		goto out;
+
+	switch (seccomp_mode) {
+	case SECCOMP_MODE_STRICT:
+		ret = 0;
 #ifdef TIF_NOTSC
 	disable_TSC();
 #endif
@@ -741,6 +841,21 @@ out:
 		mutex_unlock(&current->signal->cred_guard_mutex);
 out_free:
 	seccomp_filter_free(prepared);
+		break;
+#ifdef CONFIG_SECCOMP_FILTER
+	case SECCOMP_MODE_FILTER:
+		ret = seccomp_attach_user_filter(filter);
+		if (ret)
+			goto out;
+		break;
+#endif
+	default:
+		goto out;
+	}
+
+	current->seccomp.mode = seccomp_mode;
+	set_thread_flag(TIF_SECCOMP);
+out:
 	return ret;
 }
 #else
