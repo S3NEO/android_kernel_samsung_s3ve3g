@@ -368,15 +368,20 @@ static inline void seccomp_sync_threads(void)
  */
 static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 	struct seccomp_filter *f;
-	u32 ret = SECCOMP_RET_KILL;
+	u32 ret = SECCOMP_RET_ALLOW;
+
+	/* Ensure unexpected behavior doesn't result in failing open. */
+	if (WARN_ON(current->seccomp.filter == NULL))
+		return SECCOMP_RET_KILL;
+
 	/*
 	 * All filters in the list are evaluated and the lowest BPF return
-	 * value always takes priority.
+	 * value always takes priority (ignoring the DATA).
 	 */
 	for (f = current->seccomp.filter; f; f = f->prev) {
-		ret = sk_run_filter(NULL, f->insns);
-		if (ret != SECCOMP_RET_ALLOW)
-			break;
+		u32 cur_ret = sk_run_filter(NULL, f->insns);
+		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
+			ret = cur_ret;
 	}
 	return ret;
 }
@@ -632,6 +637,8 @@ int __secure_computing(int this_syscall)
 	int mode = current->seccomp.mode;
 	int exit_sig = 0;
 	int *syscall;
+	u32 ret = SECCOMP_RET_KILL;
+	int data;
 
 	switch (mode) {
 	case SECCOMP_MODE_STRICT:
@@ -696,8 +703,20 @@ int __secure_computing(int this_syscall)
 		break;
 #ifdef CONFIG_SECCOMP_FILTER
 	case SECCOMP_MODE_FILTER:
-		if (seccomp_run_filters(this_syscall) == SECCOMP_RET_ALLOW)
-			return;
+		ret = seccomp_run_filters(this_syscall);
+		data = ret & SECCOMP_RET_DATA;
+		switch (ret & SECCOMP_RET_ACTION) {
+		case SECCOMP_RET_ERRNO:
+			/* Set the low-order 16-bits as a errno. */
+			syscall_set_return_value(current, task_pt_regs(current),
+						 -data, 0);
+			goto skip;
+		case SECCOMP_RET_ALLOW:
+			return 0;
+		case SECCOMP_RET_KILL:
+		default:
+			break;
+		}
 		exit_sig = SIGSYS;
 		break;
 #endif
@@ -718,6 +737,9 @@ skip:
 	audit_seccomp(this_syscall);
 	audit_seccomp(this_syscall, exit_code, SECCOMP_RET_KILL);
 	do_exit(exit_sig);
+skip:
+	audit_seccomp(this_syscall, exit_sig, ret);
+	return -1;
 }
 
 long prctl_get_seccomp(void)
