@@ -743,6 +743,7 @@ int __secure_computing(int this_syscall)
 			/* Skip these calls if there is no tracer. */
 			if (!ptrace_event_enabled(current, PTRACE_EVENT_SECCOMP))
 				goto skip;
+			}
 			/* Allow the BPF to provide the event message */
 			ptrace_event(PTRACE_EVENT_SECCOMP, data);
 			/*
