@@ -177,3 +177,4 @@ MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("SHA1 Secure Hash Algorithm (ARM)");
 MODULE_ALIAS("sha1");
 MODULE_AUTHOR("David McCullough <ucdevel@gmail.com>");
+
