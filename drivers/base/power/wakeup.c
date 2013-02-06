@@ -413,6 +413,11 @@ if (!enable_si_ws && !strcmp(ws->name, "sensor_ind"))
 
         if (!enable_bluesleep_ws && !strcmp(ws->name, "bluesleep"))
 		return;
+	/*
+	 * active wakeup source should bring the system
+	 * out of PM_SUSPEND_FREEZE state
+	 */
+	freeze_wake();
 
 	ws->active = true;
 	ws->active_count++;
