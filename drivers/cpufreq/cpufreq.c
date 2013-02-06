@@ -1569,9 +1569,13 @@ EXPORT_SYMBOL(cpufreq_quick_get_max);
  */
 unsigned int cpufreq_quick_get_min(unsigned int cpu)
 {
-	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
+	struct cpufreq_policy *policy;
 	unsigned int ret_freq = 0;
 
+	if (cpufreq_driver && cpufreq_driver->setpolicy && cpufreq_driver->get)
+		return cpufreq_driver->get(cpu);
+
+	policy = cpufreq_cpu_get(cpu);
 	if (policy) {
 		ret_freq = policy->min;
 		cpufreq_cpu_put(policy);
