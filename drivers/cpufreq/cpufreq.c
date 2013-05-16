@@ -2185,8 +2185,10 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 			/* end old governor */
 			if (data->governor) {
  				__cpufreq_governor(data, CPUFREQ_GOV_STOP);
+				unlock_policy_rwsem_write(policy->cpu);
 				__cpufreq_governor(data,
 						CPUFREQ_GOV_POLICY_EXIT);
+				lock_policy_rwsem_write(policy->cpu);
 			}
 
 			/* start new governor */
@@ -2201,11 +2203,14 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 #endif
 
 			if (!__cpufreq_governor(data, CPUFREQ_GOV_POLICY_INIT)) {
-				if (!__cpufreq_governor(data, CPUFREQ_GOV_START))
-					failed = 0;
-				else
+				if (!__cpufreq_governor(data, CPUFREQ_GOV_START)) {
+ 					failed = 0;
+				} else {
+					unlock_policy_rwsem_write(policy->cpu);
 					__cpufreq_governor(data,
 							CPUFREQ_GOV_POLICY_EXIT);
+					lock_policy_rwsem_write(policy->cpu);
+				}
 			}
 
 			if (failed) {
