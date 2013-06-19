@@ -2480,7 +2480,7 @@ char *cpufreq_get_gov(unsigned int cpu)
 EXPORT_SYMBOL(cpufreq_get_gov);
 #endif
 
-static int __cpuinit cpufreq_cpu_callback(struct notifier_block *nfb,
+static int cpufreq_cpu_callback(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
