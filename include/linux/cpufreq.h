@@ -578,6 +578,8 @@ void cpufreq_frequency_table_update_policy_cpu(struct cpufreq_policy *policy);
 
 void cpufreq_frequency_table_put_attr(unsigned int cpu);
 
+ssize_t cpufreq_show_cpus(const struct cpumask *mask, char *buf);
+
 /*********************************************************************
  *                         CPUFREQ STATS                             *
  *********************************************************************/
