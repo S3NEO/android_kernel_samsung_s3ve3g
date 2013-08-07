@@ -197,7 +197,7 @@ static int of_get_fmax_vdd_class(struct platform_device *pdev, struct clk *c,
 	if (!c->fmax)
 		return -ENOMEM;
 
-	array = devm_kzalloc(&pdev->dev, prop_len * sizeof(u32) * 2, GFP_KERNEL);
+	array = devm_kzalloc(&pdev->dev, prop_len * sizeof(u32), GFP_KERNEL);
 	if (!array)
 		return -ENOMEM;
 
@@ -297,7 +297,7 @@ static int of_get_clk_src(struct platform_device *pdev, struct clk_src *parents)
 static int clock_a7_probe(struct platform_device *pdev)
 {
 	struct resource *res;
-	int speed_bin = 0, version = 0, rc;
+	int speed_bin = 0, version = 0, rc, cpu;
 	unsigned long rate, aux_rate;
 	struct clk *aux_clk, *main_pll;
 	char prop_name[] = "qcom,speedX-bin-vX";
@@ -366,8 +366,10 @@ static int clock_a7_probe(struct platform_device *pdev)
 	 * that the clocks have already been prepared and enabled by the time
 	 * they take over.
 	 */
-	WARN(clk_prepare_enable(&a7ssmux.c),
-		"Unable to turn on CPU clock");
+	for_each_online_cpu(cpu) {
+		WARN(clk_prepare_enable(&a7ssmux.c),
+			"Unable to turn on CPU%d clock", cpu);
+	}
 	return 0;
 }
 
