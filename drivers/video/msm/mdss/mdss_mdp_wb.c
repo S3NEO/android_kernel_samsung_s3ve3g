@@ -408,6 +408,17 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	struct mdss_mdp_img_data *buf;
 	int ret;
 
+	if (!list_empty(&wb->register_queue)) {
+		list_for_each_entry(node, &wb->register_queue, registered_entry)
+			if ((node->buf_info.memory_id == data->memory_id) &&
+				    (node->buf_info.offset == data->offset)) {
+				pr_debug("found node fd=%x off=%x addr=%x\n",
+						data->memory_id, data->offset,
+						node->buf_data.p[0].addr);
+				return node;
+			}
+	}
+
 	node = kzalloc(sizeof(struct mdss_mdp_wb_data), GFP_KERNEL);
 	if (node == NULL) {
 		pr_err("out of memory\n");
