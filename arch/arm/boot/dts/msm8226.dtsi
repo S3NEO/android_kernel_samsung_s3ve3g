@@ -1040,21 +1040,7 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		qcom,i2c-src-freq = <19200000>;
                 qcom,master-id = <86>;
 	};
-
-	i2c@f9924000 { /* BLSP-1 QUP-2 */
-		cell-index = <2>;
-		compatible = "qcom,i2c-qup";
-		reg = <0xf9924000 0x1000>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		reg-names = "qup_phys_addr";
-		interrupts = <0 96 0>;
-		interrupt-names = "qup_err_intr";
-		qcom,i2c-bus-freq = <100000>;
-		qcom,i2c-src-freq = <19200000>;
-	};
-
-	i2c@f9926000 { /* BLSP-1 QUP-4 */
+	i2c_0: i2c@f9926000 { /* BLSP-1 QUP-4 */
 		cell-index = <0>;
 		compatible = "qcom,i2c-qup";
 		reg = <0xf9926000 0x1000>;
@@ -1064,7 +1050,8 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		interrupts = <0 98 0>;
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <100000>;
-                qcom,master-id = <86>;
+		qcom,i2c-src-freq = <19200000>;
+		qcom,master-id = <86>;
 	};
 
 	i2c@f9927000 { /* BLSP1 QUP5 */
