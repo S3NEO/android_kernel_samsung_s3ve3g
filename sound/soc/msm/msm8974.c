@@ -143,7 +143,9 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.insert_detect = true,
 	.swap_gnd_mic = NULL,
 #if (defined(CONFIG_MACH_KLTE_KOR) || defined(CONFIG_MACH_KLTE_JPN)) && !defined(CONFIG_SEC_FACTORY)
-	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING),
+	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
+			    1 << MBHC_CS_ENABLE_REMOVAL |
+			    1 << MBHC_CS_ENABLE_DET_ANC),
 #else
 	.cs_enable_flags = 0,
 #endif
