@@ -83,6 +83,8 @@ struct tzbsp_video_set_state_req {
 
 static inline int venus_hfi_clk_gating_off(struct venus_hfi_device *device);
 
+static inline int venus_hfi_clk_gating_off(struct venus_hfi_device *device);
+
 static void venus_hfi_dump_packet(u8 *packet)
 {
 	u32 c = 0, packet_size = *(u32 *)packet;
