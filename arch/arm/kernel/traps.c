@@ -297,6 +297,7 @@ void die(const char *str, struct pt_regs *regs, int err)
 	struct thread_info *thread = current_thread_info();
 	int ret;
 	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
+	unsigned long flags;
 
 	oops_enter();
 
@@ -304,7 +305,7 @@ void die(const char *str, struct pt_regs *regs, int err)
 #ifdef CONFIG_SEC_DEBUG
 	secdbg_sched_msg("!!die!!");
 #endif
-	console_verbose();
+	raw_spin_lock_irqsave(&die_lock, flags);
 	bust_spinlocks(1);
 	if (!user_mode(regs))
 		bug_type = report_bug(regs->ARM_pc, regs);
@@ -321,13 +322,13 @@ void die(const char *str, struct pt_regs *regs, int err)
 
 	bust_spinlocks(0);
 	add_taint(TAINT_DIE);
-	raw_spin_unlock_irq(&die_lock);
-	oops_exit();
 
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
 		panic("Fatal exception");
+	raw_spin_unlock_irqrestore(&die_lock, flags);
+	oops_exit();
 	if (ret != NOTIFY_STOP)
 		do_exit(SIGSEGV);
 }
