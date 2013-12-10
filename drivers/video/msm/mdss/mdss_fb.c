@@ -1370,7 +1370,6 @@ static int mdss_fb_open(struct fb_info *info, int user)
 			pr_err("unable to start display thread %d\n",
 				mfd->index);
 			result = PTR_ERR(mfd->disp_thread);
-			mfd->disp_thread = NULL;
 			goto thread_error;
 		}
 
@@ -1390,7 +1389,6 @@ static int mdss_fb_open(struct fb_info *info, int user)
 
 blank_error:
 	kthread_stop(mfd->disp_thread);
-	mfd->disp_thread = NULL;
 
 thread_error:
 	if (pinfo && !pinfo->ref_cnt) {
@@ -1425,6 +1423,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 	list_for_each_entry_safe(pinfo, temp_pinfo, &mfd->proc_list, list) {
 		if (!release_all && (pinfo->pid != pid))
 			continue;
+
 		unknown_pid = false;
 
 		pr_debug("found process %s pid=%d mfd->ref=%d pinfo->ref=%d\n",
@@ -1441,10 +1440,8 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 			pm_runtime_put(info->dev);
 		} while (release_all && pinfo->ref_cnt);
 
-		if (release_all && mfd->disp_thread) {
+		if (release_all)
 			kthread_stop(mfd->disp_thread);
-			mfd->disp_thread = NULL;
-		}
 
 		if (pinfo->ref_cnt == 0) {
 			list_del(&pinfo->list);
@@ -1485,10 +1482,7 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 #if defined(CONFIG_WHITE_PANEL)
 		mdss_fb_set_backlight(mfd, 0);
 #endif
-		if (mfd->disp_thread) {
-			kthread_stop(mfd->disp_thread);
-			mfd->disp_thread = NULL;
-		}
+		kthread_stop(mfd->disp_thread);
 
 		ret = mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info,
 			mfd->op_enable);
