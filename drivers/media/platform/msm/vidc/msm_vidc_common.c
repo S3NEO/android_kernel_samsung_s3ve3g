@@ -526,6 +526,14 @@ static void handle_event_change(enum command_response cmd, void *data)
 					return;
 				}
 
+				if (inst->state == MSM_VIDC_CORE_INVALID ||
+					inst->core->state ==
+						VIDC_CORE_INVALID) {
+					dprintk(VIDC_DBG,
+						"Event release buf ref received in invalid state - discard\n");
+					return;
+				}
+
 				/*
 				* Get the buffer_info entry for the
 				* device address.
