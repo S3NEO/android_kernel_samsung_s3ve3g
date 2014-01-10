@@ -2605,7 +2605,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 
 	pm_runtime_resume(otg->phy->dev);
 	if (motg->pm_done)
-	    pm_runtime_get_sync(otg->phy->dev);
+		pm_runtime_get_sync(otg->phy->dev);
 	pr_debug("%s work\n", otg_state_string(otg->phy->state));
 	switch (otg->phy->state) {
 	case OTG_STATE_UNDEFINED:
@@ -4940,9 +4940,9 @@ static int msm_otg_pm_resume(struct device *dev)
 	struct msm_otg *motg = dev_get_drvdata(dev);
 
 	dev_dbg(dev, "OTG PM resume\n");
+
 	motg->pm_done = 0;
-	if (!motg->host_bus_suspend)
-		atomic_set(&motg->pm_suspended, 0);
+	atomic_set(&motg->pm_suspended, 0);
 	if (motg->async_int || motg->sm_work_pending) {
 		pm_runtime_get_noresume(dev);
 		ret = msm_otg_resume(motg);
