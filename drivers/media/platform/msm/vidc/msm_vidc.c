@@ -264,26 +264,24 @@ err_invalid_input:
 	return ret;
 }
 
-struct msm_smem *get_same_fd_buffer(struct msm_vidc_inst *inst, 
+struct msm_smem *get_same_fd_buffer(struct msm_vidc_inst *inst,
 			struct list_head *list, int fd)
 {
 	struct buffer_info *temp;
-	struct msm_smem *same_fd_handle = NULL;  
+	struct msm_smem *same_fd_handle = NULL;
 
 	int i;
 	if (fd == 0)
 		return NULL;
-
 	if (!list || fd < 0) {
 		dprintk(VIDC_ERR, "Invalid input\n");
 		goto err_invalid_input;
 	}
-
 	mutex_lock(&inst->lock);
 	list_for_each_entry(temp, list, list) {
 		for (i = 0; (i < temp->num_planes)
 			&& (i < VIDEO_MAX_PLANES); i++) {
-			if (temp && (temp->fd[i] == fd) &&		
+			if (temp && (temp->fd[i] == fd) &&
 				temp->handle[i] && temp->mapped[i])  {
 				temp->same_fd_ref[i]++;
 				dprintk(VIDC_INFO,
@@ -292,7 +290,7 @@ struct msm_smem *get_same_fd_buffer(struct msm_vidc_inst *inst,
 				break;
 			}
 		}
-		if (same_fd_handle) 
+		if (same_fd_handle)
 			break;
 	}
 	mutex_unlock(&inst->lock);
@@ -501,14 +499,14 @@ int map_and_register_buf(struct msm_vidc_inst *inst, struct v4l2_buffer *b)
 		if (rc < 0)
 			goto exit;
 
-		same_fd_handle = get_same_fd_buffer(inst,	   
-					&inst->registered_bufs, 				 
-					b->m.planes[i].reserved[0]);			 
+		same_fd_handle = get_same_fd_buffer(inst,
+					&inst->registered_bufs,
+					b->m.planes[i].reserved[0]);
 
 		populate_buf_info(binfo, b, i);
-		if (same_fd_handle) {	
+		if (same_fd_handle) {
 			binfo->device_addr[i] =
-			same_fd_handle->device_addr + binfo->buff_off[i]; 
+			same_fd_handle->device_addr + binfo->buff_off[i];
 			b->m.planes[i].m.userptr = binfo->device_addr[i];
 			binfo->mapped[i] = false;
 			binfo->handle[i] = same_fd_handle;
