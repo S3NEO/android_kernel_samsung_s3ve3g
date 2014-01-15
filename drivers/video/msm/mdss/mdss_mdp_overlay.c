@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2728,8 +2728,8 @@ int mdss_panel_register_done(struct mdss_panel_data *pdata)
 	 */
 	if (pdata->panel_info.cont_splash_enabled && first_register) {
 		pr_info("%s ++ \n", __func__);
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 		mdss_mdp_footswitch_ctrl_splash(1);
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 #ifdef CONFIG_FB_MSM_EDP_SAMSUNG
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 #endif
