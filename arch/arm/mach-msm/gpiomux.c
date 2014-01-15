@@ -1,4 +1,4 @@
-/* Copyright (c) 2010,2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010,2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -256,6 +256,11 @@ int msm_gpiomux_put(unsigned gpio)
 	return 0;
 }
 EXPORT_SYMBOL(msm_gpiomux_put);
+
+int msm_tlmm_misc_reg_read(enum msm_tlmm_misc_reg misc_reg)
+{
+	return readl_relaxed(MSM_TLMM_BASE + misc_reg);
+}
 
 #ifdef CONFIG_SEC_PM_DEBUG
 static const char * const gpiomux_drv_str[] = {
