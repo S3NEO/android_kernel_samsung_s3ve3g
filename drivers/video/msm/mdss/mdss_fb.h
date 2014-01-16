@@ -296,4 +296,5 @@ int mdss_fb_register_mdp_instance(struct msm_mdp_interface *mdp);
 void mdss_negative_color(int is_negative_on);
 #endif
 int mdss_fb_dcm(struct msm_fb_data_type *mfd, int req_state);
+int mdss_fb_suspres_panel(struct device *dev, void *data);
 #endif /* MDSS_FB_H */
