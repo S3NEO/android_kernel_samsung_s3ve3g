@@ -682,6 +682,7 @@ static int mdss_mdp_pipe_free(struct mdss_mdp_pipe *pipe)
 
 	pipe->flags = 0;
 	pipe->bwc_mode = 0;
+	pipe->mfd = NULL;
 
 	return 0;
 }
