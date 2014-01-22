@@ -324,8 +324,7 @@ static uint64_t get_node_maxib(struct msm_bus_inode_info *info)
 	}
 
 	MSM_BUS_DBG("%s: Node %d numpnodes %d maxib %llu", __func__,
-	info->num_pnodes, info->node_info->id, maxib);
-
+		info->num_pnodes, info->node_info->id, maxib);
 	return maxib;
 }
 
