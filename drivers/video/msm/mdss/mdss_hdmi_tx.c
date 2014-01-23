@@ -2729,6 +2729,11 @@ static int hdmi_tx_power_on(struct mdss_panel_data *panel_data)
 	mutex_lock(&hdmi_ctrl->mutex);
 	hdmi_ctrl->panel_power_on = true;
 	mutex_unlock(&hdmi_ctrl->mutex);
+
+	if (hdmi_ctrl->pdata.primary) {
+		if (hdmi_tx_enable_power(hdmi_ctrl, HDMI_TX_DDC_PM, true))
+			DEV_ERR("%s: Failed to enable ddc power\n", __func__);
+	}
 #ifdef MHL_CEC_SUPPORT
 	hdmi_cec_config(hdmi_ctrl->feature_data[HDMI_TX_FEAT_CEC]);
 #endif
