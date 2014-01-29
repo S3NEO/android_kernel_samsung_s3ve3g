@@ -20,3 +20,9 @@
 	compatible = "qcom,msm8974-fluid", "qcom,msm8974", "qcom,fluid";
 	qcom,board-id = <3 0>;
 };
+
+
+	hbtp {
+		compatible = "qcom,hbtp";
+		vcc_ana-supply = <&pm8941_l18>;
+	};
