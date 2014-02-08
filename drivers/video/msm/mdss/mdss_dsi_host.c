@@ -277,8 +277,6 @@ void mdss_dsi_host_init(struct mipi_panel_info *pinfo,
 
 	pinfo->rgb_swap = DSI_RGB_SWAP_RGB;
 
-	ctrl_pdata->panel_mode = pinfo->mode;
-
 	if (pinfo->mode == DSI_VIDEO_MODE) {
 		data = 0;
 		if (pinfo->pulse_mode_hsa_he)
