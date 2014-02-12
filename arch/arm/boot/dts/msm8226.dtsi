@@ -1589,6 +1589,7 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		qcom,hw-settle-time = <2>;
 		qcom,fast-avg-setup = <3>;
 		qcom,btm-channel-number = <0x48>;
+		qcom,meas-interval-timer-idx = <2>;
 	};
 
 	chan@8 {
