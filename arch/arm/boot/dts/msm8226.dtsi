@@ -555,6 +555,10 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		compatible = "qcom,msm-lsm-client";
 	};
 
+	qti,msm-pcm-loopback {
+		compatible = "qti,msm-pcm-loopback";
+	};
+
 	qcom,msm-dai-q6 {
 		compatible = "qcom,msm-dai-q6";
 		qcom,msm-dai-q6-sb-0-rx {
