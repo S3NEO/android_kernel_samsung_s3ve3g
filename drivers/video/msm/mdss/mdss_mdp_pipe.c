@@ -73,7 +73,7 @@ if (pipe->src_fmt->is_yuv || (pipe->flags & MDP_BACKEND_COMPOSITION)) {
 		return 0;
 	}
 #else	
-	if (i != 0 && n != i) {
+	if (i != 0 && n != i && !force_alloc) {
 		pr_debug("Can't change mmb configuration in set call\n");
 		return 0;
 	}
@@ -271,6 +271,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	 * allow SMP allocations to prevent composition failures.
 	 */
 	force_alloc = !(pipe->flags & MDP_BACKEND_COMPOSITION);
+
 	mutex_lock(&mdss_mdp_smp_lock);
 	if (pipe->src_fmt->is_yuv || (pipe->flags & MDP_BACKEND_COMPOSITION)) {
 	for (i = (MAX_PLANES - 1); i >= ps.num_planes; i--) {
