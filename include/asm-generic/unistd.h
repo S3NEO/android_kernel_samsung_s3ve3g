@@ -695,7 +695,7 @@ __SC_COMP(__NR_process_vm_writev, sys_process_vm_writev, \
 __SYSCALL(__NR_seccomp, sys_seccomp)
 
 #undef __NR_syscalls
-#define __NR_syscalls 272
+#define __NR_syscalls 278
 
 /*
  * All syscalls below here should go away really,
