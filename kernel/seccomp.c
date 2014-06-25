@@ -838,14 +838,12 @@ static long seccomp_set_mode_strict(void)
 long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
 static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
 {
+	const unsigned long seccomp_mode = SECCOMP_MODE_STRICT;
 	long ret = -EINVAL;
 
 	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
 
-	switch (seccomp_mode) {
-	case SECCOMP_MODE_STRICT:
-		ret = 0;
 #ifdef TIF_NOTSC
 	disable_TSC();
 #endif
@@ -854,6 +852,10 @@ static long seccomp_set_mode(unsigned long seccomp_mode, char __user *filter)
 
 out:
 	spin_unlock_irq(&current->sighand->siglock);
+	seccomp_assign_mode(seccomp_mode);
+	ret = 0;
+
+out:
 
 	return ret;
 }
@@ -916,15 +918,29 @@ out_free:
 	seccomp_filter_free(prepared);
 		break;
 #ifdef CONFIG_SECCOMP_FILTER
-	case SECCOMP_MODE_FILTER:
-		ret = seccomp_attach_user_filter(filter);
-		if (ret)
-			goto out;
-		break;
-#endif
-	default:
+/**
+ * seccomp_set_mode_filter: internal function for setting seccomp filter
+ * @filter: struct sock_fprog containing filter
+ *
+ * This function may be called repeatedly to install additional filters.
+ * Every filter successfully installed will be evaluated (in reverse order)
+ * for each system call the task makes.
+ *
+ * Once current->seccomp.mode is non-zero, it may not be changed.
+ *
+ * Returns 0 on success or -EINVAL on failure.
+ */
+static long seccomp_set_mode_filter(char __user *filter)
+{
+	const unsigned long seccomp_mode = SECCOMP_MODE_FILTER;
+	long ret = -EINVAL;
+
+	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
-	}
+
+	ret = seccomp_attach_user_filter(filter);
+	if (ret)
+		goto out;
 
 	seccomp_assign_mode(seccomp_mode);
 out:
@@ -933,6 +949,7 @@ out:
 #else
 static inline long seccomp_set_mode_filter(unsigned int flags,
 					   const char __user *filter)
+static inline long seccomp_set_mode_filter(char __user *filter)
 {
 	return -EINVAL;
 }
@@ -993,4 +1010,12 @@ long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
 	/* prctl interface doesn't have flags, so they are always zero. */
 	return do_seccomp(op, 0, uargs);
 	return seccomp_set_mode(seccomp_mode, filter);
+	switch (seccomp_mode) {
+	case SECCOMP_MODE_STRICT:
+		return seccomp_set_mode_strict();
+	case SECCOMP_MODE_FILTER:
+		return seccomp_set_mode_filter(filter);
+	default:
+		return -EINVAL;
+	}
 }
