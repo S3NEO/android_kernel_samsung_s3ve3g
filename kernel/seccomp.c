@@ -498,6 +498,7 @@ seccomp_prepare_user_filter(const char __user *user_filter)
 	struct sock_fprog fprog;
 	struct seccomp_filter *filter = ERR_PTR(-EFAULT);
 long seccomp_attach_user_filter(char __user *user_filter)
+static long seccomp_attach_user_filter(const char __user *user_filter)
 {
 	struct sock_fprog fprog;
 	long ret = -EFAULT;
@@ -930,10 +931,15 @@ out_free:
  *
  * Returns 0 on success or -EINVAL on failure.
  */
-static long seccomp_set_mode_filter(char __user *filter)
+static long seccomp_set_mode_filter(unsigned int flags,
+				    const char __user *filter)
 {
 	const unsigned long seccomp_mode = SECCOMP_MODE_FILTER;
 	long ret = -EINVAL;
+
+	/* Validate flags. */
+	if (flags != 0)
+		goto out;
 
 	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
@@ -1012,10 +1018,22 @@ long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
 	return seccomp_set_mode(seccomp_mode, filter);
 	switch (seccomp_mode) {
 	case SECCOMP_MODE_STRICT:
-		return seccomp_set_mode_strict();
+		op = SECCOMP_SET_MODE_STRICT;
+		/*
+		 * Setting strict mode through prctl always ignored filter,
+		 * so make sure it is always NULL here to pass the internal
+		 * check in do_seccomp().
+		 */
+		uargs = NULL;
+		break;
 	case SECCOMP_MODE_FILTER:
-		return seccomp_set_mode_filter(filter);
+		op = SECCOMP_SET_MODE_FILTER;
+		uargs = filter;
+		break;
 	default:
 		return -EINVAL;
 	}
+
+	/* prctl interface doesn't have flags, so they are always zero. */
+	return do_seccomp(op, 0, uargs);
 }
