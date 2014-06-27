@@ -88,7 +88,7 @@ static inline int secure_computing(int this_syscall)
  *          are allowed for a task.
  *
  *          @filter must only be accessed from the context of current as there
- *          is no locking.
+ *          is no read locking.
  */
 struct seccomp {
 	int mode;

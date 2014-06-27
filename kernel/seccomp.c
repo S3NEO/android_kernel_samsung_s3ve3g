@@ -389,6 +389,8 @@ static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 
 static inline bool seccomp_may_assign_mode(unsigned long seccomp_mode)
 {
+	BUG_ON(!spin_is_locked(&current->sighand->siglock));
+
 	if (current->seccomp.mode && current->seccomp.mode != seccomp_mode)
 		return false;
 
@@ -397,6 +399,8 @@ static inline bool seccomp_may_assign_mode(unsigned long seccomp_mode)
 
 static inline void seccomp_assign_mode(unsigned long seccomp_mode)
 {
+	BUG_ON(!spin_is_locked(&current->sighand->siglock));
+
 	current->seccomp.mode = seccomp_mode;
 	set_tsk_thread_flag(current, TIF_SECCOMP);
 }
@@ -580,6 +584,8 @@ static long seccomp_attach_filter(unsigned int flags,
 {
 	unsigned long total_insns;
 	struct seccomp_filter *walker;
+
+	BUG_ON(!spin_is_locked(&current->sighand->siglock));
 
 	/* Validate resulting filter length. */
 	total_insns = filter->len;
@@ -886,6 +892,7 @@ out:
 	ret = 0;
 
 out:
+	spin_unlock_irq(&current->sighand->siglock);
 
 	return ret;
 }
@@ -968,12 +975,14 @@ static long seccomp_set_mode_filter(unsigned int flags,
 
 	/* Validate flags. */
 	if (flags != 0)
-		goto out;
+		return -EINVAL;
 
 	/* Prepare the new filter before holding any locks. */
 	prepared = seccomp_prepare_user_filter(filter);
 	if (IS_ERR(prepared))
 		return PTR_ERR(prepared);
+
+	spin_lock_irq(&current->sighand->siglock);
 
 	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
@@ -986,6 +995,7 @@ static long seccomp_set_mode_filter(unsigned int flags,
 
 	seccomp_assign_mode(seccomp_mode);
 out:
+	spin_unlock_irq(&current->sighand->siglock);
 	seccomp_filter_free(prepared);
 	return ret;
 }
