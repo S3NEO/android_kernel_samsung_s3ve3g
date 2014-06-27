@@ -31,7 +31,6 @@
 #include <linux/security.h>
 #include <linux/ptrace.h>
 #include <linux/security.h>
-#include <linux/slab.h>
 #include <linux/tracehook.h>
 #include <linux/uaccess.h>
 
@@ -404,12 +403,12 @@ static inline void seccomp_assign_mode(unsigned long seccomp_mode)
 
 #ifdef CONFIG_SECCOMP_FILTER
 /**
- * seccomp_attach_filter: Attaches a seccomp filter to current.
+ * seccomp_prepare_filter: Prepares a seccomp filter for use.
  * @fprog: BPF program to install
  *
- * Returns 0 on success or an errno on failure.
+ * Returns filter on success or an ERR_PTR on failure.
  */
-static long seccomp_attach_filter(struct sock_fprog *fprog)
+static struct seccomp_filter *seccomp_prepare_filter(struct sock_fprog *fprog)
 {
 	struct seccomp_filter *filter;
 	unsigned long fp_size = fprog->len * sizeof(struct sock_filter);
@@ -483,11 +482,11 @@ fail:
 	return 0;
 fail:
 	kfree(filter);
-	return ret;
+	return ERR_PTR(ret);
 }
 
 /**
- * seccomp_attach_user_filter - attaches a user-supplied sock_fprog
+ * seccomp_prepare_user_filter - prepares a user-supplied sock_fprog
  * @user_filter: pointer to the user data containing a sock_fprog.
  *
  * Returns 0 on success and non-zero otherwise.
@@ -501,7 +500,7 @@ long seccomp_attach_user_filter(char __user *user_filter)
 static long seccomp_attach_user_filter(const char __user *user_filter)
 {
 	struct sock_fprog fprog;
-	long ret = -EFAULT;
+	struct seccomp_filter *filter = ERR_PTR(-EFAULT);
 
 #ifdef CONFIG_COMPAT
 	if (is_compat_task()) {
@@ -566,7 +565,37 @@ static long seccomp_attach_filter(unsigned int flags,
 	return 0;
 	ret = seccomp_attach_filter(&fprog);
 out:
-	return ret;
+	return filter;
+}
+
+/**
+ * seccomp_attach_filter: validate and attach filter
+ * @flags:  flags to change filter behavior
+ * @filter: seccomp filter to add to the current process
+ *
+ * Returns 0 on success, -ve on error.
+ */
+static long seccomp_attach_filter(unsigned int flags,
+				  struct seccomp_filter *filter)
+{
+	unsigned long total_insns;
+	struct seccomp_filter *walker;
+
+	/* Validate resulting filter length. */
+	total_insns = filter->len;
+	for (walker = current->seccomp.filter; walker; walker = walker->prev)
+		total_insns += walker->len + 4;  /* 4 instr penalty */
+	if (total_insns > MAX_INSNS_PER_PATH)
+		return -ENOMEM;
+
+	/*
+	 * If there is an existing filter, make it the prev and don't drop its
+	 * task reference.
+	 */
+	filter->prev = current->seccomp.filter;
+	current->seccomp.filter = filter;
+
+	return 0;
 }
 
 /* get_seccomp_filter - increments the reference count of the filter on @tsk */
@@ -941,15 +970,23 @@ static long seccomp_set_mode_filter(unsigned int flags,
 	if (flags != 0)
 		goto out;
 
+	/* Prepare the new filter before holding any locks. */
+	prepared = seccomp_prepare_user_filter(filter);
+	if (IS_ERR(prepared))
+		return PTR_ERR(prepared);
+
 	if (!seccomp_may_assign_mode(seccomp_mode))
 		goto out;
 
-	ret = seccomp_attach_user_filter(filter);
+	ret = seccomp_attach_filter(flags, prepared);
 	if (ret)
 		goto out;
+	/* Do not free the successfully attached filter. */
+	prepared = NULL;
 
 	seccomp_assign_mode(seccomp_mode);
 out:
+	seccomp_filter_free(prepared);
 	return ret;
 }
 #else
