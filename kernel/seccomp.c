@@ -501,8 +501,8 @@ static inline void seccomp_sync_threads(void)
 		 * allows a put before the assignment.)
 		 */
 		put_seccomp_filter(thread);
-		smp_store_release(&thread->seccomp.filter,
-				  caller->seccomp.filter);
+		smp_mb();
+		ACCESS_ONCE(thread->seccomp.filter) = caller->seccomp.filter;
 		/*
 		 * Opt the other thread into seccomp if needed.
 		 * As threads are considered to be trust-realm
