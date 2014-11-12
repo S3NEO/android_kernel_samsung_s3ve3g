@@ -1948,6 +1948,9 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);
 
+	if (target_freq == policy->cur)
+		return 0;
+
 	if (cpu_online(policy->cpu) && cpufreq_driver->target)
 		retval = cpufreq_driver->target(policy, target_freq, relation);
 
@@ -1975,11 +1978,16 @@ EXPORT_SYMBOL_GPL(cpufreq_driver_target);
 
 int __cpufreq_driver_getavg(struct cpufreq_policy *policy, unsigned int cpu)
 {
-	if (cpufreq_disabled())
+	int ret = 0;
+
+	if (!(cpu_online(cpu) && cpufreq_driver->getavg))
 		return 0;
 
-	if (!cpufreq_driver->getavg)
-		return 0;
+	policy = cpufreq_cpu_get(policy->cpu);
+	if (!policy)
+		return -EINVAL;
+
+	ret = cpufreq_driver->getavg(policy, cpu);
 
 	return cpufreq_driver->getavg(policy, cpu);
 }
