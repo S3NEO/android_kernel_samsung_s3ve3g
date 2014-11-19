@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -138,7 +138,7 @@ static void wait_callback(struct kgsl_device *device, void *priv, u32 id,
 		u32 timestamp, u32 type)
 {
 	struct adreno_context *drawctxt = priv;
-	wake_up_interruptible_all(&drawctxt->waiting);
+	wake_up_all(&drawctxt->waiting);
 }
 
 #define adreno_wait_event_interruptible_timeout(wq, condition, timeout, io)   \
@@ -266,20 +266,18 @@ static void global_wait_callback(struct kgsl_device *device, void *priv, u32 id,
 {
 	struct adreno_context *drawctxt = priv;
 
-	wake_up_interruptible_all(&drawctxt->waiting);
+	wake_up_all(&drawctxt->waiting);
 	kgsl_context_put(&drawctxt->base);
 }
 
 static int _check_global_timestamp(struct kgsl_device *device,
-		unsigned int timestamp)
+	struct adreno_context *drawctxt, unsigned int timestamp)
 {
-	int ret;
+	/* Stop waiting if the context is invalidated */
+	if (drawctxt->state == ADRENO_CONTEXT_STATE_INVALID)
+	 return 1;
 
-	mutex_lock(&device->mutex);
-	ret = kgsl_check_timestamp(device, NULL, timestamp);
-	mutex_unlock(&device->mutex);
-
-	return ret;
+	return kgsl_check_timestamp(device, NULL, timestamp);
 }
 
 int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
@@ -288,7 +286,7 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 {
 	struct kgsl_device *device = &adreno_dev->dev;
 	struct adreno_context *drawctxt = ADRENO_CONTEXT(context);
-	int ret;
+	int ret = 0;
 
 	/* Needs to hold the device mutex */
 	BUG_ON(!mutex_is_locked(&device->mutex));
@@ -297,7 +295,14 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 		ret = -EINVAL;
 		goto done;
 	}
-
+	/*
+	 * If the context is invalid then return immediately - we may end up
+	 * waiting for a timestamp that will never come
+	 */
+	if (drawctxt->state == ADRENO_CONTEXT_STATE_INVALID) {
+		kgsl_context_put(context);
+		goto done;
+	}
 	trace_adreno_drawctxt_wait_start(KGSL_MEMSTORE_GLOBAL, timestamp);
 
 	ret = kgsl_add_event(device, KGSL_MEMSTORE_GLOBAL, timestamp,
@@ -310,8 +315,8 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 	mutex_unlock(&device->mutex);
 
 	if (timeout) {
-		ret = (int) wait_event_interruptible_timeout(drawctxt->waiting,
-			_check_global_timestamp(device, timestamp),
+		ret = (int) wait_event_timeout(drawctxt->waiting,
+		_check_global_timestamp(device, drawctxt, timestamp),
 			msecs_to_jiffies(timeout));
 
 		if (ret == 0)
@@ -319,8 +324,8 @@ int adreno_drawctxt_wait_global(struct adreno_device *adreno_dev,
 		else if (ret > 0)
 			ret = 0;
 	} else {
-		ret = (int) wait_event_interruptible(drawctxt->waiting,
-			_check_global_timestamp(device, timestamp));
+		wait_event(drawctxt->waiting,
+		_check_global_timestamp(device, drawctxt, timestamp));
 	}
 
 	mutex_lock(&device->mutex);
@@ -386,8 +391,8 @@ void adreno_drawctxt_invalidate(struct kgsl_device *device,
 	mutex_unlock(&drawctxt->mutex);
 
 	/* Give the bad news to everybody waiting around */
-	wake_up_interruptible_all(&drawctxt->waiting);
-	wake_up_interruptible_all(&drawctxt->wq);
+	wake_up_all(&drawctxt->waiting);
+	wake_up_all(&drawctxt->wq);
 }
 
 /**
@@ -425,11 +430,13 @@ adreno_drawctxt_create(struct kgsl_device_private *dev_priv,
 		KGSL_CONTEXT_PER_CONTEXT_TS |
 		KGSL_CONTEXT_USER_GENERATED_TS |
 		KGSL_CONTEXT_NO_FAULT_TOLERANCE |
-		KGSL_CONTEXT_TYPE_MASK);
+		KGSL_CONTEXT_TYPE_MASK |
+		KGSL_CONTEXT_PWR_CONSTRAINT);
 
 	/* Always enable per-context timestamps */
 	drawctxt->base.flags |= KGSL_CONTEXT_PER_CONTEXT_TS;
-
+	drawctxt->type = (drawctxt->base.flags & KGSL_CONTEXT_TYPE_MASK)
+		>> KGSL_CONTEXT_TYPE_SHIFT;
 	mutex_init(&drawctxt->mutex);
 	init_waitqueue_head(&drawctxt->wq);
 	init_waitqueue_head(&drawctxt->waiting);
@@ -542,6 +549,13 @@ int adreno_drawctxt_detach(struct kgsl_context *context)
 	/* Wait for the last global timestamp to pass before continuing */
 	ret = adreno_drawctxt_wait_global(adreno_dev, context,
 		drawctxt->internal_timestamp, 10 * 1000);
+	/*
+	 * If the wait for global fails then nothing after this point is likely
+	 * to work very well - BUG_ON() so we can take advantage of the debug
+	 * tools to figure out what the h - e - double hockey sticks happened
+	 */
+
+	BUG_ON(ret);
 
 	kgsl_sharedmem_writel(device, &device->memstore,
 			KGSL_MEMSTORE_OFFSET(context->id, soptimestamp),
@@ -557,8 +571,8 @@ int adreno_drawctxt_detach(struct kgsl_context *context)
 		drawctxt->ops->detach(drawctxt);
 
 	/* wake threads waiting to submit commands from this context */
-	wake_up_interruptible_all(&drawctxt->waiting);
-	wake_up_interruptible_all(&drawctxt->wq);
+	wake_up_all(&drawctxt->waiting);
+	wake_up_all(&drawctxt->wq);
 
 	return ret;
 }

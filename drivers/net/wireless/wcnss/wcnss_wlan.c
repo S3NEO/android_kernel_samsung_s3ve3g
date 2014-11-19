@@ -39,9 +39,14 @@
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <mach/subsystem_restart.h>
+#include <mach/subsystem_notif.h>
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include "wcnss_prealloc.h"
+#endif
+
+#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
+#include <mach/board.h>
 #endif
 
 #define DEVICE "wcnss_wlan"
@@ -377,6 +382,7 @@ static struct {
 	struct qpnp_adc_tm_btm_param vbat_monitor_params;
 	struct qpnp_adc_tm_chip *adc_tm_dev;
 	struct mutex vbat_monitor_mutex;
+        void *wcnss_notif_hdle;
 } *penv = NULL;
 
 static ssize_t wcnss_serial_number_show(struct device *dev,
@@ -685,11 +691,52 @@ void wcnss_pronto_log_debug_regs(void)
 }
 EXPORT_SYMBOL(wcnss_pronto_log_debug_regs);
 
+#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
+static void wcnss_log_iris_regs(void)
+{
+	int i;
+	u32 reg_val;
+	u32 regs_array[] = {
+		0x04, 0x05, 0x11, 0x1e, 0x40, 0x48,
+		0x49, 0x4b, 0x00, 0x01, 0x4d};
+
+	pr_info("IRIS Registers [address] : value\n");
+
+	for (i = 0; i < ARRAY_SIZE(regs_array); i++) {
+		reg_val = wcnss_rf_read_reg(regs_array[i]);
+		pr_info("[0x%08x] : 0x%08x\n", regs_array[i], reg_val);
+	}
+}
+#endif
+
 #ifdef CONFIG_WCNSS_REGISTER_DUMP_ON_BITE
 void wcnss_log_debug_regs_on_bite(void)
 {
-	if (wcnss_hardware_type() == WCNSS_PRONTO_HW)
-		wcnss_pronto_log_debug_regs();
+	struct platform_device *pdev = wcnss_get_platform_device();
+	struct clk *measure;
+	struct clk *wcnss_debug_mux;
+	unsigned long clk_rate;
+
+	if (wcnss_hardware_type() != WCNSS_PRONTO_HW)
+		return;
+
+	measure = clk_get(&pdev->dev, "measure");
+	wcnss_debug_mux = clk_get(&pdev->dev, "wcnss_debug");
+
+	if (!IS_ERR(measure) && !IS_ERR(wcnss_debug_mux)) {
+		clk_set_parent(measure, wcnss_debug_mux);
+		clk_rate = clk_get_rate(measure);
+		pr_debug("wcnss: clock frequency is: %luHz\n", clk_rate);
+
+		if (clk_rate){
+			wcnss_pronto_log_debug_regs();
+		} else {
+			pr_err("clock frequency is zero, cannot access PMU or other registers\n");
+#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
+                        wcnss_log_iris_regs();
+#endif
+                }
+	}
 }
 #endif
 
@@ -1587,7 +1634,9 @@ static void wcnss_nvbin_dnld(void)
 	const struct firmware *nv = NULL;
 	struct device *dev = &penv->pdev->dev;
 
+  pr_err("wcnss: wcnss_nvbin_dnld \n");
 	down_read(&wcnss_pm_sem);
+  pr_err("wcnss: request_firmware \n");
 
 	ret = request_firmware(&nv, NVBIN_FILE, dev);
 
@@ -1606,8 +1655,8 @@ static void wcnss_nvbin_dnld(void)
 
 	total_fragments = TOTALFRAGMENTS(nv_blob_size);
 
-	pr_info("wcnss: NV bin size: %d, total_fragments: %d\n",
-		nv_blob_size, total_fragments);
+  pr_err("wcnss: NV bin size: %d, total_fragments: %d\n",
+  nv_blob_size, total_fragments);
 
 	/* get buffer for nv bin dnld req message */
 	outbuffer = kmalloc((sizeof(struct nvbin_dnld_req_msg) +
@@ -2270,6 +2319,20 @@ exit:
 }
 
 
+static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,void *ss_handle)
+{
+        pr_debug("%s: wcnss notification event: %lu\n", __func__, code);
+
+        if (SUBSYS_POWERUP_FAILURE == code)
+                wcnss_pronto_log_debug_regs();
+
+        return NOTIFY_DONE;
+}	
+
+static struct notifier_block wnb = {
+        .notifier_call = wcnss_notif_cb,
+};
+
 static const struct file_operations wcnss_node_fops = {
 	.owner = THIS_MODULE,
 	.open = wcnss_node_open,
@@ -2309,6 +2372,13 @@ wcnss_wlan_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
+        /* register wcnss event notification */
+        penv->wcnss_notif_hdle = subsys_notif_register_notifier("wcnss", &wnb);
+        if (IS_ERR(penv->wcnss_notif_hdle)) {
+                pr_err("wcnss: register event notification failed!\n");
+                return PTR_ERR(penv->wcnss_notif_hdle);
+        }
+
 	mutex_init(&penv->dev_lock);
 	mutex_init(&penv->ctrl_lock);
 	mutex_init(&penv->vbat_monitor_mutex);
@@ -2333,6 +2403,8 @@ wcnss_wlan_probe(struct platform_device *pdev)
 static int __devexit
 wcnss_wlan_remove(struct platform_device *pdev)
 {
+        if (penv->wcnss_notif_hdle)
+                subsys_notif_unregister_notifier(penv->wcnss_notif_hdle, &wnb);
 	wcnss_remove_sysfs(&pdev->dev);
 	penv = NULL;
 	return 0;

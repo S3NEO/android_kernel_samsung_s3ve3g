@@ -60,10 +60,13 @@ struct mdss_mdp_wb_data {
 	struct msmfb_data buf_info;
 	struct mdss_mdp_data buf_data;
 	int state;
+	bool user_alloc;
 };
 
 static DEFINE_MUTEX(mdss_mdp_wb_buf_lock);
 static struct mdss_mdp_wb mdss_mdp_wb_info;
+
+static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node);
 
 #ifdef DEBUG_WRITEBACK
 /* for debugging: writeback output buffer to allocated memory */
@@ -284,6 +287,7 @@ static int mdss_mdp_wb_terminate(struct msm_fb_data_type *mfd)
 		struct mdss_mdp_wb_data *node, *temp;
 		list_for_each_entry_safe(node, temp, &wb->register_queue,
 					 registered_entry) {
+			mdss_mdp_wb_free_node(node);
 			list_del(&node->registered_entry);
 			kfree(node);
 		}
@@ -338,12 +342,13 @@ static int mdss_mdp_wb_stop(struct msm_fb_data_type *mfd)
 static int mdss_mdp_wb_register_node(struct mdss_mdp_wb *wb,
 				     struct mdss_mdp_wb_data *node)
 {
-	node->state = REGISTERED;
-	list_add_tail(&node->registered_entry, &wb->register_queue);
 	if (!node) {
 		pr_err("Invalid wb node\n");
 		return -EINVAL;
 	}
+
+	node->state = REGISTERED;
+	list_add_tail(&node->registered_entry, &wb->register_queue);
 
 	return 0;
 }
@@ -394,7 +399,9 @@ static struct mdss_mdp_wb_data *get_local_node(struct mdss_mdp_wb *wb,
 static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 						struct msmfb_data *data)
 {
-
+#if defined(CONFIG_FB_MSM_CMD_MODE)
+	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd); 
+#endif
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_wb_data *node;
 	struct mdss_mdp_img_data *buf;
@@ -406,10 +413,17 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 		return NULL;
 	}
 
+	node->user_alloc = true;
 	node->buf_data.num_planes = 1;
 	buf = &node->buf_data.p[0];
 	if (wb->is_secure)
 		buf->flags |= MDP_SECURE_OVERLAY_SESSION;
+
+#if defined(CONFIG_FB_MSM_CMD_MODE)
+	if (!is_mdss_iommu_attached()) 
+		mdss_iommu_attach(ctl->mdata); 
+#endif
+
 	ret = mdss_mdp_get_img(data, buf);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("error getting buffer info\n");
@@ -431,6 +445,22 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 register_fail:
 	kfree(node);
 	return NULL;
+}
+
+static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
+{
+	struct mdss_mdp_img_data *buf;
+
+	if (node->user_alloc) {
+		buf = &node->buf_data.p[0];
+		pr_debug("free user node mem_id=%d offset=%u addr=0x%x\n",
+				node->buf_info.memory_id,
+				node->buf_info.offset,
+				buf->addr);
+
+		mdss_mdp_put_img(&node->buf_data.p[0]);
+		node->user_alloc = false;
+	}
 }
 
 static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
@@ -524,7 +554,9 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 	struct mdss_mdp_wb_data *node = NULL;
 	int ret = 0;
-	struct mdss_mdp_writeback_arg wb_args;
+	struct mdss_mdp_writeback_arg wb_args = {
+		.data = NULL,
+	};
 
 	if (!ctl->power_on)
 		return 0;
@@ -607,78 +639,31 @@ int mdss_mdp_wb_set_mirr_hint(struct msm_fb_data_type *mfd, int hint)
 int mdss_mdp_wb_get_format(struct msm_fb_data_type *mfd,
 					struct mdp_mixer_cfg *mixer_cfg)
 {
-	int dst_format;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
 	if (!ctl) {
 		pr_err("No panel data!\n");
 		return -EINVAL;
-	}
+	} else {
+		mixer_cfg->writeback_format = ctl->dst_format;
+ 	}
 
-	switch (ctl->dst_format) {
-	case MDP_RGB_888:
-		dst_format = WB_FORMAT_RGB_888;
-		break;
-	case MDP_RGB_565:
-		dst_format = WB_FORMAT_RGB_565;
-		break;
-	case MDP_XRGB_8888:
-		dst_format = WB_FORMAT_xRGB_8888;
-		break;
-	case MDP_ARGB_8888:
-		dst_format = WB_FORMAT_ARGB_8888;
-		break;
-	case MDP_BGRA_8888:
-		dst_format = WB_FORMAT_BGRA_8888;
-		break;
-	case MDP_BGRX_8888:
-		dst_format = WB_FORMAT_BGRX_8888;
-		break;
-	case MDP_Y_CBCR_H2V2_VENUS:
-		dst_format = WB_FORMAT_NV12;
-		break;
-	default:
-		return -EINVAL;
-	}
-	mixer_cfg->writeback_format = dst_format;
 	return 0;
 }
 
-int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, int dst_format)
+int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, u32 dst_format)
 {
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
 	if (!ctl) {
 		pr_err("No panel data!\n");
 		return -EINVAL;
-	}
-
-	switch (dst_format) {
-	case WB_FORMAT_RGB_888:
-		ctl->dst_format = MDP_RGB_888;
-		break;
-	case WB_FORMAT_RGB_565:
-		ctl->dst_format = MDP_RGB_565;
-		break;
-	case WB_FORMAT_xRGB_8888:
-		ctl->dst_format = MDP_XRGB_8888;
-		break;
-	case WB_FORMAT_ARGB_8888:
-		ctl->dst_format = MDP_ARGB_8888;
-		break;
-	case WB_FORMAT_BGRA_8888:
-		ctl->dst_format = MDP_BGRA_8888;
-		break;
-	case WB_FORMAT_BGRX_8888:
-		ctl->dst_format = MDP_BGRX_8888;
-		break;
-	case WB_FORMAT_NV12:
-		ctl->dst_format = MDP_Y_CBCR_H2V2_VENUS;
-		break;
-	default:
-		pr_err("wfd format not supported\n");
+	} else if (dst_format >= MDP_IMGTYPE_LIMIT2) {
+		pr_err("Invalid dst format=%u\n", dst_format);
 		return -EINVAL;
-	}
+	} else {
+		ctl->dst_format = dst_format;
+ 	}
 
 	pr_debug("wfd format %d\n", ctl->dst_format);
 	return 0;

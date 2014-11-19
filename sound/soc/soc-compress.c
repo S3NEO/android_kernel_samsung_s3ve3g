@@ -95,7 +95,7 @@ static int soc_compr_open_fe(struct snd_compr_stream *cstream)
 	else
 		stream = SNDRV_PCM_STREAM_CAPTURE;
 
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
+	mutex_lock(&fe->card->dpcm_mutex);
 
 	if (platform->driver->compr_ops && platform->driver->compr_ops->open) {
 		ret = platform->driver->compr_ops->open(cstream);
@@ -154,7 +154,7 @@ static int soc_compr_open_fe(struct snd_compr_stream *cstream)
 	codec_dai->active++;
 	fe->codec->active++;
 
-	mutex_unlock(&fe->card->mutex);
+	mutex_unlock(&fe->card->dpcm_mutex);
 
 	return 0;
 
@@ -166,7 +166,7 @@ machine_err:
 		platform->driver->compr_ops->free(cstream);
 out:
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
+	mutex_unlock(&fe->card->dpcm_mutex);
 	return ret;
 }
 
@@ -273,8 +273,7 @@ static int soc_compr_free_fe(struct snd_compr_stream *cstream)
 	else
 		stream = SNDRV_PCM_STREAM_CAPTURE;
 
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
-
+	mutex_lock(&fe->card->dpcm_mutex);
 	if (cstream->direction == SND_COMPRESS_PLAYBACK) {
 		cpu_dai->playback_active--;
 		codec_dai->playback_active--;
@@ -323,7 +322,7 @@ static int soc_compr_free_fe(struct snd_compr_stream *cstream)
 		platform->driver->compr_ops->free(cstream);
 	//cpu_dai->runtime = NULL;
 
-	mutex_unlock(&fe->card->mutex);
+	mutex_unlock(&fe->card->dpcm_mutex);
 	return 0;
 }
 
@@ -393,8 +392,7 @@ static int soc_compr_trigger_fe(struct snd_compr_stream *cstream, int cmd)
 		stream = SNDRV_PCM_STREAM_CAPTURE;
 
 
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
-
+	mutex_lock(&fe->card->dpcm_mutex);
 	if (platform->driver->compr_ops && platform->driver->compr_ops->trigger) {
 		ret = platform->driver->compr_ops->trigger(cstream, cmd);
 		if (ret < 0)
@@ -422,7 +420,7 @@ static int soc_compr_trigger_fe(struct snd_compr_stream *cstream, int cmd)
 
 out:
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
+	mutex_unlock(&fe->card->dpcm_mutex);
 	return ret;
 }
 
@@ -477,7 +475,7 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 	struct snd_soc_pcm_runtime *fe = cstream->private_data;
 	struct snd_pcm_substream *fe_substream = fe->pcm->streams[0].substream;
 	struct snd_soc_platform *platform = fe->platform;
-	struct snd_pcm_hw_params *hw_params;
+
 	int ret = 0, stream;
 
 	if (cstream->direction == SND_COMPRESS_PLAYBACK)
@@ -485,12 +483,7 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 	else
 		stream = SNDRV_PCM_STREAM_CAPTURE;
 
-	hw_params = kzalloc(sizeof(*hw_params), GFP_KERNEL);
-	if (hw_params == NULL)
-		return -ENOMEM;
-
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
-
+	mutex_lock(&fe->card->dpcm_mutex);
 	/* first we call set_params for the platform driver
 	 * this should configure the soc side
 	 * if the machine has compressed ops then we call that as well
@@ -509,7 +502,7 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 			goto out;
 	}
 
-	memcpy(&fe->dpcm[fe_substream->stream].hw_params, params,
+	memset(&fe->dpcm[fe_substream->stream].hw_params, 0,
 			sizeof(struct snd_pcm_hw_params));
 
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_FE;
@@ -535,7 +528,7 @@ static int soc_compr_set_params_fe(struct snd_compr_stream *cstream,
 
 out:
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
+	mutex_unlock(&fe->card->dpcm_mutex);
 	return ret;
 }
 

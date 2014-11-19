@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -812,21 +812,10 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 				__func__, rc);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pr_debug("%s: SNDRV_PCM_TRIGGER_STOP\n", __func__);
 		spin_lock_irqsave(&prtd->lock, flags);
-
+		pr_debug("%s: SNDRV_PCM_TRIGGER_STOP transition %d\n", __func__,
+					prtd->gapless_state.gapless_transition);
 		stream_id = ac->stream_id;
-		if (prtd->gapless_state.set_next_stream_id &&
-		    prtd->first_buffer) {
-			/*
-			 * Stream just switched for gapless, no buffers sent.
-			 * So seek needs to be applied to previous stream
-			 */
-			pr_debug("Seek previous stream as next stream hasn't started\n");
-			stream_id = stream_id^1;
-			ac->stream_id = stream_id;
-			prtd->first_buffer = 0;
-		}
 		atomic_set(&prtd->start, 0);
 		if (atomic_read(&prtd->eos)) {
 			pr_debug("%s: interrupt eos wait queues", __func__);
@@ -844,22 +833,27 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		prtd->last_buffer = 0;
 		pr_debug("issue CMD_FLUSH\n");
 		prtd->cmd_ack = 0;
-		spin_unlock_irqrestore(&prtd->lock, flags);
-		rc = q6asm_stream_cmd(prtd->audio_client, CMD_FLUSH, stream_id);
-		if (rc < 0) {
-			pr_err("%s: flush cmd failed rc=%d\n",
-			       __func__, rc);
-			return rc;
-		}
-		rc = wait_event_timeout(prtd->flush_wait,
+		if (!prtd->gapless_state.gapless_transition) {
+			spin_unlock_irqrestore(&prtd->lock, flags);
+			rc = q6asm_stream_cmd(
+				prtd->audio_client, CMD_FLUSH, stream_id);
+			if (rc < 0) {
+				pr_err("%s: flush cmd failed rc=%d\n",
+							__func__, rc);
+				return rc;
+			}
+			rc = wait_event_timeout(prtd->flush_wait,
 					prtd->cmd_ack, 1 * HZ);
-		if (!rc) {
-			rc = -ETIMEDOUT;
-			pr_err("Flush cmd timeout\n");
-		} else
-			rc = 0; /* prtd->cmd_status == OK? 0 : -EPERM */
-
-		spin_lock_irqsave(&prtd->lock, flags);
+			if (!rc) {
+				rc = -ETIMEDOUT;
+				pr_err("Flush cmd timeout\n");
+			} else {
+				rc = 0; /* prtd->cmd_status == OK? 0 : -EPERM*/
+			}
+			spin_lock_irqsave(&prtd->lock, flags);
+		} else {
+			prtd->first_buffer = 0;
+		}
 		/* FIXME. only reset if flush was successful */
 		prtd->byte_offset  = 0;
 		prtd->copied_total = 0;
@@ -869,14 +863,20 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		spin_unlock_irqrestore(&prtd->lock, flags);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_PUSH\n");
-		q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
-		atomic_set(&prtd->start, 0);
+		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_PUSH transition %d\n",
+				prtd->gapless_state.gapless_transition);
+		if (!prtd->gapless_state.gapless_transition) {
+			q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
+			atomic_set(&prtd->start, 0);
+		}
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_RELEASE\n");
-		atomic_set(&prtd->start, 1);
-		q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
+		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_RELEASE transition %d\n",
+				   prtd->gapless_state.gapless_transition);
+		if (!prtd->gapless_state.gapless_transition) {
+			atomic_set(&prtd->start, 1);
+			q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
+		}
 		break;
 	case SND_COMPR_TRIGGER_PARTIAL_DRAIN:
 		pr_debug("%s: SND_COMPR_TRIGGER_PARTIAL_DRAIN\n", __func__);
@@ -942,7 +942,6 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 
 			/* send EOS */
 			prtd->cmd_ack = 0;
-			atomic_set(&prtd->eos, 1);
 			q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
 			pr_info("PARTIAL DRAIN, do not wait for EOS ack\n");
 
@@ -986,6 +985,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			prtd->app_pointer  = 0;
 			prtd->first_buffer = 1;
 			prtd->last_buffer = 0;
+			prtd->gapless_state.gapless_transition = 1;
 			/*
 			Don't reset these as these vars map to
 			total_bytes_transferred and total_bytes_available
@@ -1247,7 +1247,8 @@ static int msm_compr_copy(struct snd_compr_stream *cstream,
 	 * since the available bytes fits fragment_size, copy the data right away
 	 */
 	spin_lock_irqsave(&prtd->lock, flags);
-
+	if (prtd->gapless_state.gapless_transition)
+		prtd->gapless_state.gapless_transition = 0;
 	prtd->bytes_received += count;
 	if (atomic_read(&prtd->start)) {
 		if (atomic_read(&prtd->xrun)) {
@@ -1560,7 +1561,7 @@ static int msm_compr_add_volume_control(struct snd_soc_pcm_runtime *rtd)
 		 rtd->pcm->device, suffix);
 	fe_volume_control[0].name = mixer_str;
 	fe_volume_control[0].private_value = rtd->dai_link->be_id;
-	pr_debug("Registering new mixer ctl %s", mixer_str);
+	pr_debug("Registering new mixer ctl %s\n", mixer_str);
 	snd_soc_add_platform_controls(rtd->platform, fe_volume_control,
 				      ARRAY_SIZE(fe_volume_control));
 	kfree(mixer_str);
@@ -1680,7 +1681,6 @@ static struct snd_soc_platform_driver msm_soc_platform = {
 	.pcm_new	= msm_compr_new,
 	.controls       = msm_compr_gapless_controls,
 	.num_controls   = ARRAY_SIZE(msm_compr_gapless_controls),
-
 };
 
 static __devinit int msm_compr_dev_probe(struct platform_device *pdev)

@@ -79,10 +79,10 @@ static int l2pm_irq;
 static unsigned int bytes_per_beat;
 static unsigned int sample_ms = 50;
 static unsigned int tolerance_percent = 10;
-static unsigned int guard_band_mbps = 100;
+static unsigned int guard_band_mbps = 70;
 static unsigned int decay_rate = 90;
-static unsigned int io_percent = 15;
-static unsigned int bw_step = 200;
+static unsigned int io_percent = 16;
+static unsigned int bw_step = 190;
 
 static u32 prev_r_start_val;
 static u32 prev_w_start_val;

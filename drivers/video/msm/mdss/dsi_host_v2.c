@@ -586,6 +586,19 @@ int msm_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 	unsigned char *ctrl_base = dsi_host_private->dsi_base;
 	unsigned long flag;
 
+#if defined(CONFIG_DSI_HOST_DEBUG)
+	int i = 0;
+	char *bp;
+
+	bp = tp->data;
+
+	printk("%s: ", __func__);
+	for (i = 0; i < tp->len; i++)
+		printk("%02X ", *bp++);
+
+	printk("\n");
+#endif
+
 	len = ALIGN(tp->len, 4);
 	size = ALIGN(tp->len, SZ_4K);
 

@@ -23,6 +23,7 @@ struct msm_camera_i2c_client {
 	struct msm_camera_cci_client *cci_client;
 	struct msm_camera_spi_client *spi_client;
 	enum msm_camera_i2c_reg_addr_type addr_type;
+	enum msm_camera_i2c_data_type data_type;
 };
 
 struct msm_camera_i2c_fn_t {
@@ -111,10 +112,5 @@ int32_t msm_camera_qup_i2c_write_seq_table(struct msm_camera_i2c_client *client,
 int32_t msm_camera_qup_i2c_write_table_w_microdelay(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_setting *write_setting);
-
-int32_t msm_camera_qup_i2c_write_conf_tbl(
-	struct msm_camera_i2c_client *client,
-	struct msm_camera_i2c_reg_conf *reg_conf_tbl, uint16_t size,
-	enum msm_camera_i2c_data_type data_type);
 
 #endif

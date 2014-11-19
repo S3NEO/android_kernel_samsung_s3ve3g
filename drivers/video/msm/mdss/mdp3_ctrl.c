@@ -591,6 +591,9 @@ static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 	if (panel->event_handler) {
 		rc = panel->event_handler(panel, MDSS_EVENT_UNBLANK, NULL);
 		rc |= panel->event_handler(panel, MDSS_EVENT_PANEL_ON, NULL);
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+		rc |= panel->event_handler(panel, MDSS_EVENT_MDNIE_DEFAULT_UPDATE, NULL);
+#endif
 	}
 	if (rc) {
 		pr_err("fail to turn on the panel\n");
@@ -672,6 +675,11 @@ static int mdp3_ctrl_off(struct msm_fb_data_type *mfd)
 	if (rc)
 		pr_debug("fail to stop the MDP3 dma\n");
 
+#if defined(CONFIG_WHITE_PANEL)
+	/* turn off the backlight for TN panel ( normally white panel ) */
+	if (panel && panel->set_backlight)
+		panel->set_backlight(panel, 0);
+#endif
 
 	if (panel->event_handler)
 		rc = panel->event_handler(panel, MDSS_EVENT_PANEL_OFF, NULL);
@@ -908,9 +916,6 @@ static int mdp3_overlay_set(struct msm_fb_data_type *mfd,
 			dma->source_config.height = req->src.height,
 			dma->source_config.format = format;
 			dma->source_config.stride = stride;
-			mdp3_clk_enable(1, 0);
-			mdp3_session->dma->dma_config_source(dma);
-			mdp3_clk_enable(0, 0);
 		}
 		mdp3_session->overlay.id = 1;
 		req->id = 1;
@@ -1066,8 +1071,13 @@ static int mdp3_ctrl_display_commit_kickoff(struct msm_fb_data_type *mfd,
 	}
 
 	if (mdp3_session->first_commit) {
+#if defined(CONFIG_WHITE_PANEL)
+		/*wait for 5 frames time to ensure frame is sent to panel*/
+		msleep(1000 / panel_info->mipi.frame_rate * 5);
+#else
 		/*wait for one frame time to ensure frame is sent to panel*/
 		msleep(1000 / panel_info->mipi.frame_rate);
+#endif
 		mdp3_session->first_commit = false;
 	}
 
@@ -1090,6 +1100,10 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 	int bpp;
 	struct mdss_panel_info *panel_info = mfd->panel_info;
 	int rc;
+#if defined(CONFIG_WHITE_PANEL)
+	bool reset_done = false;
+	struct mdss_panel_data *panel;
+#endif
 
 	pr_debug("mdp3_ctrl_pan_display\n");
 	if (!mfd || !mfd->mdp.private1)
@@ -1102,6 +1116,9 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 	if (!mdp3_iommu_is_attached(MDP3_CLIENT_DMA_P)) {
 		pr_debug("continuous splash screen, IOMMU not attached\n");
 		mdp3_ctrl_reset(mfd);
+#if defined(CONFIG_WHITE_PANEL)
+		reset_done = true;
+#endif
 	}
 	mdp3_release_splash_memory();
 
@@ -1157,6 +1174,16 @@ static void mdp3_ctrl_pan_display(struct msm_fb_data_type *mfd)
 	}
 
 	mdp3_session->vsync_before_commit = 0;
+#if defined(CONFIG_WHITE_PANEL)
+	if (reset_done && boot_mode_recovery) {
+		/*wait for 3 frame time to ensure frame is sent to panel*/
+		msleep(1000 / panel_info->mipi.frame_rate * 3);
+
+		panel = mdp3_session->panel;
+		if (panel && panel->set_backlight)
+			panel->set_backlight(panel, panel->panel_info.bl_max);
+	}
+#endif
 
 pan_error:
 	mutex_unlock(&mdp3_session->lock);

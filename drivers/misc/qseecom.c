@@ -2947,6 +2947,8 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			ret = -EINVAL;
 			break;
 		}
+		pr_debug("%s : Perf Enable ioctl (Process:%s PID:%d)\n", __func__, \
+				current->comm, current->pid);
 		atomic_inc(&data->ioctl_count);
 		ret = qsee_vote_for_clock(data, CLK_DFAB);
 		if (ret)
@@ -2972,6 +2974,8 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			ret = -EINVAL;
 			break;
 		}
+		pr_debug("%s : Perf Disable ioctl (Process:%s PID:%d)\n", __func__, \
+				current->comm, current->pid);
 		atomic_inc(&data->ioctl_count);
 			qsee_disable_clock_vote(data, CLK_DFAB);
 			qsee_disable_clock_vote(data, CLK_SFPB);
