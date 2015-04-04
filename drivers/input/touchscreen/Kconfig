@@ -1133,6 +1133,10 @@ config TOUCHSCREEN_ZINITIX_BT531
 	  To compile this driver as a module, choose M here: the
 	  module will be called BT531.
 
+config STATE_NOTIFIER
+        bool "State Notifier"
+	default y
+
 source "drivers/input/touchscreen/wacom/Kconfig"
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 source "drivers/input/touchscreen/synaptics/Kconfig"
@@ -1143,4 +1147,5 @@ source "drivers/input/touchscreen/cyttsp4/Kconfig"
 source "drivers/input/touchscreen/wacom_hl/Kconfig"
 source "drivers/input/touchscreen/melfas_mms136/Kconfig"
 source "drivers/input/touchscreen/stm_fts/Kconfig"
+
 endif

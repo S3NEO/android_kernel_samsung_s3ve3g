@@ -96,3 +96,4 @@ obj-$(CONFIG_TOUCHSCREEN_MMS134S)   += mms134S_ts.o
 obj-$(CONFIG_TOUCHSCREEN_MMS136)   += melfas_mms136/
 obj-$(CONFIG_TOUCHSCREEN_FTS) += stm_fts/
 obj-$(CONFIG_TOUCHSCREEN_ZINITIX_BT532)	+= zinitix_bt532_ts.o
+obj-$(CONFIG_STATE_NOTIFIER)		+= state_notifier.o
