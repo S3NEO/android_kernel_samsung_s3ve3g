@@ -274,6 +274,7 @@ config TC358764_I2C_CONTROL
 	bool "TOSHIBA I2C CONTROLLER"
 	default n
 	---help---
+
 	The TOSHIBA I2C CONTROLLER support
 config LCD_FORCE_VIDEO_MODE
 	bool "forcing video mode on cmd panle"
@@ -330,4 +331,14 @@ config CLK_TUNING
 config MDP_NEGATIVE_SUPPORT
 	bool "Support MDP negative color"
 	default n
+
+
+	  MDSS support for Framebuffer quickdraw
+
+config FB_MSM_MDSS_KCAL_CTRL
+	depends on FB_MSM_MDSS
+	bool "MDSS color control"
+	---help---
+	  Enable sysfs for rgb/lut control for mdss-mdp display controllers
+	  in the MDSS sub-system.
 
