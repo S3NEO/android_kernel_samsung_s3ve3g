@@ -78,10 +78,6 @@ allnoconfig allyesconfig allmodconfig alldefconfig randconfig: $(obj)/conf
 
 PHONY += listnewconfig oldnoconfig savedefconfig defconfig
 
-ifneq ($(VARIANT_DEFCONFIG),)
-export KCONFIG_VARIANT := arch/$(SRCARCH)/configs/$(VARIANT_DEFCONFIG)
-endif
-
 ifneq ($(DEBUG_DEFCONFIG),)
 export KCONFIG_DEBUG := arch/$(SRCARCH)/configs/$(DEBUG_DEFCONFIG)
 endif
