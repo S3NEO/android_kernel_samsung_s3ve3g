@@ -89,6 +89,7 @@ static inline cputime64_t get_cpu_idle_time(unsigned int cpu, cputime64_t *wall)
 
 static int update_average_load(unsigned int freq, unsigned int cpu)
 {
+	int ret;
 	unsigned int idle_time, wall_time;
 	unsigned int cur_load, load_at_max_freq;
 	cputime64_t cur_wall_time, cur_idle_time;
