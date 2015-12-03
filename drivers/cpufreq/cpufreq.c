@@ -33,7 +33,6 @@
 #include <linux/syscore_ops.h>
 #include <linux/kernel_stat.h>
 #include <linux/tick.h>
-#include <linux/pm_qos.h>
 
 #include <trace/events/power.h>
 
@@ -2065,17 +2064,8 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 #ifdef CONFIG_UNI_CPU_POLICY_LIMIT
 	struct cpufreq_policy *cpu0_policy = NULL;
 #endif
-	unsigned int pmin = policy->min;
-	unsigned int pmax = policy->max;
-	unsigned int qmin = pm_qos_request(PM_QOS_CPU_FREQ_MIN);
-	unsigned int qmax = pm_qos_request(PM_QOS_CPU_FREQ_MAX);
-
-	pr_debug("setting new policy for CPU %u: %u - %u (%u - %u) kHz\n",
-		policy->cpu, pmin, pmax, qmin, qmax);
-
-	/* clamp the new policy to PM QoS limits */
-	policy->min = max(pmin, qmin);
-	policy->max = min(pmax, qmax);
+	pr_debug("setting new policy for CPU %u: %u - %u kHz\n", policy->cpu,
+		policy->min, policy->max);
 
 	memcpy(&policy->cpuinfo, &data->cpuinfo,
 				sizeof(struct cpufreq_cpuinfo));
@@ -2180,9 +2170,6 @@ error_out:
 		__cpufreq_cpu_put(cpu0_policy, false);
 	}
 #endif
-	/* restore the limits that the policy requested */
-	policy->min = pmin;
-	policy->max = pmax;
 	return ret;
 }
 
@@ -2447,32 +2434,6 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 }
 EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
 
-static int cpu_freq_notify(struct notifier_block *b,
-			   unsigned long l, void *v);
-
-static struct notifier_block min_freq_notifier = {
-	.notifier_call = cpu_freq_notify,
-};
-static struct notifier_block max_freq_notifier = {
-	.notifier_call = cpu_freq_notify,
-};
-
-static int cpu_freq_notify(struct notifier_block *b,
-			   unsigned long l, void *v)
-{
-	int cpu;
-	pr_debug("PM QoS %s %lu\n",
-		b == &min_freq_notifier ? "min" : "max", l);
-	for_each_online_cpu(cpu) {
-		struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
-		if (policy) {
-			cpufreq_update_policy(policy->cpu);
-			cpufreq_cpu_put(policy);
-		}
-	}
-	return NOTIFY_OK;
-}
-
 static int __init cpufreq_core_init(void)
 {
 	int cpu;
@@ -2495,12 +2456,6 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject->kset = cpufreq_kset;
 
 	register_syscore_ops(&cpufreq_syscore_ops);
-	rc = pm_qos_add_notifier(PM_QOS_CPU_FREQ_MIN,
-				 &min_freq_notifier);
-	BUG_ON(rc);
-	rc = pm_qos_add_notifier(PM_QOS_CPU_FREQ_MAX,
-				 &max_freq_notifier);
-	BUG_ON(rc);
 
 	return 0;
 }
