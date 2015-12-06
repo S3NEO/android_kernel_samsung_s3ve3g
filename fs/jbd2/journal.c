@@ -1408,7 +1408,7 @@ EXPORT_SYMBOL(jbd2_journal_update_sb_errno);
 static int journal_get_superblock(journal_t *journal)
 {
 	struct buffer_head *bh;
-	journal_superblock_t *sb;
+	journal_superblock_t *sb = NULL;
 	int err = -EIO;
 
 	bh = journal->j_sb_buffer;
