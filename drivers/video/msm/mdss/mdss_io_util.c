@@ -199,11 +199,32 @@ vreg_get_fail:
 	return rc;
 } /* msm_dss_config_vreg */
 
+#ifdef CONFIG_MACH_KSPORTSLTE_SPR
+extern unsigned int system_rev;
+#endif
+
 int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 {
 	int i = 0, rc = 0;
 	if (enable) {
 		for (i = 0; i < num_vreg; i++) {
+#if defined(CONFIG_MACH_MONDRIAN) || defined(CONFIG_MACH_CHAGALL)
+			if(!strncmp(in_vreg[i].vreg_name, "vdd", 4)) {
+				pr_info("%s : VDD enable skip!!\n", __func__);
+				continue;
+			}
+#endif
+#ifdef CONFIG_MACH_KSPORTSLTE_SPR
+			if(!strncmp(in_vreg[i].vreg_name, "vdd", 4) && (system_rev == 2)) {
+				pr_info("%s : VDD enable skip!! rev(%d)\n",in_vreg[i].vreg_name, system_rev);
+				continue;
+			}
+#endif
+#ifdef CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL
+			if(!strncmp(in_vreg[i].vreg_name, "vdd", 4)) {
+				continue;
+			}
+#endif
 			rc = PTR_RET(in_vreg[i].vreg);
 			if (rc) {
 				DEV_ERR("%pS->%s: %s regulator error. rc=%d\n",
@@ -234,6 +255,23 @@ int msm_dss_enable_vreg(struct dss_vreg *in_vreg, int num_vreg, int enable)
 	} else {
 		for (i = num_vreg-1; i >= 0; i--)
 			if (regulator_is_enabled(in_vreg[i].vreg)) {
+#if defined(CONFIG_MACH_MONDRIAN) || defined(CONFIG_MACH_CHAGALL)
+				if(!strncmp(in_vreg[i].vreg_name, "vdd", 4)) {
+					pr_info("%s : VDD disable skip!!\n", __func__);
+					continue;
+				}
+#endif
+#ifdef CONFIG_MACH_KANAS3G_CTC
+				if(!strncmp(in_vreg[i].vreg_name, "vdd", 3)) {
+					continue;
+				}
+#endif
+#ifdef CONFIG_MACH_KSPORTSLTE_SPR
+				if(!strncmp(in_vreg[i].vreg_name, "vdd", 4) && (system_rev == 2)) {
+					pr_info("%s : VDD disable skip!! rev(%d)\n",in_vreg[i].vreg_name, system_rev);
+					continue;
+				}
+#endif
 				if (in_vreg[i].pre_off_sleep)
 					msleep(in_vreg[i].pre_off_sleep);
 				regulator_set_optimum_mode(in_vreg[i].vreg,

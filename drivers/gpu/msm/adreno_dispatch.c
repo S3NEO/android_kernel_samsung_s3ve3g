@@ -83,6 +83,7 @@ static inline bool _isidle(struct kgsl_device *device)
 	if (!kgsl_pwrctrl_isenabled(device))
 		goto ret;
 
+
 	ts = kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED);
 
 	/* If GPU HW status is idle return true */

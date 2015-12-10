@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1167,8 +1167,10 @@ static irqreturn_t msm_spi_input_irq(int irq, void *dev_id)
 		if ((!dd->read_buf || op & SPI_OP_MAX_INPUT_DONE_FLAG) &&
 		    (!dd->write_buf || op & SPI_OP_MAX_OUTPUT_DONE_FLAG)) {
 			msm_spi_ack_transfer(dd);
+			if (dd->rx_unaligned_len == 0) {
 				if (atomic_inc_return(&dd->rx_irq_called) == 1)
 					return IRQ_HANDLED;
+			}
 			msm_spi_complete(dd);
 			return IRQ_HANDLED;
 		}
@@ -1980,17 +1982,14 @@ static void msm_spi_workq(struct work_struct *work)
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
 
-	spin_lock_irqsave(&dd->queue_lock, flags);
-	dd->transfer_pending = 1;
-	spin_unlock_irqrestore(&dd->queue_lock, flags);
-
-	if (dd->suspended || !msm_spi_is_valid_state(dd)) {
+	if (!msm_spi_is_valid_state(dd)) {
 		dev_err(dd->dev, "%s: SPI operational state not valid\n",
 			__func__);
 		status_error = 1;
 	}
-	spin_lock_irqsave(&dd->queue_lock, flags);
 
+	spin_lock_irqsave(&dd->queue_lock, flags);
+	dd->transfer_pending = 1;
 	while (!list_empty(&dd->queue)) {
 		dd->cur_msg = list_entry(dd->queue.next,
 					 struct spi_message, queue);
@@ -2710,6 +2709,17 @@ struct msm_spi_platform_data * __init msm_spi_dt_to_pdata(
 		}
 	}
 
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+	/* Even if you set the bam setting, */
+	/* you can't access bam when you use tzspi */
+	if ((dd->cs_gpios[0].gpio_num) == FP_SPI_CS) {
+		pdata->use_bam = false;
+		pr_info("%s: disable bam for BLSP5 tzspi\n", __func__);
+	}
+#endif
+	dev_warn(&pdev->dev,
+		"%s pdata->use_bam: %d", __func__, pdata->use_bam);
+
 	if (pdata->use_bam) {
 		if (!pdata->bam_consumer_pipe_index) {
 			dev_warn(&pdev->dev,
@@ -2770,6 +2780,85 @@ static int __init msm_spi_bam_get_resources(struct msm_spi *dd,
 	dd->dma_teardown = msm_spi_bam_teardown;
 	return 0;
 }
+
+#ifdef ENABLE_SENSORS_FPRINT_SECURE
+int fp_spi_clock_set_rate(struct spi_device *spidev)
+{
+	struct msm_spi *dd;
+
+	if (!spidev) {
+		pr_err("%s: spidev pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	dd = spi_master_get_devdata(spidev->master);
+	if (!dd) {
+		pr_err("%s: spi master pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	msm_spi_clock_set(dd, spidev->max_speed_hz);
+
+	pr_info("%s sucess\n", __func__);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fp_spi_clock_set_rate);
+
+int fp_spi_clock_enable(struct spi_device *spidev)
+{
+	struct msm_spi *dd;
+	int rc;
+
+	if (!spidev) {
+		pr_err("%s: spidev pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	dd = spi_master_get_devdata(spidev->master);
+	if (!dd) {
+		pr_err("%s: spi master pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	rc = clk_prepare_enable(dd->clk);
+	if (rc) {
+		pr_err("%s: unable to enable core_clk\n", __func__);
+		return rc;
+	}
+
+	rc = clk_prepare_enable(dd->pclk);
+	if (rc) {
+		pr_err("%s: unable to enable iface_clk\n", __func__);
+		return rc;
+	}
+	pr_info("%s sucess\n", __func__);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fp_spi_clock_enable);
+
+int fp_spi_clock_disable(struct spi_device *spidev)
+{
+	struct msm_spi *dd;
+
+	if (!spidev) {
+		pr_err("%s: spidev pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	dd = spi_master_get_devdata(spidev->master);
+	if (!dd) {
+		pr_err("%s: spi master pointer is NULL\n", __func__);
+		return -EFAULT;
+	}
+
+	clk_disable_unprepare(dd->clk);
+	clk_disable_unprepare(dd->pclk);
+
+	pr_info("%s sucess\n", __func__);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fp_spi_clock_disable);
+#endif
 
 static int __init msm_spi_probe(struct platform_device *pdev)
 {

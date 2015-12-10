@@ -202,23 +202,19 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 
 static void stop_pcm(struct msm_pcm_loopback *pcm)
 {
-	struct snd_soc_pcm_runtime *soc_pcm_rx;
-	struct snd_soc_pcm_runtime *soc_pcm_tx;
+	struct snd_soc_pcm_runtime *soc_pcm_rx =
+		pcm->playback_substream->private_data;
+	struct snd_soc_pcm_runtime *soc_pcm_tx =
+		pcm->capture_substream->private_data;
 
 	if (pcm->audio_client == NULL)
 		return;
 	q6asm_cmd(pcm->audio_client, CMD_CLOSE);
 
-	if (pcm->playback_substream != NULL) {
-		soc_pcm_rx = pcm->playback_substream->private_data;
-		msm_pcm_routing_dereg_phy_stream(soc_pcm_rx->dai_link->be_id,
-				SNDRV_PCM_STREAM_PLAYBACK);
-	}
-	if (pcm->capture_substream != NULL) {
-		soc_pcm_tx = pcm->capture_substream->private_data;
-		msm_pcm_routing_dereg_phy_stream(soc_pcm_tx->dai_link->be_id,
-				SNDRV_PCM_STREAM_CAPTURE);
-	}
+	msm_pcm_routing_dereg_phy_stream(soc_pcm_rx->dai_link->be_id,
+			SNDRV_PCM_STREAM_PLAYBACK);
+	msm_pcm_routing_dereg_phy_stream(soc_pcm_tx->dai_link->be_id,
+			SNDRV_PCM_STREAM_CAPTURE);
 	q6asm_audio_client_free(pcm->audio_client);
 	pcm->audio_client = NULL;
 }
@@ -389,7 +385,7 @@ static __devinit int msm_pcm_probe(struct platform_device *pdev)
 	dev_dbg(&pdev->dev, "%s: dev name %s\n",
 		__func__, dev_name(&pdev->dev));
 
-	pcm = kzalloc(sizeof(struct msm_pcm_loopback), GFP_KERNEL);
+	pcm = devm_kzalloc(&pdev->dev, sizeof(struct msm_pcm_loopback), GFP_KERNEL);
 	if (!pcm) {
 		dev_err(&pdev->dev, "%s Failed to allocate memory for pcm\n",
 			__func__);
@@ -415,7 +411,7 @@ static int msm_pcm_remove(struct platform_device *pdev)
 }
 
 static const struct of_device_id msm_pcm_loopback_dt_match[] = {
-	{.compatible = "qcom,msm-pcm-loopback"},
+	{.compatible = "qti,msm-pcm-loopback"},
 	{}
 };
 

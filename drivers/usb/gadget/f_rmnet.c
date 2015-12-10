@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,7 +47,7 @@ struct f_rmnet {
 
 	/* control info */
 	struct list_head		cpkt_resp_q;
-	unsigned long			notify_count;
+	atomic_t			notify_count;
 	unsigned long			cpkts_len;
 };
 
@@ -75,8 +75,13 @@ static struct usb_interface_descriptor rmnet_interface_desc = {
 	.bDescriptorType =	USB_DT_INTERFACE,
 	.bNumEndpoints =	3,
 	.bInterfaceClass =	USB_CLASS_VENDOR_SPEC,
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	.bInterfaceSubClass = 0xE0,
+	.bInterfaceProtocol = 0x00,
+#else
 	.bInterfaceSubClass =	USB_CLASS_VENDOR_SPEC,
 	.bInterfaceProtocol =	USB_CLASS_VENDOR_SPEC,
+#endif
 	/* .iInterface = DYNAMIC */
 };
 
@@ -388,7 +393,7 @@ static int rmnet_gport_setup(void)
 
 static int gport_rmnet_connect(struct f_rmnet *dev)
 {
-	int			ret;
+	int			ret = 0;
 	unsigned		port_num;
 	enum transport_type	cxport = rmnet_ports[dev->port_num].ctrl_xport;
 	enum transport_type	dxport = rmnet_ports[dev->port_num].data_xport;
@@ -605,7 +610,7 @@ static void frmnet_purge_responses(struct f_rmnet *dev)
 		list_del(&cpkt->list);
 		rmnet_free_ctrl_pkt(cpkt);
 	}
-	dev->notify_count = 0;
+	atomic_set(&dev->notify_count, 0);
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
 
@@ -619,7 +624,6 @@ static void frmnet_suspend(struct usb_function *f)
 		__func__, xport_to_str(dxport),
 		dev, dev->port_num);
 
-	usb_ep_fifo_flush(dev->notify);
 	frmnet_purge_responses(dev);
 
 	port_num = rmnet_ports[dev->port_num].data_xport_num;
@@ -755,7 +759,7 @@ static void frmnet_ctrl_response_available(struct f_rmnet *dev)
 		return;
 	}
 
-	if (++dev->notify_count != 1) {
+	if (atomic_inc_return(&dev->notify_count) != 1) {
 		spin_unlock_irqrestore(&dev->lock, flags);
 		return;
 	}
@@ -773,14 +777,7 @@ static void frmnet_ctrl_response_available(struct f_rmnet *dev)
 	if (ret) {
 		spin_lock_irqsave(&dev->lock, flags);
 		if (!list_empty(&dev->cpkt_resp_q)) {
-			if (dev->notify_count > 0)
-				dev->notify_count--;
-			else {
-				pr_debug("%s: Invalid notify_count=%lu to decrement\n",
-					 __func__, dev->notify_count);
-				spin_unlock_irqrestore(&dev->lock, flags);
-				return;
-			}
+			atomic_dec(&dev->notify_count);
 			cpkt = list_first_entry(&dev->cpkt_resp_q,
 					struct rmnet_ctrl_pkt, list);
 			list_del(&cpkt->list);
@@ -919,9 +916,7 @@ static void frmnet_notify_complete(struct usb_ep *ep, struct usb_request *req)
 	case -ECONNRESET:
 	case -ESHUTDOWN:
 		/* connection gone */
-		spin_lock_irqsave(&dev->lock, flags);
-		dev->notify_count = 0;
-		spin_unlock_irqrestore(&dev->lock, flags);
+		atomic_set(&dev->notify_count, 0);
 		break;
 	default:
 		pr_err("rmnet notify ep error %d\n", status);
@@ -930,34 +925,14 @@ static void frmnet_notify_complete(struct usb_ep *ep, struct usb_request *req)
 		if (!atomic_read(&dev->ctrl_online))
 			break;
 
-		spin_lock_irqsave(&dev->lock, flags);
-		if (dev->notify_count > 0) {
-			dev->notify_count--;
-			if (dev->notify_count == 0) {
-				spin_unlock_irqrestore(&dev->lock, flags);
-				break;
-			}
-		} else {
-			pr_debug("%s: Invalid notify_count=%lu to decrement\n",
-					__func__, dev->notify_count);
-			spin_unlock_irqrestore(&dev->lock, flags);
+		if (atomic_dec_and_test(&dev->notify_count))
 			break;
-		}
-		spin_unlock_irqrestore(&dev->lock, flags);
 
 		status = usb_ep_queue(dev->notify, req, GFP_ATOMIC);
 		if (status) {
 			spin_lock_irqsave(&dev->lock, flags);
 			if (!list_empty(&dev->cpkt_resp_q)) {
-				if (dev->notify_count > 0)
-					dev->notify_count--;
-				else {
-					pr_err("%s: Invalid notify_count=%lu to decrement\n",
-						__func__, dev->notify_count);
-					spin_unlock_irqrestore(&dev->lock,
-								flags);
-					break;
-				}
+				atomic_dec(&dev->notify_count);
 				cpkt = list_first_entry(&dev->cpkt_resp_q,
 						struct rmnet_ctrl_pkt, list);
 				list_del(&cpkt->list);
@@ -1151,7 +1126,7 @@ static int frmnet_bind(struct usb_configuration *c, struct usb_function *f)
 			goto fail;
 	}
 
-	pr_debug("%s: RmNet(%d) %s Speed, IN:%s OUT:%s\n",
+	pr_info("%s: RmNet(%d) %s Speed, IN:%s OUT:%s\n",
 			__func__, dev->port_num,
 			gadget_is_dualspeed(cdev->gadget) ? "dual" : "full",
 			dev->port.in->name, dev->port.out->name);

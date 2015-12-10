@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -51,8 +51,7 @@ enum mdss_mdp_wb_node_state {
 	REGISTERED,
 	IN_FREE_QUEUE,
 	IN_BUSY_QUEUE,
-	WITH_CLIENT,
-	WB_BUFFER_READY,
+	WITH_CLIENT
 };
 
 struct mdss_mdp_wb_data {
@@ -343,12 +342,13 @@ static int mdss_mdp_wb_stop(struct msm_fb_data_type *mfd)
 static int mdss_mdp_wb_register_node(struct mdss_mdp_wb *wb,
 				     struct mdss_mdp_wb_data *node)
 {
-	node->state = REGISTERED;
-	list_add_tail(&node->registered_entry, &wb->register_queue);
 	if (!node) {
 		pr_err("Invalid wb node\n");
 		return -EINVAL;
 	}
+
+	node->state = REGISTERED;
+	list_add_tail(&node->registered_entry, &wb->register_queue);
 
 	return 0;
 }
@@ -399,22 +399,13 @@ static struct mdss_mdp_wb_data *get_local_node(struct mdss_mdp_wb *wb,
 static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 						struct msmfb_data *data)
 {
-
+#if defined(CONFIG_FB_MSM_CMD_MODE)
+	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd); 
+#endif
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_wb_data *node;
 	struct mdss_mdp_img_data *buf;
 	int ret;
-
-	if (!list_empty(&wb->register_queue)) {
-		list_for_each_entry(node, &wb->register_queue, registered_entry)
-			if ((node->buf_info.memory_id == data->memory_id) &&
-				    (node->buf_info.offset == data->offset)) {
-				pr_debug("found node fd=%x off=%x addr=%x\n",
-						data->memory_id, data->offset,
-						node->buf_data.p[0].addr);
-				return node;
-			}
-	}
 
 	node = kzalloc(sizeof(struct mdss_mdp_wb_data), GFP_KERNEL);
 	if (node == NULL) {
@@ -427,6 +418,12 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	buf = &node->buf_data.p[0];
 	if (wb->is_secure)
 		buf->flags |= MDP_SECURE_OVERLAY_SESSION;
+
+#if defined(CONFIG_FB_MSM_CMD_MODE)
+	if (!is_mdss_iommu_attached()) 
+		mdss_iommu_attach(ctl->mdata); 
+#endif
+
 	ret = mdss_mdp_get_img(data, buf);
 	if (IS_ERR_VALUE(ret)) {
 		pr_err("error getting buffer info\n");
@@ -471,7 +468,6 @@ static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
 {
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_wb_data *node = NULL;
-	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	int ret = 0;
 
 	if (!wb) {
@@ -481,46 +477,19 @@ static int mdss_mdp_wb_queue(struct msm_fb_data_type *mfd,
 
 	pr_debug("fb%d queue\n", wb->fb_ndx);
 
-	if (!mfd->panel_info->cont_splash_enabled)
-		mdss_iommu_attach(mdp5_data->mdata);
-
 	mutex_lock(&wb->lock);
 	if (local)
 		node = get_local_node(wb, data);
 	if (node == NULL)
 		node = get_user_node(mfd, data);
 
-	if (!node) {
-		pr_err("memory not registered\n");
-		ret = -ENOENT;
+	if (!node || node->state == IN_BUSY_QUEUE ||
+	    node->state == IN_FREE_QUEUE) {
+		pr_err("memory not registered or Buffer already with us\n");
+		ret = -EINVAL;
 	} else {
-		struct mdss_mdp_img_data *buf = &node->buf_data.p[0];
-
-		switch (node->state) {
-		case IN_FREE_QUEUE:
-			pr_err("node 0x%pa was already queueued before\n",
-					&buf->addr);
-			ret = -EINVAL;
-			break;
-		case IN_BUSY_QUEUE:
-			pr_err("node 0x%pa still in busy state\n", &buf->addr);
-			ret = -EBUSY;
-			break;
-		case WB_BUFFER_READY:
-			pr_debug("node 0x%pa re-queueded without dequeue\n",
-				&buf->addr);
-			list_del(&node->active_entry);
-		case WITH_CLIENT:
-		case REGISTERED:
-			list_add_tail(&node->active_entry, &wb->free_queue);
-			node->state = IN_FREE_QUEUE;
-			break;
-		default:
-			pr_err("Invalid node 0x%pa state %d\n",
-				&buf->addr, node->state);
-			ret = -EINVAL;
-			break;
-		}
+		list_add_tail(&node->active_entry, &wb->free_queue);
+		node->state = IN_FREE_QUEUE;
 	}
 	mutex_unlock(&wb->lock);
 
@@ -585,12 +554,12 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 	struct mdss_mdp_wb_data *node = NULL;
 	int ret = 0;
-	struct mdss_mdp_writeback_arg wb_args;
+	struct mdss_mdp_writeback_arg wb_args = {
+		.data = NULL,
+	};
 
 	if (!ctl->power_on)
 		return 0;
-
-	memset(&wb_args, 0, sizeof(wb_args));
 
 	mutex_lock(&mdss_mdp_wb_buf_lock);
 	if (wb) {
@@ -632,7 +601,6 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 	if (wb && node) {
 		mutex_lock(&wb->lock);
 		list_add_tail(&node->active_entry, &wb->busy_queue);
-		node->state = WB_BUFFER_READY;
 		mutex_unlock(&wb->lock);
 		wake_up(&wb->wait_q);
 	}
@@ -671,78 +639,31 @@ int mdss_mdp_wb_set_mirr_hint(struct msm_fb_data_type *mfd, int hint)
 int mdss_mdp_wb_get_format(struct msm_fb_data_type *mfd,
 					struct mdp_mixer_cfg *mixer_cfg)
 {
-	int dst_format;
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
 	if (!ctl) {
 		pr_err("No panel data!\n");
 		return -EINVAL;
-	}
+	} else {
+		mixer_cfg->writeback_format = ctl->dst_format;
+ 	}
 
-	switch (ctl->dst_format) {
-	case MDP_RGB_888:
-		dst_format = WB_FORMAT_RGB_888;
-		break;
-	case MDP_RGB_565:
-		dst_format = WB_FORMAT_RGB_565;
-		break;
-	case MDP_XRGB_8888:
-		dst_format = WB_FORMAT_xRGB_8888;
-		break;
-	case MDP_ARGB_8888:
-		dst_format = WB_FORMAT_ARGB_8888;
-		break;
-	case MDP_BGRA_8888:
-		dst_format = WB_FORMAT_BGRA_8888;
-		break;
-	case MDP_BGRX_8888:
-		dst_format = WB_FORMAT_BGRX_8888;
-		break;
-	case MDP_Y_CBCR_H2V2_VENUS:
-		dst_format = WB_FORMAT_NV12;
-		break;
-	default:
-		return -EINVAL;
-	}
-	mixer_cfg->writeback_format = dst_format;
 	return 0;
 }
 
-int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, int dst_format)
+int mdss_mdp_wb_set_format(struct msm_fb_data_type *mfd, u32 dst_format)
 {
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 
 	if (!ctl) {
 		pr_err("No panel data!\n");
 		return -EINVAL;
-	}
-
-	switch (dst_format) {
-	case WB_FORMAT_RGB_888:
-		ctl->dst_format = MDP_RGB_888;
-		break;
-	case WB_FORMAT_RGB_565:
-		ctl->dst_format = MDP_RGB_565;
-		break;
-	case WB_FORMAT_xRGB_8888:
-		ctl->dst_format = MDP_XRGB_8888;
-		break;
-	case WB_FORMAT_ARGB_8888:
-		ctl->dst_format = MDP_ARGB_8888;
-		break;
-	case WB_FORMAT_BGRA_8888:
-		ctl->dst_format = MDP_BGRA_8888;
-		break;
-	case WB_FORMAT_BGRX_8888:
-		ctl->dst_format = MDP_BGRX_8888;
-		break;
-	case WB_FORMAT_NV12:
-		ctl->dst_format = MDP_Y_CBCR_H2V2_VENUS;
-		break;
-	default:
-		pr_err("wfd format not supported\n");
+	} else if (dst_format >= MDP_IMGTYPE_LIMIT2) {
+		pr_err("Invalid dst format=%u\n", dst_format);
 		return -EINVAL;
-	}
+	} else {
+		ctl->dst_format = dst_format;
+ 	}
 
 	pr_debug("wfd format %d\n", ctl->dst_format);
 	return 0;
@@ -894,22 +815,3 @@ int msm_fb_writeback_set_secure(struct fb_info *info, int enable)
 	return mdss_mdp_wb_set_secure(mfd, enable);
 }
 EXPORT_SYMBOL(msm_fb_writeback_set_secure);
-
-/**
- * msm_fb_writeback_iommu_ref() - Power ON/OFF mdp clock
- * @enable - true/false to Power ON/OFF mdp clock
- *
- * Call to enable mdp clock at start of mdp_mmap/mdp_munmap API and
- * to disable mdp clock at end of these API's to ensure iommu is in
- * proper state while driver map/un-map any buffers.
- */
-int msm_fb_writeback_iommu_ref(struct fb_info *info, int enable)
-{
-	if (enable)
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-	else
-		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
-
-	return 0;
-}
-EXPORT_SYMBOL(msm_fb_writeback_iommu_ref);

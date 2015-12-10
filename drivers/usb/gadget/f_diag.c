@@ -35,8 +35,13 @@ static struct usb_interface_descriptor intf_desc = {
 	.bDescriptorType    =	USB_DT_INTERFACE,
 	.bNumEndpoints      =	2,
 	.bInterfaceClass    =	0xFF,
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	.bInterfaceSubClass =	0x10,
+	.bInterfaceProtocol =	0x01,
+#else
 	.bInterfaceSubClass =	0xFF,
 	.bInterfaceProtocol =	0xFF,
+#endif
 };
 
 static struct usb_endpoint_descriptor hs_bulk_in_desc = {
@@ -352,6 +357,28 @@ static void free_reqs(struct diag_context *ctxt)
 		usb_ep_free_request(ctxt->out, req);
 	}
 }
+
+/**
+ * usb_diag_free_req() - Free USB requests
+ * @ch: Channel handler
+ *
+ * This function free read and write USB requests for the interface
+ * associated with this channel.
+ *
+ */
+void usb_diag_free_req(struct usb_diag_ch *ch)
+{
+	struct diag_context *ctxt = ch->priv_usb;
+	unsigned long flags;
+
+	if (ctxt) {
+		spin_lock_irqsave(&ctxt->lock, flags);
+		free_reqs(ctxt);
+		spin_unlock_irqrestore(&ctxt->lock, flags);
+	}
+
+}
+EXPORT_SYMBOL(usb_diag_free_req);
 
 /**
  * usb_diag_alloc_req() - Allocate USB requests

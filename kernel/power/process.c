@@ -28,6 +28,7 @@
 static int try_to_freeze_tasks(bool user_only)
 {
 	struct task_struct *g, *p;
+	struct task_struct *q = NULL;
 	unsigned long end_time;
 	unsigned int todo;
 	bool wq_busy = false;
@@ -35,7 +36,6 @@ static int try_to_freeze_tasks(bool user_only)
 	u64 elapsed_csecs64;
 	unsigned int elapsed_csecs;
 	bool wakeup = false;
-	int sleep_usecs = USEC_PER_MSEC;
 
 	do_gettimeofday(&start);
 
@@ -62,8 +62,10 @@ static int try_to_freeze_tasks(bool user_only)
 			 * transition can't race with task state testing here.
 			 */
 			if (!task_is_stopped_or_traced(p) &&
-			    !freezer_should_skip(p))
+			    !freezer_should_skip(p)) {
 				todo++;
+				q = p;
+			}
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 
@@ -82,12 +84,9 @@ static int try_to_freeze_tasks(bool user_only)
 
 		/*
 		 * We need to retry, but first give the freezing tasks some
-		 * time to enter the refrigerator.  Start with an initial
-		 * 1 ms sleep followed by exponential backoff until 8 ms.
+		 * time to enter the regrigerator.
 		 */
-		usleep_range(sleep_usecs / 2, sleep_usecs);
-		if (sleep_usecs < 8 * USEC_PER_MSEC)
-			sleep_usecs *= 2;
+		msleep(10);
 	}
 
 	do_gettimeofday(&end);
@@ -103,8 +102,9 @@ static int try_to_freeze_tasks(bool user_only)
 		 */
 		if(wakeup) {
 			printk("\n");
-			printk(KERN_ERR "Freezing of %s aborted\n",
-					user_only ? "user space " : "tasks ");
+			printk(KERN_ERR "Freezing of %s aborted (%d) (%s)\n",
+					user_only ? "user space " : "tasks ",
+					q ? q->pid : 0, q ? q->comm : "NONE");
 		}
 		else {
 			printk("\n");

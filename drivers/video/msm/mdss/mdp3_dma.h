@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -259,7 +259,6 @@ struct mdp3_dma {
 	int histo_state;
 	struct mdp3_dma_histogram_data histo_data;
 	unsigned int vsync_status;
-	bool update_src_cfg;
 
 	int (*dma_config)(struct mdp3_dma *dma,
 			struct mdp3_dma_source *source_config,
@@ -319,7 +318,6 @@ struct mdp3_video_intf_cfg {
 	int hsync_polarity;
 	int vsync_polarity;
 	int de_polarity;
-	int underflow_color;
 };
 
 struct mdp3_dsi_cmd_intf_cfg {

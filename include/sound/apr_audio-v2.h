@@ -757,7 +757,6 @@ struct adm_cmd_connect_afe_port_v5 {
 #define AFE_PORT_ID_SECONDARY_PCM_RX        0x100C
 #define AFE_PORT_ID_SECONDARY_PCM_TX        0x100D
 #define AFE_PORT_ID_MULTICHAN_HDMI_RX       0x100E
-#define AFE_PORT_ID_SECONDARY_MI2S_RX_VIBRA	0x1010
 #define  AFE_PORT_ID_RT_PROXY_PORT_001_RX   0x2000
 #define  AFE_PORT_ID_RT_PROXY_PORT_001_TX   0x2001
 #define AFE_PORT_ID_INTERNAL_BT_SCO_RX      0x3000
@@ -2256,7 +2255,9 @@ struct afe_port_cmdrsp_get_param_v2 {
 #define VPM_TX_SM_ECNS_COPP_TOPOLOGY			0x00010F71
 #define VPM_TX_DM_FLUENCE_COPP_TOPOLOGY			0x00010F72
 #define VPM_TX_QMIC_FLUENCE_COPP_TOPOLOGY		0x00010F75
-#define VPM_TX_DM_RFECNS_COPP_TOPOLOGY			0x00010F86
+
+// NXP LVVEFQ
+#define VPM_TX_SM_LVVE_COPP_TOPOLOGY	0x1000BFFF
 
 /* Memory map regions command payload used by the
  * #ASM_CMD_SHARED_MEM_MAP_REGIONS ,#ADM_CMD_SHARED_MEM_MAP_REGIONS
@@ -6981,6 +6982,102 @@ struct afe_lpass_digital_clk_config_command {
 	struct afe_digital_clk_cfg clk_cfg;
 } __packed;
 
+#define ASM_MODULE_ID_PP_SA                 0x10001fa0
+#define ASM_PARAM_ID_PP_SA_PARAMS           0x10001fa1
+
+//#define ASM_MODULE_ID_PP_SA_VOL             0x10001fa3
+//#define ASM_PARAM_ID_PP_SA_VOLUME           0x10001fa4
+#define ASM_MODULE_ID_PP_SA_VSP             0x10001fb0
+#define ASM_PARAM_ID_PP_SA_VSP_PARAMS       0x10001fb1
+
+#define ASM_MODULE_ID_PP_DHA                0x10001fc0
+#define ASM_PARAM_ID_PP_DHA_PARAMS          0x10001fc1
+
+#define ASM_MODULE_ID_PP_LRSM               0x10001fe0
+#define ASM_PARAM_ID_PP_LRSM_PARAMS         0x10001fe1
+
+#define ASM_MODULE_ID_PP_SA_EP              0x10001fd0
+#define ASM_PARAM_ID_PP_SA_EP_PARAMS        0x10001fd1
+#define ASM_PARAM_ID_PP_SA_EP_GET_PARAMS    0x10001fd2
+
+struct sa_params {
+	int16_t OutDevice;
+	int16_t Preset;
+	int32_t EqLev[7];
+	int16_t m3Dlevel;
+	int16_t BElevel;
+	int16_t CHlevel;
+	int16_t CHRoomSize; 
+	int16_t Clalevel;
+	int16_t volume;
+	int16_t Sqrow;
+	int16_t Sqcol;
+	int16_t TabInfo;
+	int16_t NewUI;
+} __packed;
+
+struct vsp_params {
+	uint32_t speed_int;
+} __packed ;
+
+struct dha_params {
+	int32_t enable;
+	int16_t gain[2][6];
+} __packed ;
+
+struct lrsm_params {
+	int16_t sm;
+	int16_t lr;
+} __packed ;
+
+struct sa_ep_params {
+	int32_t enable;
+	int32_t score;
+} __packed ;
+
+struct asm_stream_cmd_set_pp_params_sa {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+
+	struct sa_params sa_param;
+} __packed;
+
+struct asm_stream_cmd_set_pp_params_vsp {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+
+	uint32_t speed_int;
+} __packed;
+
+struct asm_stream_cmd_set_pp_params_dha {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+
+	int32_t enable;
+	int16_t gain[2][6];
+} __packed;
+
+struct asm_stream_cmd_set_pp_params_lrsm {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+
+	int16_t sm;
+	int16_t lr;
+} __packed;
+
+struct asm_stream_cmd_set_pp_params_sa_ep {
+	struct apr_hdr	hdr;
+	struct asm_stream_cmd_set_pp_params_v2 param;
+	struct asm_stream_param_data_v2 data;
+
+	int32_t enable;
+	int32_t score;
+} __packed;
+
 /*
  * Opcode for AFE to start DTMF.
  */
@@ -7176,46 +7273,97 @@ struct afe_svc_cmd_set_clip_bank_selection {
 #define US_PROX_FORMAT_V2       0x0001272E
 #define US_RAW_SYNC_FORMAT      0x0001272F
 #define US_GES_SYNC_FORMAT      0x00012730
+#ifdef CONFIG_SND_SOC_MAX98504 // Vinay
+/* Integrating DSM specific AMD IDs */
+#define ADM_CUSTOM_PP_TOPO_ID_DYNAMIC 0x10000098
+#define ADM_CUSTOM_PP_TX_TOPO_ID_DYNAMIC 0x100000AB
 
-#define AFE_MODULE_GROUP_DEVICE	0x00010254
-#define AFE_PARAM_ID_GROUP_DEVICE_CFG	0x00010255
-#define AFE_PARAM_ID_GROUP_DEVICE_ENABLE 0x00010256
-#define AFE_GROUP_DEVICE_ID_SECONDARY_MI2S_RX	0x1102
+/* Structure for APR payload for the ADD_TOPOLOGY command */
+struct adm_cmd_add_topologies_v5_t {
+    u32 data_payload_addr_lsw;
+    /* LSW of the parameter data payload address. */
+    u32 data_payload_addr_msw;
+    /* MSW of the parameter data payload address. */
+    u32 mem_map_handle;
+    /* Unique identifier for an address
+    This memory map handle is returned by the aDSP through the
+    ADM_CMD_SHARED_MEM_MAP_REGIONS command. */
+    u32 buffer_size;
+    /* Size in bytes of the valid data in the topology buffer. */
+}__packed;
 
-/*  Payload of the #AFE_PARAM_ID_GROUP_DEVICE_CFG
- * parameter, which configures max of 8 AFE ports
- * into a group.
- * The fixed size of this structure is sixteen bytes.
- */
-struct afe_group_device_group_cfg {
-	u32 minor_version;
-	u16 group_id;
-	u16 num_channels;
-	u16 port_id[8];
+struct adm_custom_topo_add{
+    struct apr_hdr hdr;
+    struct adm_cmd_add_topologies_v5_t param;
 } __packed;
 
+/* Topology ID */
+#define ASM_STREAM_PP_CUSTOM_FILTER_TOPO_ID 0x10010000
 
-/*  Payload of the #AFE_PARAM_ID_GROUP_DEVICE_ENABLE
- * parameter, which enables or
- * disables any module.
- * The fixed size of this structure is four bytes.
- */
+/* module Id */
+#define MODULE_ID_DSM_FILTER 0x10010095
 
-struct afe_group_device_enable {
-	u16 group_id;
-	/* valid value is AFE_GROUP_DEVICE_ID_SECONDARY_MI2S_RX */
-	u16 enable;
-/* Enables (1) or disables (0) the module. */
+/* parameters */
+#define PARAM_ID_DSM_FILTER_ENABLE 0x10001001
+#define PARAM_ID_DSM_FILTER_SHIFT 0x10001002
+#define PARAM_ID_DSM_FILTER_PARAM 0x10001003
+
+/* COMMAND IDs for DSM module */
+#define DSM_ID_FILTER_DISABLE 0x00000000
+#define DSM_ID_FILTER_ENABLE 0x00000001
+#define DSM_ID_FILTER_GET_PARAMS 0x00000002
+#define DSM_ID_FILTER_SET_CNTRLS 0x00000003
+#define DSM_ID_FILTER_SHIFT_3 0x00000004
+#define DSM_ID_FILTER_SHIFT_4 0x00000005
+
+#define DSM_ID_FILTER_PARAMS_RXINIT   0x00000006
+#define DSM_ID_FILTER_PARAMS_TXINIT   0x00000007
+#endif
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+/* Integrating DSM specific AMD IDs */
+#define ADM_CUSTOM_PP_TOPO_ID_DYNAMIC 0x10000098
+#define ADM_CUSTOM_PP_TX_TOPO_ID_DYNAMIC 0x100000AB
+
+/* Structure for APR payload for the ADD_TOPOLOGY command */
+struct adm_cmd_add_topologies_v5_t {
+    u32 data_payload_addr_lsw;
+    /* LSW of the parameter data payload address. */
+    u32 data_payload_addr_msw;
+    /* MSW of the parameter data payload address. */
+    u32 mem_map_handle;
+    /* Unique identifier for an address
+    This memory map handle is returned by the aDSP through the
+    ADM_CMD_SHARED_MEM_MAP_REGIONS command. */
+    u32 buffer_size;
+    /* Size in bytes of the valid data in the topology buffer. */
+}__packed;
+
+struct adm_custom_topo_add{
+    struct apr_hdr hdr;
+    struct adm_cmd_add_topologies_v5_t param;
 } __packed;
 
-struct afe_port_group_create {
-	struct apr_hdr hdr;
-	struct afe_svc_cmd_set_param param;
-	struct afe_port_param_data_v2 pdata;
-	union {
-		struct afe_group_device_group_cfg group_cfg;
-		struct afe_group_device_enable group_enable;
-	} __packed data;
-} __packed;
+/* Topology ID */
+#define ASM_STREAM_PP_CUSTOM_FILTER_TOPO_ID 0x10010000
 
+/* module Id */
+#define MODULE_ID_DSM_FILTER 0x10010095
+
+/* parameters */
+#define PARAM_ID_DSM_FILTER_ENABLE 0x10002001
+#define PARAM_ID_DSM_FILTER_SHIFT 0x10002002
+#define PARAM_ID_DSM_FILTER_PARAM 0x10002003
+
+/* COMMAND IDs for DSM module */
+#define DSM_ID_FILTER_DISABLE 0x00000000
+#define DSM_ID_FILTER_ENABLE 0x00000001
+#define DSM_ID_FILTER_GET_PARAMS 0x00000002
+#define DSM_ID_FILTER_SET_CNTRLS 0x00000003
+#define DSM_ID_FILTER_SHIFT_3 0x00000004
+#define DSM_ID_FILTER_SHIFT_4 0x00000005
+
+#define DSM_ID_FILTER_PARAMS_RXINIT   0x00000006
+#define DSM_ID_FILTER_PARAMS_TXINIT   0x00000007
+#endif
 #endif /*_APR_AUDIO_V2_H_ */

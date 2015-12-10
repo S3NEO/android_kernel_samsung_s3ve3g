@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,7 +19,6 @@
 #include "msm_camera_io_util.h"
 #include "../msm_sensor.h"
 #include "msm_led_flash.h"
-#include <linux/debugfs.h>
 
 #define FLASH_NAME "camera-led-flash"
 
@@ -95,30 +94,27 @@ int msm_flash_led_init(struct msm_led_flash_ctrl_t *fctrl)
 {
 	int rc = 0;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 	CDBG("%s:%d called\n", __func__, __LINE__);
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
-	if (power_info->gpio_conf->cam_gpiomux_conf_tbl != NULL) {
+	if (flashdata->gpio_conf->cam_gpiomux_conf_tbl != NULL) {
 		pr_err("%s:%d mux install\n", __func__, __LINE__);
 		msm_gpiomux_install(
 			(struct msm_gpiomux_config *)
-			power_info->gpio_conf->cam_gpiomux_conf_tbl,
-			power_info->gpio_conf->cam_gpiomux_conf_tbl_size);
+			flashdata->gpio_conf->cam_gpiomux_conf_tbl,
+			flashdata->gpio_conf->cam_gpiomux_conf_tbl_size);
 	}
 
 	rc = msm_camera_request_gpio_table(
-		power_info->gpio_conf->cam_gpio_req_tbl,
-		power_info->gpio_conf->cam_gpio_req_tbl_size, 1);
+		flashdata->gpio_conf->cam_gpio_req_tbl,
+		flashdata->gpio_conf->cam_gpio_req_tbl_size, 1);
 	if (rc < 0) {
 		pr_err("%s: request gpio failed\n", __func__);
 		return rc;
 	}
 	msleep(20);
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_EN],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[0],
 		GPIO_OUT_HIGH);
 
 	if (fctrl->flash_i2c_client && fctrl->reg_setting) {
@@ -136,26 +132,22 @@ int msm_flash_led_release(struct msm_led_flash_ctrl_t *fctrl)
 {
 	int rc = 0;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
 	CDBG("%s:%d called\n", __func__, __LINE__);
 	if (!fctrl) {
 		pr_err("%s:%d fctrl NULL\n", __func__, __LINE__);
 		return -EINVAL;
 	}
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_EN],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[0],
 		GPIO_OUT_LOW);
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[1],
 		GPIO_OUT_LOW);
 	rc = msm_camera_request_gpio_table(
-		power_info->gpio_conf->cam_gpio_req_tbl,
-		power_info->gpio_conf->cam_gpio_req_tbl_size, 0);
+		flashdata->gpio_conf->cam_gpio_req_tbl,
+		flashdata->gpio_conf->cam_gpio_req_tbl_size, 0);
 	if (rc < 0) {
 		pr_err("%s: request gpio failed\n", __func__);
 		return rc;
@@ -167,10 +159,8 @@ int msm_flash_led_off(struct msm_led_flash_ctrl_t *fctrl)
 {
 	int rc = 0;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
 	CDBG("%s:%d called\n", __func__, __LINE__);
 	if (!fctrl) {
 		pr_err("%s:%d fctrl NULL\n", __func__, __LINE__);
@@ -184,8 +174,7 @@ int msm_flash_led_off(struct msm_led_flash_ctrl_t *fctrl)
 			pr_err("%s:%d failed\n", __func__, __LINE__);
 	}
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[1],
 		GPIO_OUT_LOW);
 
 	return rc;
@@ -195,19 +184,15 @@ int msm_flash_led_low(struct msm_led_flash_ctrl_t *fctrl)
 {
 	int rc = 0;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 	CDBG("%s:%d called\n", __func__, __LINE__);
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_EN],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[0],
 		GPIO_OUT_HIGH);
 
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[1],
 		GPIO_OUT_HIGH);
 
 
@@ -226,19 +211,15 @@ int msm_flash_led_high(struct msm_led_flash_ctrl_t *fctrl)
 {
 	int rc = 0;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 	CDBG("%s:%d called\n", __func__, __LINE__);
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_EN],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[0],
 		GPIO_OUT_HIGH);
 
 	gpio_set_value_cansleep(
-		power_info->gpio_conf->gpio_num_info->
-		gpio_num[SENSOR_GPIO_FL_NOW],
+		flashdata->gpio_conf->gpio_num_info->gpio_num[1],
 		GPIO_OUT_HIGH);
 
 	if (fctrl->flash_i2c_client && fctrl->reg_setting) {
@@ -252,6 +233,61 @@ int msm_flash_led_high(struct msm_led_flash_ctrl_t *fctrl)
 	return rc;
 }
 
+static int32_t msm_flash_init_gpio_pin_tbl(struct device_node *of_node,
+	struct msm_camera_gpio_conf *gconf, uint16_t *gpio_array,
+	uint16_t gpio_array_size)
+{
+	int32_t rc = 0;
+	int32_t val = 0;
+
+	gconf->gpio_num_info = kzalloc(sizeof(struct msm_camera_gpio_num_info),
+		GFP_KERNEL);
+	if (!gconf->gpio_num_info) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		rc = -ENOMEM;
+		return rc;
+	}
+
+	rc = of_property_read_u32(of_node, "qcom,gpio-flash-en", &val);
+	if (rc < 0) {
+		pr_err("%s:%d read qcom,gpio-flash-en failed rc %d\n",
+			__func__, __LINE__, rc);
+		goto ERROR;
+	} else if (val >= gpio_array_size) {
+		pr_err("%s:%d qcom,gpio-flash-en invalid %d\n",
+			__func__, __LINE__, val);
+		goto ERROR;
+	}
+	/*index 0 is for qcom,gpio-flash-en */
+	gconf->gpio_num_info->gpio_num[0] =
+		gpio_array[val];
+	CDBG("%s qcom,gpio-flash-en %d\n", __func__,
+		gconf->gpio_num_info->gpio_num[0]);
+
+	rc = of_property_read_u32(of_node, "qcom,gpio-flash-now", &val);
+	if (rc < 0) {
+		pr_err("%s:%d read qcom,gpio-flash-now failed rc %d\n",
+			__func__, __LINE__, rc);
+		goto ERROR;
+	} else if (val >= gpio_array_size) {
+		pr_err("%s:%d qcom,gpio-flash-now invalid %d\n",
+			__func__, __LINE__, val);
+		goto ERROR;
+	}
+	/*index 1 is for qcom,gpio-flash-now */
+	gconf->gpio_num_info->gpio_num[1] =
+		gpio_array[val];
+	CDBG("%s qcom,gpio-flash-now %d\n", __func__,
+		gconf->gpio_num_info->gpio_num[1]);
+
+	return rc;
+
+ERROR:
+	kfree(gconf->gpio_num_info);
+	gconf->gpio_num_info = NULL;
+	return rc;
+}
+
 static int32_t msm_led_get_dt_data(struct device_node *of_node,
 		struct msm_led_flash_ctrl_t *fctrl)
 {
@@ -259,7 +295,6 @@ static int32_t msm_led_get_dt_data(struct device_node *of_node,
 	struct msm_camera_gpio_conf *gconf = NULL;
 	struct device_node *flash_src_node = NULL;
 	struct msm_camera_sensor_board_info *flashdata = NULL;
-	struct msm_camera_power_ctrl_t *power_info = NULL;
 	uint32_t count = 0;
 	uint16_t *gpio_array = NULL;
 	uint16_t gpio_array_size = 0;
@@ -281,7 +316,13 @@ static int32_t msm_led_get_dt_data(struct device_node *of_node,
 	}
 
 	flashdata = fctrl->flashdata;
-	power_info = &flashdata->power_info;
+
+	flashdata->sensor_init_params = kzalloc(sizeof(
+		struct msm_sensor_init_params), GFP_KERNEL);
+	if (!flashdata->sensor_init_params) {
+		pr_err("%s failed %d\n", __func__, __LINE__);
+		return -ENOMEM;
+	}
 
 	rc = of_property_read_u32(of_node, "cell-index", &fctrl->subdev_id);
 	if (rc < 0) {
@@ -347,15 +388,15 @@ static int32_t msm_led_get_dt_data(struct device_node *of_node,
 		}
 
 	} else { /*Handle LED Flash Ctrl by GPIO*/
-		power_info->gpio_conf =
+		flashdata->gpio_conf =
 			 kzalloc(sizeof(struct msm_camera_gpio_conf),
 				 GFP_KERNEL);
-		if (!power_info->gpio_conf) {
+		if (!flashdata->gpio_conf) {
 			pr_err("%s failed %d\n", __func__, __LINE__);
 			rc = -ENOMEM;
 			return rc;
 		}
-		gconf = power_info->gpio_conf;
+		gconf = flashdata->gpio_conf;
 
 		gpio_array_size = of_gpio_count(of_node);
 		CDBG("%s gpio count %d\n", __func__, gpio_array_size);
@@ -374,21 +415,21 @@ static int32_t msm_led_get_dt_data(struct device_node *of_node,
 					gpio_array[i]);
 			}
 
-			rc = msm_camera_get_dt_gpio_req_tbl(of_node, gconf,
+			rc = msm_sensor_get_dt_gpio_req_tbl(of_node, gconf,
 				gpio_array, gpio_array_size);
 			if (rc < 0) {
 				pr_err("%s failed %d\n", __func__, __LINE__);
 				goto ERROR4;
 			}
 
-			rc = msm_camera_get_dt_gpio_set_tbl(of_node, gconf,
+			rc = msm_sensor_get_dt_gpio_set_tbl(of_node, gconf,
 				gpio_array, gpio_array_size);
 			if (rc < 0) {
 				pr_err("%s failed %d\n", __func__, __LINE__);
 				goto ERROR5;
 			}
 
-			rc = msm_camera_init_gpio_pin_tbl(of_node, gconf,
+			rc = msm_flash_init_gpio_pin_tbl(of_node, gconf,
 				gpio_array, gpio_array_size);
 			if (rc < 0) {
 				pr_err("%s failed %d\n", __func__, __LINE__);
@@ -420,7 +461,7 @@ static int32_t msm_led_get_dt_data(struct device_node *of_node,
 ERROR9:
 		kfree(fctrl->flashdata->slave_info);
 ERROR8:
-		kfree(fctrl->flashdata->power_info.gpio_conf->gpio_num_info);
+		kfree(fctrl->flashdata->gpio_conf->gpio_num_info);
 ERROR6:
 		kfree(gconf->cam_gpio_set_tbl);
 ERROR5:
@@ -444,44 +485,12 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 		msm_camera_qup_i2c_write_table_w_microdelay,
 };
 
-#ifdef CONFIG_DEBUG_FS
-static int set_led_status(void *data, u64 val)
-{
-	struct msm_led_flash_ctrl_t *fctrl =
-		 (struct msm_led_flash_ctrl_t *)data;
-	int rc = -1;
-	pr_debug("set_led_status: Enter val: %llu", val);
-	if (!fctrl) {
-		pr_err("set_led_status: fctrl is NULL");
-		return rc;
-	}
-	if (!fctrl->func_tbl) {
-		pr_err("set_led_status: fctrl->func_tbl is NULL");
-		return rc;
-	}
-	if (val == 0) {
-		pr_debug("set_led_status: val is disable");
-		rc = msm_flash_led_off(fctrl);
-	} else {
-		pr_debug("set_led_status: val is enable");
-		rc = msm_flash_led_low(fctrl);
-	}
-
-	return rc;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(ledflashdbg_fops,
-	NULL, set_led_status, "%llu\n");
-#endif
-
 int msm_flash_i2c_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
 	int rc = 0;
 	struct msm_led_flash_ctrl_t *fctrl = NULL;
-#ifdef CONFIG_DEBUG_FS
-	struct dentry *dentry;
-#endif
+
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("i2c_check_functionality failed\n");
 		goto probe_failure;
@@ -520,12 +529,6 @@ int msm_flash_i2c_probe(struct i2c_client *client,
 			&msm_sensor_qup_func_tbl;
 
 	rc = msm_led_i2c_flash_create_v4lsubdev(fctrl);
-#ifdef CONFIG_DEBUG_FS
-	dentry = debugfs_create_file("ledflash", S_IRUGO, NULL, (void *)fctrl,
-		&ledflashdbg_fops);
-	if (!dentry)
-		pr_err("Failed to create the debugfs ledflash file");
-#endif
 	CDBG("%s:%d probe success\n", __func__, __LINE__);
 	return 0;
 

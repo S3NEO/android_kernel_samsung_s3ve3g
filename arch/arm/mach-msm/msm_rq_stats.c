@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,6 +30,9 @@
 #include <linux/kernel_stat.h>
 #include <linux/tick.h>
 #include <asm/smp_plat.h>
+#if !defined(CONFIG_ARCH_MSM8226) && !defined(CONFIG_ARCH_MSM8610)
+#include "acpuclock.h"
+#endif
 #include <linux/suspend.h>
 
 #define MAX_LONG_SIZE 24
@@ -198,7 +201,11 @@ static int cpu_hotplug_handler(struct notifier_block *nb,
 	switch (val) {
 	case CPU_ONLINE:
 		if (!this_cpu->cur_freq)
-			this_cpu->cur_freq = cpufreq_quick_get(cpu);
+#if defined(CONFIG_ARCH_MSM8226) || defined(CONFIG_ARCH_MSM8610)
+			this_cpu->cur_freq = cpufreq_quick_get(cpu) * 1000;
+#else
+			this_cpu->cur_freq = acpuclk_get_rate(cpu);
+#endif
 	case CPU_ONLINE_FROZEN:
 		this_cpu->avg_load_maxfreq = 0;
 	}
@@ -375,12 +382,11 @@ static int __init msm_rq_stats_init(void)
 	int ret;
 	int i;
 	struct cpufreq_policy cpu_policy;
-
-#ifndef CONFIG_SMP
 	/* Bail out if this is not an SMP Target */
-	rq_info.init = 0;
-	return -ENOSYS;
-#endif
+	if (!is_smp()) {
+		rq_info.init = 0;
+		return -ENOSYS;
+	}
 
 	rq_wq = create_singlethread_workqueue("rq_stats");
 	BUG_ON(!rq_wq);
@@ -401,7 +407,11 @@ static int __init msm_rq_stats_init(void)
 		cpufreq_get_policy(&cpu_policy, i);
 		pcpu->policy_max = cpu_policy.cpuinfo.max_freq;
 		if (cpu_online(i))
-			pcpu->cur_freq = cpufreq_quick_get(i);
+#if defined(CONFIG_ARCH_MSM8226) || defined(CONFIG_ARCH_MSM8610)
+			pcpu->cur_freq = cpufreq_quick_get(i) * 1000;
+#else
+			pcpu->cur_freq = acpuclk_get_rate(i);
+#endif
 		cpumask_copy(pcpu->related_cpus, cpu_policy.cpus);
 	}
 	freq_transition.notifier_call = cpufreq_transition_handler;
@@ -416,11 +426,11 @@ late_initcall(msm_rq_stats_init);
 
 static int __init msm_rq_stats_early_init(void)
 {
-#ifndef CONFIG_SMP
 	/* Bail out if this is not an SMP Target */
-	rq_info.init = 0;
-	return -ENOSYS;
-#endif
+	if (!is_smp()) {
+		rq_info.init = 0;
+		return -ENOSYS;
+	}
 
 	pm_notifier(system_suspend_handler, 0);
 	return 0;

@@ -45,6 +45,8 @@ struct msm_actuator_func_tbl {
 			int16_t);
 	int32_t (*actuator_set_position)(struct msm_actuator_ctrl_t *,
 		struct msm_actuator_set_position_t *);
+	int32_t (*actuator_sw_landing)(struct msm_actuator_ctrl_t *,
+			struct msm_actuator_move_params_t *);
 };
 
 struct msm_actuator {
@@ -80,9 +82,11 @@ struct msm_actuator_ctrl_t {
 	uint16_t pwd_step;
 	uint16_t initial_code;
 	struct msm_camera_i2c_reg_array *i2c_reg_tbl;
+	struct msm_camera_i2c_seq_reg_array *i2c_reg_seq_tbl;
 	uint16_t i2c_tbl_index;
 	enum cci_i2c_master_t cci_master;
 	uint32_t subdev_id;
+	struct msm_camera_gpio_conf *gpio_conf;
 };
 
 #endif

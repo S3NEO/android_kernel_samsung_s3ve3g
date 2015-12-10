@@ -100,11 +100,10 @@ static void _kgsl_destroy_pagetable(struct kgsl_pagetable *pagetable)
 
 	kfree(pagetable);
 }
-
 static void kgsl_destroy_pagetable(struct kref *kref)
 {
 	struct kgsl_pagetable *pagetable = container_of(kref,
-		struct kgsl_pagetable, refcount);
+	 struct kgsl_pagetable, refcount);
 	unsigned long flags;
 
 	spin_lock_irqsave(&kgsl_driver.ptlock, flags);
@@ -117,7 +116,7 @@ static void kgsl_destroy_pagetable(struct kref *kref)
 static void kgsl_destroy_pagetable_locked(struct kref *kref)
 {
 	struct kgsl_pagetable *pagetable = container_of(kref,
-		struct kgsl_pagetable, refcount);
+	 struct kgsl_pagetable, refcount);
 
 	list_del(&pagetable->list);
 
@@ -154,12 +153,12 @@ kgsl_get_pagetable(unsigned long name)
 static struct kgsl_pagetable *
 _get_pt_from_kobj(struct kobject *kobj)
 {
-	unsigned int ptname;
+	unsigned long ptname;
 
 	if (!kobj)
 		return NULL;
 
-	if (kstrtou32(kobj->name, 0, &ptname))
+	if (sscanf(kobj->name, "%ld", &ptname) != 1)
 		return NULL;
 
 	return kgsl_get_pagetable(ptname);
@@ -344,7 +343,7 @@ kgsl_mmu_get_ptname_from_ptbase(struct kgsl_mmu *mmu, phys_addr_t pt_base)
 			if (mmu->mmu_ops->mmu_pt_equal(mmu, pt, pt_base)) {
 				ptid = (int) pt->name;
 				kref_put(&pt->refcount,
-					kgsl_destroy_pagetable_locked);
+				kgsl_destroy_pagetable_locked);
 				break;
 			}
 			kref_put(&pt->refcount, kgsl_destroy_pagetable_locked);

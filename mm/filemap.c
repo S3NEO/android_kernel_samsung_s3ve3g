@@ -1174,6 +1174,9 @@ page_ok:
 		 * only mark it as accessed the first time.
 		 */
 		if (prev_index != index || offset != prev_offset)
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+			if (!(filp->f_flags & O_SCFSLOWER))
+#endif
 			mark_page_accessed(page);
 		prev_index = index;
 
@@ -1192,6 +1195,26 @@ page_ok:
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 		prev_offset = offset;
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+#if 1
+		{
+			extern u64 scfs_lowerpage_total_count;
+			if ((filp->f_flags & O_SCFSLOWER) && (!PageScfslower(page) && !PageNocache(page)))
+				scfs_lowerpage_total_count++;
+		}
+#endif
+		if ((filp->f_flags & O_SCFSLOWER) && /* SCFS lower pages */
+			(((ret == PAGE_CACHE_SIZE) || /* Seq.Read : all pages except last one */
+			(PageScfslower(page) && !offset)) /* Seq.Read : last page */
+			|| (ra->size <= 4))) { /* Ran.Read */
+			SetPageNocache(page);
+			if (PageLRU(page))
+				deactivate_page(page);
+		}
+		else if (filp->f_flags & O_SCFSLOWER)
+			SetPageScfslower(page);
+#endif
 
 		page_cache_release(page);
 		if (ret == nr && desc->count)

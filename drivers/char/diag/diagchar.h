@@ -237,7 +237,6 @@ struct diag_smd_info {
 
 	int in_busy_1;
 	int in_busy_2;
-	spinlock_t in_busy_lock;
 
 	unsigned char *buf_in_1;
 	unsigned char *buf_in_2;
@@ -380,7 +379,6 @@ struct diagchar_dev {
 	struct work_struct diag_usb_disconnect_work;
 #endif
 	struct workqueue_struct *diag_wq;
-	struct workqueue_struct *diag_usb_wq;
 	struct work_struct diag_drain_work;
 	struct workqueue_struct *diag_cntl_wq;
 	uint8_t *msg_masks;
@@ -400,6 +398,8 @@ struct diagchar_dev {
 	int logging_process_id;
 	struct task_struct *socket_process;
 	struct task_struct *callback_process;
+	/* pid for diag_mdlog(CP silent log app) */
+	struct pid *silent_log_pid;
 #ifdef CONFIG_DIAG_SDIO_PIPE
 	unsigned char *buf_in_sdio;
 	unsigned char *usb_buf_mdm_out;

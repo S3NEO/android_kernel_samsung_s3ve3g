@@ -22,6 +22,7 @@
 #include <linux/mutex.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
+#include <mach/bam_dmux.h>
 #include <mach/ipa.h>
 #include <mach/sps.h>
 #include "ipa_i.h"

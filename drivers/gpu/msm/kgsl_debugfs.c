@@ -347,7 +347,7 @@ kgsl_process_init_debugfs(struct kgsl_process_private *private)
 	 * So if debugfs is disabled in kernel, return as
 	 * success.
 	 */
-	dentry = debugfs_create_file("mem", 0400, private->debug_root, private,
+	dentry = debugfs_create_file("mem", 0444, private->debug_root, private,
 			    &process_mem_fops);
 
 	if (IS_ERR(dentry)) {

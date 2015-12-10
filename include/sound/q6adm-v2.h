@@ -27,6 +27,139 @@ struct route_payload {
 	unsigned short num_copps;
 	unsigned int session_id;
 };
+#ifdef CONFIG_SND_SOC_MAX98504 // Vinay
+struct asm_custom_filter_config {
+    struct apr_hdr hdr;
+    struct asm_stream_cmd_set_pp_params_v2 param;
+    struct asm_stream_param_data_v2 data;
+} __packed;
+
+struct asm_custom_get_filter_config {
+    struct apr_hdr hdr;
+    struct asm_stream_cmd_get_pp_params_v2 param;
+    struct asm_stream_param_data_v2 data;
+} __packed;
+
+
+/** @brief Structure for enabling the configuration parameter for the
+    DSM filter on the Tx path.
+*/
+typedef struct dsm_filter_enable_cfg_t dsm_filter_enable_cfg_t;
+struct dsm_filter_enable_cfg_t {
+  uint32_t enable_flag;
+  /**< Enable flag: 0 = disabled; nonzero = enabled. */
+} __packed;
+
+/** \brief Structure for DSM filter coefficients for DSM module */
+typedef struct dsm_filter_get_params_t dsm_filter_get_params_t;
+struct dsm_filter_get_params_t {
+  /** \ Sequence of DSM filter paramters */
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+ /** \ sequence of control parameters */
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+} __packed;
+
+/** \brief Structure for DSM filter coefficients for DSM module */
+typedef struct dsm_filter_set_params_t dsm_filter_set_params_t;
+struct dsm_filter_set_params_t {
+  /** \ Sequence of DSM filter paramters */
+  uint32_t dsmenabled;
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+} __packed;
+#endif
+
+#ifdef CONFIG_SND_SOC_MAXIM_DSM
+struct asm_custom_filter_config {
+    struct apr_hdr hdr;
+    struct asm_stream_cmd_set_pp_params_v2 param;
+    struct asm_stream_param_data_v2 data;
+} __packed;
+
+struct asm_custom_get_filter_config {
+    struct apr_hdr hdr;
+    struct asm_stream_cmd_get_pp_params_v2 param;
+    struct asm_stream_param_data_v2 data;
+} __packed;
+
+/** @brief Structure for enabling the configuration parameter for the
+    DSM filter on the Tx path.
+*/
+typedef struct dsm_filter_enable_cfg_t dsm_filter_enable_cfg_t;
+struct dsm_filter_enable_cfg_t {
+  uint32_t enable_flag;
+  /**< Enable flag: 0 = disabled; nonzero = enabled. */
+} __packed;
+
+#define USE_DSM_LOG	// To save DSM log data.
+
+#ifdef USE_DSM_LOG
+#define LOG_BUFFER_ARRAY_SIZE 10
+#define BEFORE_BUFSIZE 4+(LOG_BUFFER_ARRAY_SIZE*2)	// 4 byte allignment
+#define AFTER_BUFSIZE LOG_BUFFER_ARRAY_SIZE*4		// 4 byte allignment
+#endif
+/** \brief Structure for DSM filter coefficients for DSM module */
+typedef struct dsm_filter_get_params_t dsm_filter_get_params_t;
+struct dsm_filter_get_params_t {
+  /** \ Sequence of DSM filter paramters */
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+ /** \ sequence of control parameters */
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+#ifdef USE_DSM_LOG
+  /* Refer "byteLogStruct" for mapping below array */
+  uint8_t  byteLogArray[BEFORE_BUFSIZE];
+  /* Refer "intLogStruct" for mapping below array */
+  uint32_t intLogArray[BEFORE_BUFSIZE];
+  /* Refer "byteLogStruct" for mapping below array */
+  uint8_t  afterProbByteLogArray[AFTER_BUFSIZE];
+  /* Refer "intLogStruct" for mapping below array */
+  uint32_t afterProbIntLogArray[AFTER_BUFSIZE];
+#endif
+} __packed;
+
+/** \brief Structure for DSM filter coefficients for DSM module */
+typedef struct dsm_filter_set_params_t dsm_filter_set_params_t;
+struct dsm_filter_set_params_t {
+  /** \ Sequence of DSM filter paramters */
+  uint32_t dcResistance;
+  uint32_t coilTemp;
+  uint32_t qualityfactor;
+  uint32_t resonanceFreq;
+  uint32_t excursionMeasure;
+ /** \ sequence of control parameters */
+  uint32_t rdcroomtemp;
+  uint32_t releasetime;
+  uint32_t coilthermallimit;
+  uint32_t excursionlimit;
+  uint32_t dsmenabled;
+  uint32_t staticgain;
+  uint32_t lfxgain;
+  uint32_t pilotgain;
+  uint32_t flagToWrite;
+} __packed;
+#endif
 
 int srs_trumedia_open(int port_id, int srs_tech_id, void *srs_params);
 

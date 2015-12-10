@@ -17,20 +17,6 @@
 		status = "ok";
 	};
 
-        i2c@f9925000 { /* BLSP1 QUP3 */
-                nfc-nci@0e {
-                        compatible = "qcom,nfc-nci";
-                        reg = <0x0e>;
-                        qcom,irq-gpio = <&msmgpio 21 0x00>;
-                        qcom,dis-gpio = <&msmgpio 20 0x00>;
-                        qcom,clk-src = "BBCLK2";
-                        qcom,clk-en-gpio = <&msmgpio 0 0x00>;
-                        interrupt-parent = <&msmgpio>;
-                        interrupts = <21 0>;
-                        qcom,clk-gpio = <&pm8226_gpios 3 0>;
-                };
-        };
-
 	i2c@f9927000 { /* BLSP1 QUP5 */
 		synaptics@20 {
 			compatible = "synaptics,rmi4";
@@ -144,13 +130,15 @@
 			"MIC BIAS1 External", "Handset Mic",
 			"AMIC2", "MIC BIAS2 External",
 			"MIC BIAS2 External", "Headset Mic",
-			"AMIC3", "MIC BIAS1 External",
+			"MIC BIAS1 External", "ANCRight Headset Mic",
 			"MIC BIAS1 External", "Analog Mic3",
 			"AMIC4", "MIC BIAS3 External",
 			"MIC BIAS3 External", "Analog Mic4";
+			"MIC BIAS2 External", "ANCRight Headset Mic",
+			"AMIC5", "MIC BIAS2 External",
 
 		qcom,cdc-mclk-gpios = <&pm8226_gpios 1 0>;
-		qcom,cdc-vdd-spkr-gpios = <&pm8226_gpios 2 0>;
+		/*qcom,cdc-vdd-spkr-gpios = <&pm8226_gpios 2 0>;*/
 		qcom,cdc-us-euro-gpios = <&msmgpio 69 0>;
 	};
 
@@ -381,9 +369,12 @@
 		};
 
 		qcom,vibrator@c000 {
-			status = "okay";
+			compatible = "qcom,qpnp-vibrator";
+			reg = <0xc000 0x100>;
+			label = "vibrator";
 			qcom,vib-timeout-ms = <15000>;
 			qcom,vib-vtg-level-mV = <3100>;
+			status = "okay";
 		};
 
 	};
@@ -479,6 +470,13 @@
 	};
 
 	mpp@a700 { /* MPP 8 */
+	};
+};
+
+&slim_msm {
+	tapan_codec {
+		qcom,cdc-micbias1-ext-cap;
+		qcom,cdc-micbias3-ext-cap;
 	};
 };
 

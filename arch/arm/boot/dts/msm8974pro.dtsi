@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1578,13 +1578,13 @@
 		/* Off */
 		<26 512 0 0>, <89 604 0 0>,
 		/* Sub-SVS / SVS */
-		<26 512 1200000 2456000>, <89 604 0 3200000>,
+		<26 512 0 1600000>, <89 604 0 3200000>,
 		/* SVS */
-		<26 512 1200000 2456000>, <89 604 0 3200000>,
+		<26 512 0 2456000>, <89 604 0 3200000>,
 		/* low Nominal / SVS */
 		<26 512 0 3680000>, <89 604 0 3200000>,
 		/* SVS / low Nominal */
-		<26 512 1200000 2456000>, <89 604 0 5280000>,
+		<26 512 0 2456000>, <89 604 0 5280000>,
 		/* low Nominal / low Nominal */
 		<26 512 0 3680000>, <89 604 0 5280000>,
 		/* Nominal / low Nominal */
@@ -1616,48 +1616,47 @@
                        reg = <0>;
                        qcom,gpu-freq = <578000000>;
                        qcom,bus-freq = <14>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <33>;
                };
 
                qcom,gpu-pwrlevel@1 {
                        reg = <1>;
                        qcom,gpu-freq = <462400000>;
                        qcom,bus-freq = <11>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <66>;
                };
 
                qcom,gpu-pwrlevel@2 {
                        reg = <2>;
                        qcom,gpu-freq = <389000000>;
                        qcom,bus-freq = <8>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <66>;
                };
 
                qcom,gpu-pwrlevel@3 {
                        reg = <3>;
-                       qcom,gpu-freq = <330000000>;
+                       qcom,gpu-freq = <320000000>;
                        qcom,bus-freq = <5>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <100>;
                };
 
                qcom,gpu-pwrlevel@4 {
                        reg = <4>;
                        qcom,gpu-freq = <200000000>;
                        qcom,bus-freq = <2>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <100>;
                };
 
                qcom,gpu-pwrlevel@5 {
                        reg = <5>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
-                       qcom,io-fraction = <101>;
+                       qcom,io-fraction = <0>;
                };
        };
 };
 
 &mdss_mdp {
-	qcom,max-bandwidth-low-kbps = <2750000>;
 	qcom,vbif-settings = <0x0004 0x00000001>;
 
 	qcom,mdss-wb-off = <0x00011100 0x00011500
@@ -1702,7 +1701,7 @@
 	qcom,dec-ocmem-ab-ib = <0 0>,
 		<176000 519000>,
 		<456000 519000>,
-		<864000 629000>,
+		<864000 519000>,
 		<1728000 1038000>,
 		<2766000 1661000>,
 		<3456000 2076000>,
@@ -1723,7 +1722,7 @@
 		<3240000 1600000>,
 		<4048000 1600000>,
 		<4264000 1600000>;
-	qcom,max-hw-load = <1216800>; /* 3840 X 2160 @ 30 fps + 1920 X 1088 @ 30 fps */
+	qcom,max-hw-load = <1281600>; /* max(4k X 2304 @ 24, 4k X 2160 @ 30) + 1080p @ 30 */
 	qcom,buffer-type-tz-usage-table = <0x241 0x1>,
 					<0x106 0x2>,
 					<0x480 0x3>;
@@ -1751,15 +1750,4 @@
 &memory_hole {
 	qcom,memblock-remove = <0x05a00000 0x7800000
 				0x0fa00000 0x500000>; /* Address and size of the hole */
-};
-
-&gdsc_venus {
-	qcom,skip-logic-collapse;
-};
-
-&sdhc_1 {
-	reg = <0xf9824900 0x1a0>, <0xf9824000 0x800>;
-
-	qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 192000000 384000000>;
-	qcom,bus-speed-mode = "HS400_1p8v", "HS200_1p8v", "DDR_1p8v";
 };

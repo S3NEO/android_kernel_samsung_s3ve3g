@@ -178,6 +178,7 @@ static struct dentry *debugfs_create_stacktrace_depth(
 
 #endif /* CONFIG_FAULT_INJECTION_STACKTRACE_FILTER */
 
+#ifndef CONFIG_ZSWAP
 static int debugfs_atomic_t_set(void *data, u64 val)
 {
 	atomic_set((atomic_t *)data, val);
@@ -198,6 +199,7 @@ static struct dentry *debugfs_create_atomic_t(const char *name, umode_t mode,
 {
 	return debugfs_create_file(name, mode, parent, value, &fops_atomic_t);
 }
+#endif
 
 struct dentry *fault_create_debugfs_attr(const char *name,
 			struct dentry *parent, struct fault_attr *attr)

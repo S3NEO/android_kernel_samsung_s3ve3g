@@ -93,8 +93,6 @@ Optional properties :
 	enable this feature without proper bus voting.
 -qcom,disable-retention-with-vdd-min: If present dont allow phy retention but allow
 	vdd min.
-- qcom,usbin-vadc: Corresponding vadc device's phandle to read usbin voltage using VADC.
-	This will be used to get value of usb power supply's VOLTAGE_NOW property.
 
 Example HSUSB OTG controller device node :
 	usb@f9690000 {
@@ -122,7 +120,6 @@ Example HSUSB OTG controller device node :
 		qcom,disable-retention-with-vdd-min;
 		qcom,hsusb-otg-dpsehv-int = <49>;
 		qcom,hsusb-otg-dmsehv-int = <58>;
-		qcom,usbin-vadc = <&pm8226_vadc>;
 		qcom,msm_bus,name = "usb2";
 		qcom,msm_bus,num_cases = <2>;
 		qcom,msm_bus,active_only = <0>;
@@ -194,15 +191,12 @@ Optional properties :
   turnaround timeout is observed on enabling streaming. Hence it is required
   to see these errors and number of erros on enabling this at USB level to make
   final decision to enable this feature or not.
-- qcom,android-usb-uicc-nluns : Number of mass storage LUNs required for
-  the UICC card.
 Example Android USB device node :
 	android_usb@fc42b0c8 {
 		compatible = "qcom,android-usb";
 		reg = <0xfc42b0c8 0xc8>;
 		qcom,android-usb-swfi-latency = <1>;
 		qcom,streaming-func = "rndis","mtp";
-		qcom,android-usb-uicc-nluns = <1>;
 	};
 
 

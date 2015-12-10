@@ -1627,17 +1627,19 @@ static int adreno_of_get_iommu(struct device_node *parent,
 			goto err;
 		}
 
-		ret = of_property_read_u32_array(child, "reg", reg_val, 2);
-		if (ret) {
-			KGSL_CORE_ERR("Unable to read KGSL IOMMU 'reg'\n");
-			goto err;
+		if (!strcmp("gfx3d_user", ctxs[ctx_index].iommu_ctx_name)) {
+		ctxs[ctx_index].ctx_id = 0;
+		} else if (!strcmp("gfx3d_priv",
+		ctxs[ctx_index].iommu_ctx_name)) {
+		ctxs[ctx_index].ctx_id = 1;
+		} else if (!strcmp("gfx3d_spare",
+		ctxs[ctx_index].iommu_ctx_name)) {
+		ctxs[ctx_index].ctx_id = 2;
+		} else {
+		KGSL_CORE_ERR("dt: IOMMU context %s is invalid\n",
+		ctxs[ctx_index].iommu_ctx_name);
+		goto err;
 		}
-		if (msm_soc_version_supports_iommu_v0())
-			ctxs[ctx_index].ctx_id = (reg_val[0] -
-				data->physstart) >> KGSL_IOMMU_CTX_SHIFT;
-		else
-			ctxs[ctx_index].ctx_id = ((reg_val[0] -
-				data->physstart) >> KGSL_IOMMU_CTX_SHIFT) - 8;
 
 		ctx_index++;
 	}
@@ -1691,12 +1693,6 @@ static int adreno_of_get_pdata(struct platform_device *pdev)
 	ret = adreno_of_get_pwrlevels(pdev->dev.of_node, pdata);
 	if (ret)
 		goto err;
-
-	/* get pm-qos-latency from target, set it to default if not found */
-	if (adreno_of_read_property(pdev->dev.of_node, "qcom,pm-qos-latency",
-		&pdata->pm_qos_latency))
-		pdata->pm_qos_latency = 501;
-
 
 	if (adreno_of_read_property(pdev->dev.of_node, "qcom,idle-timeout",
 		&pdata->idle_timeout))
@@ -2423,12 +2419,9 @@ static int _ft_fast_hang_detect_store(struct device *dev,
 
 	if (tmp != adreno_dev->fast_hang_detect) {
 		if (adreno_dev->fast_hang_detect) {
-			if (adreno_dev->gpudev->fault_detect_start &&
-				!kgsl_active_count_get(&adreno_dev->dev)) {
+			if (adreno_dev->gpudev->fault_detect_start)
 				adreno_dev->gpudev->fault_detect_start(
 					adreno_dev);
-				kgsl_active_count_put(&adreno_dev->dev);
-			}
 		} else {
 			if (adreno_dev->gpudev->fault_detect_stop)
 				adreno_dev->gpudev->fault_detect_stop(

@@ -16,8 +16,6 @@
 #include <linux/irq.h>
 #include <linux/kthread.h>
 #include <mach/msm_qmi_interface.h>
-#include <mach/subsystem_notif.h>
-#include <mach/msm_ipc_logging.h>
 
 /* Per spec.max 40 bytes per received message */
 #define SLIM_MSGQ_BUF_LEN	40
@@ -84,8 +82,7 @@
 
 /* Slimbus QMI service */
 #define SLIMBUS_QMI_SVC_ID 0x0301
-#define SLIMBUS_QMI_SVC_V1 1
-#define SLIMBUS_QMI_INS_ID 0
+#define SLIMBUS_QMI_INS_ID 1
 
 #define PGD_THIS_EE(r, v) ((v) ? PGD_THIS_EE_V2(r) : PGD_THIS_EE_V1(r))
 #define PGD_PORT(r, p, v) ((v) ? PGD_PORT_V2(r, p) : PGD_PORT_V1(r, p))
@@ -171,7 +168,7 @@ enum msm_slim_port_status {
 
 enum msm_ctrl_state {
 	MSM_CTRL_AWAKE,
-	MSM_CTRL_IDLE,
+	MSM_CTRL_SLEEPING,
 	MSM_CTRL_ASLEEP,
 	MSM_CTRL_DOWN,
 };
@@ -200,20 +197,12 @@ struct msm_slim_endp {
 struct msm_slim_qmi {
 	struct qmi_handle		*handle;
 	struct task_struct		*task;
-	struct task_struct		*slave_thread;
-	struct completion		slave_notify;
 	struct kthread_work		kwork;
 	struct kthread_worker		kworker;
 	struct completion		qmi_comp;
 	struct notifier_block		nb;
 	struct work_struct		ssr_down;
 	struct work_struct		ssr_up;
-};
-
-struct msm_slim_mdm {
-	struct notifier_block nb;
-	void *ssr;
-	enum msm_ctrl_state state;
 };
 
 struct msm_slim_pdata {
@@ -261,13 +250,9 @@ struct msm_slim_ctrl {
 	struct completion	ctrl_up;
 	int			nsats;
 	u32			ver;
+	struct work_struct	slave_notify;
 	struct msm_slim_qmi	qmi;
 	struct msm_slim_pdata	pdata;
-	struct msm_slim_mdm	mdm;
-	int			default_ipc_log_mask;
-	int			ipc_log_mask;
-	bool			sysfs_created;
-	void			*ipc_slimbus_log;
 };
 
 struct msm_sat_chan {
@@ -301,57 +286,6 @@ enum rsc_grp {
 };
 
 
-/* IPC logging stuff */
-#define IPC_SLIMBUS_LOG_PAGES 5
-
-/* Log levels */
-enum {
-	FATAL_LEV = 0U,
-	ERR_LEV = 1U,
-	WARN_LEV = 2U,
-	INFO_LEV = 3U,
-	DBG_LEV = 4U,
-};
-
-/* Default IPC log level INFO */
-#define SLIM_DBG(dev, x...) do { \
-	pr_debug(x); \
-	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= DBG_LEV) { \
-		ipc_log_string(dev->ipc_slimbus_log, x); \
-	} \
-} while (0)
-
-#define SLIM_INFO(dev, x...) do { \
-	pr_debug(x); \
-	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= INFO_LEV) {\
-		ipc_log_string(dev->ipc_slimbus_log, x); \
-	} \
-} while (0)
-
-/* warnings and errors show up on console always */
-#define SLIM_WARN(dev, x...) do { \
-	pr_warn(x); \
-	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= WARN_LEV) \
-		ipc_log_string(dev->ipc_slimbus_log, x); \
-} while (0)
-
-/* ERROR condition in the driver sets the hs_serial_debug_mask
- * to ERR_FATAL level, so that this message can be seen
- * in IPC logging. Further errors continue to log on the console
- */
-#define SLIM_ERR(dev, x...) do { \
-	pr_err(x); \
-	if (dev->ipc_slimbus_log && dev->ipc_log_mask >= ERR_LEV) { \
-		ipc_log_string(dev->ipc_slimbus_log, x); \
-		dev->default_ipc_log_mask = dev->ipc_log_mask; \
-		dev->ipc_log_mask = FATAL_LEV; \
-	} \
-} while (0)
-
-#define SLIM_RST_LOGLVL(dev) { \
-	dev->ipc_log_mask = dev->default_ipc_log_mask; \
-}
-
 int msm_slim_rx_enqueue(struct msm_slim_ctrl *dev, u32 *buf, u8 len);
 int msm_slim_rx_dequeue(struct msm_slim_ctrl *dev, u8 *buf);
 int msm_slim_get_ctrl(struct msm_slim_ctrl *dev);
@@ -383,5 +317,4 @@ void msm_slim_disconnect_endp(struct msm_slim_ctrl *dev,
 void msm_slim_qmi_exit(struct msm_slim_ctrl *dev);
 int msm_slim_qmi_init(struct msm_slim_ctrl *dev, bool apps_is_master);
 int msm_slim_qmi_power_request(struct msm_slim_ctrl *dev, bool active);
-int msm_slim_qmi_check_framer_request(struct msm_slim_ctrl *dev);
 #endif
