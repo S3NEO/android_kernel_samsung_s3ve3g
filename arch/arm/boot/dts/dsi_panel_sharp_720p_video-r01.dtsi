@@ -60,6 +60,8 @@
 		qcom,mdss-dsi-lane-map = <0>;
 		qcom,mdss-dsi-h-sync-pulse = <0>;
 		qcom,mdss-dsi-panel-clock-rate = <455000000>;
+		qcom,mdss-dsi-pan-enable-dynamic-fps;
+		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
 
 
 		qcom,mdss-dsi-sharp-on-command = [
