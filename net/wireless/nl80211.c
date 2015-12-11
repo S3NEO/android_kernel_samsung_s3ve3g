@@ -5269,10 +5269,6 @@ static struct genl_multicast_group nl80211_testmode_mcgrp = {
 	.name = "testmode",
 };
 
-static struct genl_multicast_group nl80211_vendor_mcgrp = {
-	.name = "vendor",
-};
-
 static int nl80211_testmode_do(struct sk_buff *skb, struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
@@ -6816,107 +6812,6 @@ static void nl80211_post_doit(struct genl_ops *ops, struct sk_buff *skb,
 	if (ops->internal_flags & NL80211_FLAG_NEED_RTNL)
 		rtnl_unlock();
 }
-
-static int nl80211_vendor_cmd(struct sk_buff *skb, struct genl_info *info)
-{
-	struct cfg80211_registered_device *rdev = info->user_ptr[0];
-	struct net_device *dev = info->user_ptr[1];
-	struct wireless_dev *wdev = dev->ieee80211_ptr;
-	int i, err;
-	u32 vid, subcmd;
-
-	if (!rdev->wiphy.vendor_commands)
-		return -EOPNOTSUPP;
-
-	if (IS_ERR(wdev)) {
-		err = PTR_ERR(wdev);
-		if (err != -EINVAL)
-			return err;
-		wdev = NULL;
-	} else if (wdev->wiphy != &rdev->wiphy) {
-		return -EINVAL;
-	}
-
-	if (!info->attrs[NL80211_ATTR_VENDOR_ID] ||
-	    !info->attrs[NL80211_ATTR_VENDOR_SUBCMD])
-		return -EINVAL;
-
-	vid = nla_get_u32(info->attrs[NL80211_ATTR_VENDOR_ID]);
-	subcmd = nla_get_u32(info->attrs[NL80211_ATTR_VENDOR_SUBCMD]);
-	for (i = 0; i < rdev->wiphy.n_vendor_commands; i++) {
-		const struct wiphy_vendor_command *vcmd;
-		void *data = NULL;
-		int len = 0;
-
-		vcmd = &rdev->wiphy.vendor_commands[i];
-
-		if (vcmd->info.vendor_id != vid || vcmd->info.subcmd != subcmd)
-			continue;
-
-		if (vcmd->flags & (WIPHY_VENDOR_CMD_NEED_WDEV |
-				   WIPHY_VENDOR_CMD_NEED_NETDEV)) {
-			if (!wdev)
-				return -EINVAL;
-			if (vcmd->flags & WIPHY_VENDOR_CMD_NEED_NETDEV &&
-			    !wdev->netdev)
-				return -EINVAL;
-
-			if (vcmd->flags & WIPHY_VENDOR_CMD_NEED_RUNNING) {
-				if (wdev->netdev &&
-				    !netif_running(wdev->netdev))
-					return -ENETDOWN;
-			}
-		} else {
-			wdev = NULL;
-		}
-
-		if (info->attrs[NL80211_ATTR_VENDOR_DATA]) {
-			data = nla_data(info->attrs[NL80211_ATTR_VENDOR_DATA]);
-			len = nla_len(info->attrs[NL80211_ATTR_VENDOR_DATA]);
-		}
-		rdev->cur_cmd_info = info;
-		err = rdev->wiphy.vendor_commands[i].doit(&rdev->wiphy, wdev,
-							   data, len);
-		rdev->cur_cmd_info = NULL;
-		return err;
-	}
-
-	return -EOPNOTSUPP;
-}
-
-struct sk_buff *__cfg80211_alloc_reply_skb(struct wiphy *wiphy,
-					   enum nl80211_commands cmd,
-					   enum nl80211_attrs attr,
-					   int approxlen)
-{
-	struct cfg80211_registered_device *rdev = wiphy_to_dev(wiphy);
-
-	if (WARN_ON(!rdev->cur_cmd_info))
-		return NULL;
-
-	return __cfg80211_alloc_vendor_skb(rdev, approxlen,
-					   0,
-					   0,
-					   cmd, attr, NULL, GFP_KERNEL);
-}
-EXPORT_SYMBOL(__cfg80211_alloc_reply_skb);
-
-int cfg80211_vendor_cmd_reply(struct sk_buff *skb)
-{
-	struct cfg80211_registered_device *rdev = ((void **)skb->cb)[0];
-	void *hdr = ((void **)skb->cb)[1];
-	struct nlattr *data = ((void **)skb->cb)[2];
-
-	if (WARN_ON(!rdev->cur_cmd_info)) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
-
-	nla_nest_end(skb, data);
-	genlmsg_end(skb, hdr);
-	return genlmsg_reply(skb, rdev->cur_cmd_info);
-}
-EXPORT_SYMBOL(cfg80211_vendor_cmd_reply);
 
 static struct genl_ops nl80211_ops[] = {
 	{
