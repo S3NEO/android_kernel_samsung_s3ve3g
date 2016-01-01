@@ -23,9 +23,7 @@
 #include <linux/mfd/wcd9xxx/wcd9306_registers.h>
 
 #define SOUND_CONTROL_MAJOR_VERSION	3
-#define SOUND_CONTROL_MINOR_VERSION	5
-
-#define REG_SZ	21
+#define SOUND_CONTROL_MINOR_VERSION	6
 
 extern struct snd_soc_codec *fauxsound_codec_ptr;
 extern int wcd9xxx_hw_revision;
@@ -37,10 +35,9 @@ unsigned int tapan_read(struct snd_soc_codec *codec, unsigned int reg);
 int tapan_write(struct snd_soc_codec *codec, unsigned int reg,
 		unsigned int value);
 
-
+#define REG_SZ	17
 static unsigned int cached_regs[] = {6, 6, 0, 0, 0, 0, 0, 0, 0, 0,
-			    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			    0 };
+			    0, 0, 0, 0, 0, 0, 0};
 
 static unsigned int *cache_select(unsigned int reg)
 {
@@ -76,6 +73,12 @@ static unsigned int *cache_select(unsigned int reg)
 			break;
                 case TAPAN_A_CDC_TX4_VOL_CTL_GAIN:
 			out = &cached_regs[14];
+			break;
+		case TAPAN_A_RX_LINE_1_GAIN:
+			out = &cached_regs[15];
+			break;
+		case TAPAN_A_RX_LINE_2_GAIN:
+			out = &cached_regs[16];
 			break;
         }
 	return out;
@@ -115,6 +118,8 @@ int snd_hax_reg_access(unsigned int reg)
 		case TAPAN_A_CDC_RX2_VOL_CTL_B2_CTL:
 		case TAPAN_A_CDC_RX3_VOL_CTL_B2_CTL:
 		case TAPAN_A_CDC_RX4_VOL_CTL_B2_CTL:
+		case TAPAN_A_RX_LINE_1_GAIN:
+		case TAPAN_A_RX_LINE_2_GAIN:
 			if (snd_ctrl_locked > 0)
 				ret = 0;
 			break;
@@ -378,7 +383,7 @@ static struct kobj_attribute sound_reg_read_attribute =
 
 static struct kobj_attribute sound_reg_write_attribute =
 	__ATTR(sound_reg_write,
-		0222,
+		0666,
 		NULL,
 		sound_reg_write_store);
 
