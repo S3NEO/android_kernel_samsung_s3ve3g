@@ -12,7 +12,7 @@
 
 #define pr_fmt(fmt)	"BMS: %s: " fmt, __func__
 #if !(defined(CONFIG_MACH_KANAS3G_CMCC) || defined(CONFIG_MACH_KANAS3G_CTC) || defined(CONFIG_MACH_VICTORLTE))
-#define DEBUG
+//#define DEBUG
 #endif
 
 #include <linux/module.h>
