@@ -197,6 +197,7 @@ void __init msm8226_add_drivers(void)
 	else
 		msm_clock_init(&msm8226_clock_init_data);
 	tsens_tm_init_driver();
+
 #if defined(CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT) || defined(CONFIG_MACH_S3VE3G_EUR)  || defined (CONFIG_MACH_VICTOR3GDSDTV_LTN)  || \
     defined(CONFIG_SEC_AFYON_PROJECT) || defined(CONFIG_SEC_VICTOR_PROJECT) || defined(CONFIG_SEC_BERLUTI_PROJECT) || \
     defined(CONFIG_SEC_HESTIA_PROJECT) || defined(CONFIG_SEC_GNOTE_PROJECT) || defined(CONFIG_SEC_ATLANTIC_PROJECT) || \
@@ -204,9 +205,11 @@ void __init msm8226_add_drivers(void)
 	defined(CONFIG_SEC_MS01_PROJECT)
 #ifdef CONFIG_SEC_THERMISTOR
 	platform_device_register(&sec_device_thermistor);
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+	 sensor polling support.
 #endif
 #endif
-	msm_thermal_device_init();
+#endif
 }
 struct class *sec_class;
 EXPORT_SYMBOL(sec_class);
