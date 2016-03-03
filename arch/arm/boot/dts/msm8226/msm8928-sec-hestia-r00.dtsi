@@ -229,8 +229,8 @@
 		compatible = "qcom,i2c-qup";
 		qcom,scl-gpio = <&msmgpio 19 0>;
 		qcom,sda-gpio = <&msmgpio 18 0>;
-		mms300-ts@48 {
-				compatible = "melfas,mms300-ts";
+		mms300_ts@48 {
+				compatible = "melfas,mms-ts";
 				reg = <0x48>; /*slave address*/
 				interrupt-parent = <&msmgpio>;
 				interrupts = <17 0>; /* Touch int gpio */
@@ -239,7 +239,7 @@
 				melfas,irq-gpio = <&msmgpio 17 0x00>; /*TSP IRQ GPIO */
 				melfas,panel-coords = <0  0 800 1280>;
 				melfas,config_fw_version = "melfas mms300";
-				melfas,i2c-pull-up = <1>;
+				melfas,i2c-pull-up = <1>;			
 		};
 	};
 
