@@ -1089,12 +1089,23 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		reg = <0xf9011050 0x8>;
 		reg-names = "rcg-base";
 		clock-names = "clk-4", "clk-5";
-		qcom,speed0-bin-v0 =
-			<         0 0>,
-			< 384000000 1>,
-			< 787200000 2>,
-			<1190400000 3>;
 
+                qcom,speed1-bin-v2 =
+			<       0 0>,
+			<96000000 1 >,
+			<192000000 2 >,
+			<249600000 3 >,
+			<384000000 4>,
+			<787200000 5>,
+			<998400000 6>,
+			<1094400000 7>,
+			<1190400000 8>,
+			<1305600000 9>,
+			<1344000000 10>,
+			<1401600000 11>,
+			<1497600000 12>,
+			<1593600000 13>;
+ 
 		cpu-vdd-supply = <&apc_vreg_corner>;
 	};
 
@@ -1112,6 +1123,9 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		reg = <0 4>;
 		compatible = "qcom,msm-cpufreq";
 		qcom,cpufreq-table =
+                        <   96000 1525 >,
+			<  192000 1525 >,
+			<  249600 1525 >,
 			<  300000 1525 >,
 			<  384000 1525 >,
 			<  600000 1525 >,
