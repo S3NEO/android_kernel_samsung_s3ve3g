@@ -1114,6 +1114,7 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		compatible = "qcom,cpubw";
 		qcom,cpu-mem-ports = <1 512>;
 		qcom,bw-tbl =
+                        < 1014 /* 133 MHz */ >,
 			< 1525 /* 200 MHz */ >,
 			< 2441 /* 320 MHz */ >,
 			< 3051 /* 400 MHz */ >,
