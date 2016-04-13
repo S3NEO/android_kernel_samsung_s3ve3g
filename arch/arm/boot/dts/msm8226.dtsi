@@ -1124,9 +1124,9 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		reg = <0 4>;
 		compatible = "qcom,msm-cpufreq";
 		qcom,cpufreq-table =
-                        <   96000 1525 >,
-			<  192000 1525 >,
-			<  249600 1525 >,
+                        <   96000 1014 >,
+			<  192000 1014 >,
+			<  249600 1014 >,
 			<  300000 1525 >,
 			<  384000 1525 >,
 			<  600000 1525 >,
