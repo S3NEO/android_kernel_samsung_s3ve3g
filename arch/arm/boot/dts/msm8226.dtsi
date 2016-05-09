@@ -1119,7 +1119,8 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 			< 2441 /* 320 MHz */ >,
 			< 3051 /* 400 MHz */ >,
 			< 4066 /* 533 MHz */ >,
-                        < 4317 /* 566 MHz */ >;
+                        < 4317 /* 566 MHz */ >,
+                        < 4575 /* 600 MHz */ >;
 	};
 
 	qcom,msm-cpufreq@0 {
@@ -1140,8 +1141,8 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 			< 1401600 4317 >,
 			< 1497600 4317 >,
 			< 1593600 4317 >,
-			< 1689600 4317 >,
-			< 1785600 4317 >;
+			< 1689600 4575 >,
+			< 1785600 4575 >;
 	};
 
 	qcom,ocmem@fdd00000 {

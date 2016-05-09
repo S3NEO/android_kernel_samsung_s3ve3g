@@ -41,6 +41,8 @@ static struct msm_bus_paths bw_level_tbl_8226[] = {
 	[5] = BW_MBPS(2128), /* At least 266 MHz on bus. */
 	[6] = BW_MBPS(3200), /* At least 400 MHz on bus. */
 	[7] = BW_MBPS(4264), /* At least 533 MHz on bus. */
+        [8] = BW_MBPS(4528), /* At least 566 MHz on bus. */
+        [9] = BW_MBPS(4800), /* At least 600 MHz on bus. */
 };
 
 static struct msm_bus_paths bw_level_tbl_8610[] = {
