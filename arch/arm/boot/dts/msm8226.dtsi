@@ -1309,6 +1309,12 @@ This is causing conflict to IRLED driver in Millet Wifi US Open and thus disabli
 		};
 	};
 
+        qcom,msm-thermal-simple {
+		compatible = "qcom,msm-thermal-simple";
+		qcom,thermal-vadc = <&pm8226_vadc>;
+		qcom,adc-channel = <178>;
+	};
+
 	spi_0: spi@f9923000 { /* BLSP1 QUP1 */
 		compatible = "qcom,spi-qup-v2";
 		#address-cells = <1>;
