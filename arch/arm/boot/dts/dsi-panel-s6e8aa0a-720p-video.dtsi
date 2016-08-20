@@ -60,8 +60,7 @@
 		qcom,mdss-force-clk-lane-hs = <1>;
 		qcom,mdss-dsi-lane-map = <0>;
 		qcom,mdss-dsi-h-sync-pulse = <0>;
-		qcom,mdss-dsi-pan-enable-dynamic-fps;
-		qcom,mdss-dsi-pan-fps-update = "dfps_suspend_resume_mode";
+
 
 		qcom,mdss-dsi-on-command = [39 01 00 00 01 00 03 F0 5A 5A
 					39 01 00 00 01 00 03 F1 5A 5A
