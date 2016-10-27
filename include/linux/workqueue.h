@@ -280,10 +280,10 @@ enum {
 	 *
 	 * http://thread.gmane.org/gmane.linux.kernel/1480396
 	 */
-	WQ_POWER_EFFICIENT	= 1 << 7,
+	WQ_POWER_EFFICIENT	= 1 << 6,
 
-	WQ_DRAINING		= 1 << 16, /* internal: workqueue is draining */
-	WQ_RESCUER		= 1 << 17, /* internal: workqueue has rescuer */
+	WQ_DRAINING		= 1 << 7, /* internal: workqueue is draining */
+	WQ_RESCUER		= 1 << 8, /* internal: workqueue has rescuer */
 
 	WQ_MAX_ACTIVE		= 512,	  /* I like 512, better ideas? */
 	WQ_MAX_UNBOUND_PER_CPU	= 4,	  /* 4 * #cpus for unbound wq */
@@ -319,12 +319,6 @@ enum {
  *
  * system_nrt_freezable_wq is equivalent to system_nrt_wq except that
  * it's freezable.
- *
- * *_power_efficient_wq are inclined towards saving power and converted
- * into WQ_UNBOUND variants if 'wq_power_efficient' is enabled; otherwise,
- * they are same as their non-power-efficient counterparts - e.g.
- * system_power_efficient_wq is identical to system_wq if
- * 'wq_power_efficient' is disabled.  See WQ_POWER_EFFICIENT for more info.
  */
 extern struct workqueue_struct *system_wq;
 extern struct workqueue_struct *system_long_wq;
@@ -332,8 +326,6 @@ extern struct workqueue_struct *system_nrt_wq;
 extern struct workqueue_struct *system_unbound_wq;
 extern struct workqueue_struct *system_freezable_wq;
 extern struct workqueue_struct *system_nrt_freezable_wq;
-extern struct workqueue_struct *system_power_efficient_wq;
-extern struct workqueue_struct *system_freezable_power_efficient_wq;
 
 extern struct workqueue_struct *
 __alloc_workqueue_key(const char *fmt, unsigned int flags, int max_active,
@@ -488,3 +480,4 @@ extern int queue_work_front(struct workqueue_struct *wq,
 #endif
 
 #endif
+
