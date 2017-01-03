@@ -10,10 +10,9 @@
  *
  */
 
-#include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/cpufreq.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 static int cpufreq_governor_powersave(struct cpufreq_policy *policy,
 					unsigned int event)

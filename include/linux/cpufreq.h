@@ -11,16 +11,13 @@
 #ifndef _LINUX_CPUFREQ_H
 #define _LINUX_CPUFREQ_H
 
-#include <linux/mutex.h>
-#include <linux/notifier.h>
-#include <linux/threads.h>
-#include <linux/kobject.h>
-#include <linux/sysfs.h>
-#include <linux/completion.h>
-#include <linux/workqueue.h>
 #include <linux/cpumask.h>
-#include <asm/div64.h>
-#include <asm/cputime.h>
+#include <linux/completion.h>
+#include <linux/kobject.h>
+#include <linux/notifier.h>
+#include <linux/sysfs.h>
+#include <linux/kernel_stat.h>
+#include <linux/sched/rt.h>
 
 #define CPUFREQ_NAME_LEN 16
 /* Print length for names. Extra 1 space for accomodating '\n' in prints */
