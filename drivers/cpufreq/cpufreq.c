@@ -45,7 +45,7 @@
 static struct cpufreq_driver *cpufreq_driver;
 static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 static DEFINE_RWLOCK(cpufreq_driver_lock);
-static DEFINE_MUTEX(cpufreq_governor_lock);
+DEFINE_MUTEX(cpufreq_governor_lock);
 
 #ifdef CONFIG_HOTPLUG_CPU
 /*
@@ -61,7 +61,6 @@ static DEFINE_PER_CPU(struct cpufreq_cpu_save_data, cpufreq_policy_save);
 
 static struct kset *cpufreq_kset;
 static struct kset *cpudev_kset;
-DEFINE_MUTEX(cpufreq_governor_lock);
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
