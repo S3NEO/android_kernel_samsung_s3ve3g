@@ -1984,10 +1984,12 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 
 	ret = policy->governor->governor(policy, event);
 
-	if (event == CPUFREQ_GOV_START)
-		policy->governor->initialized++;
-	else if (event == CPUFREQ_GOV_STOP)
-		policy->governor->initialized--;
+	if (!ret) {
+		if (event == CPUFREQ_GOV_POLICY_INIT)
+			policy->governor->initialized++;
+		else if (event == CPUFREQ_GOV_POLICY_EXIT)
+			policy->governor->initialized--;
+	}
 
 	/* we keep one module reference alive for
 			each CPU governed by this CPU */
