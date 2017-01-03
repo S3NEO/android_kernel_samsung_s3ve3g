@@ -1955,6 +1955,11 @@ static int __cpufreq_governor(struct cpufreq_policy *policy,
 
 	ret = policy->governor->governor(policy, event);
 
+	if (event == CPUFREQ_GOV_START)
+		policy->governor->initialized++;
+	else if (event == CPUFREQ_GOV_STOP)
+		policy->governor->initialized--;
+
 	/* we keep one module reference alive for
 			each CPU governed by this CPU */
 	if ((event != CPUFREQ_GOV_START) || ret)
@@ -1977,6 +1982,7 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 
 	mutex_lock(&cpufreq_governor_mutex);
 
+	governor->initialized = 0;
 	err = -EBUSY;
 	if (__find_governor(governor->name) == NULL) {
 		err = 0;
