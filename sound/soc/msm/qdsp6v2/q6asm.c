@@ -3002,10 +3002,11 @@ int q6asm_memory_map(struct audio_client *ac, uint32_t buf_add, int dir,
 							mmap_region_cmd;
 	q6asm_add_mmaphdr(ac, &mmap_regions->hdr, cmd_size,
 			TRUE, ((ac->session << 8) | dir));
-<<<<<<< HEAD
-=======
+	//WTF was this????
+	//<<<<<<< HEAD
+	//=======
+	//>>>>>>> f51548d... ASoC: msm: qdsp6v2: Add a new waitqueue state for mem map/unmap
 	atomic_set(&ac->mem_state, 1);
->>>>>>> f51548d... ASoC: msm: qdsp6v2: Add a new waitqueue state for mem map/unmap
 	mmap_regions->hdr.opcode = ASM_CMD_SHARED_MEM_MAP_REGIONS;
 	mmap_regions->mem_pool_id = ADSP_MEMORY_MAP_SHMEM8_4K_POOL;
 	mmap_regions->num_regions = bufcnt & 0x00ff;
@@ -3069,11 +3070,7 @@ int q6asm_memory_unmap(struct audio_client *ac, uint32_t buf_add, int dir)
 	q6asm_add_mmaphdr(ac, &mem_unmap.hdr,
 			sizeof(struct avs_cmd_shared_mem_unmap_regions),
 			TRUE, ((ac->session << 8) | dir));
-<<<<<<< HEAD
-
-=======
 	atomic_set(&ac->mem_state, 1);
->>>>>>> f51548d... ASoC: msm: qdsp6v2: Add a new waitqueue state for mem map/unmap
 	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
 	list_for_each_safe(ptr, next, &ac->port[dir].mem_map_handle) {
 		buf_node = list_entry(ptr, struct asm_buffer_node,
@@ -3171,10 +3168,7 @@ static int q6asm_memory_map_regions(struct audio_client *ac, int dir,
 							mmap_region_cmd;
 	q6asm_add_mmaphdr(ac, &mmap_regions->hdr, cmd_size, TRUE,
 					((ac->session << 8) | dir));
-<<<<<<< HEAD
-=======
 	atomic_set(&ac->mem_state, 1);
->>>>>>> f51548d... ASoC: msm: qdsp6v2: Add a new waitqueue state for mem map/unmap
 	pr_debug("mmap_region=0x%p token=0x%x\n",
 		mmap_regions, ((ac->session << 8) | dir));
 
@@ -3256,10 +3250,7 @@ static int q6asm_memory_unmap_regions(struct audio_client *ac, int dir)
 	cmd_size = sizeof(struct avs_cmd_shared_mem_unmap_regions);
 	q6asm_add_mmaphdr(ac, &mem_unmap.hdr, cmd_size,
 			TRUE, ((ac->session << 8) | dir));
-<<<<<<< HEAD
-=======
 	atomic_set(&ac->mem_state, 1);
->>>>>>> f51548d... ASoC: msm: qdsp6v2: Add a new waitqueue state for mem map/unmap
 	port = &ac->port[dir];
 	buf_add = (uint32_t)port->buf->phys;
 	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
