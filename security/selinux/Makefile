@@ -4,7 +4,7 @@
 
 ifeq ($(SEC_BUILD_OPTION_PRODUCT_SHIP), true)
 ifeq ($(SEC_BUILD_OPTION_SELINUX_ENFORCE),true)
-EXTRA_CFLAGS += -DCONFIG_ALWAYS_ENFORCE=true
+EXTRA_CFLAGS += -DCONFIG_ALWAYS_ENFORCE=false #edited by PythonLimited on 26.07.2016
 endif
 endif
 
