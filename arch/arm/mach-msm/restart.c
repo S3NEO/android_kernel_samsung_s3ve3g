@@ -124,7 +124,7 @@ static bool get_dload_mode(void)
 }
 #endif
 
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	if (emergency_dload_mode_addr) {
@@ -172,7 +172,7 @@ void set_dload_mode(int on)
 }
 EXPORT_SYMBOL(set_dload_mode);
 
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if 0
 static void enable_emergency_dload_mode(void)
 {
 	printk(KERN_ERR "dload mode is not enabled on target\n");
@@ -385,8 +385,7 @@ static void msm_restart_prepare(const char *cmd)
 			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "nvrecovery", 10)) {
 			__raw_writel(0x77665515, restart_reason);
-			warm_reboot_set = 1;
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if 0
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 			warm_reboot_set = 1;
