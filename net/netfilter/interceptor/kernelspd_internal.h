@@ -13,6 +13,8 @@
 #include "ip_selector_db.h"
 #include "spd_util.h"
 
+#include <linux/uidgid.h>
+#include <linux/version.h>
 #include "implementation_defs.h"
 
 #define __DEBUG_MODULE__ kernelspdlinux
@@ -37,5 +39,9 @@ spd_proc_uninit(
 extern struct IPSelectorDb spd;
 
 extern rwlock_t spd_lock;
+
+extern char *ipsec_boundary;
+
+extern kuid_t bypass_kuid;
 
 #endif /* KERNELSPD_INTERNAL_H */
