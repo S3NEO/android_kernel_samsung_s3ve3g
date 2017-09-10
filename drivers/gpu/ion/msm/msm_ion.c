@@ -1017,7 +1017,7 @@ static long msm_ion_custom_ioctl(struct ion_client *client,
 		break;
 	}
 
-#if defined(CONFIG_MACH_KLTE_JPN) || defined(CONFIG_DTCP_ION_PHYS)
+#if defined(CONFIG_MACH_KLTE_JPN)
 	case ION_IOC_GET_PHYS:
 	{
 		struct ion_buffer_data data;

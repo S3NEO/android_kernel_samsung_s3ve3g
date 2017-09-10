@@ -223,7 +223,6 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap);
 
 struct pages_mem {
 	struct page **pages;
-	u32 size;
 	void (*free_fn) (const void *);
 };
 
@@ -235,11 +234,11 @@ void *ion_heap_map_kernel(struct ion_heap *, struct ion_buffer *);
 void ion_heap_unmap_kernel(struct ion_heap *, struct ion_buffer *);
 int ion_heap_map_user(struct ion_heap *, struct ion_buffer *,
 			struct vm_area_struct *);
-int ion_heap_pages_zero(struct page **pages, int num_pages);
+int ion_heap_pages_zero(struct page **pages, int num_pages,
+			bool should_invalidate);
 int ion_heap_buffer_zero(struct ion_buffer *buffer);
-int ion_heap_high_order_page_zero(struct page *page, int order);
-int ion_heap_alloc_pages_mem(struct pages_mem *pages_mem);
-void ion_heap_free_pages_mem(struct pages_mem *pages_mem);
+int ion_heap_high_order_page_zero(struct page *page,
+				int order, bool should_invalidate);
 
 /**
  * ion_heap_init_deferred_free -- initialize deferred free functionality
@@ -358,6 +357,8 @@ void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
  * @gfp_mask:		gfp_mask to use from alloc
  * @order:		order of pages in the pool
  * @list:		plist node for list of pools
+ * @should_invalidate:	whether or not the cache needs to be invalidated at
+ *			page allocation time.
  *
  * Allows you to keep a pool of pre allocated pages to use from your heap.
  * Keeping a pool of pages that is ready for dma, ie any cached mapping have
@@ -373,9 +374,11 @@ struct ion_page_pool {
 	gfp_t gfp_mask;
 	unsigned int order;
 	struct plist_node list;
+	bool should_invalidate;
 };
 
-struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order);
+struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order,
+	bool should_invalidate);
 void ion_page_pool_destroy(struct ion_page_pool *);
 void *ion_page_pool_alloc(struct ion_page_pool *, bool *from_pool);
 void ion_page_pool_free(struct ion_page_pool *, struct page *);
