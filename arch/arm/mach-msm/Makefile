@@ -509,6 +509,7 @@ obj-$(CONFIG_BT_BCM4339) += board-bluetooth-bcm4339.o
 obj-$(CONFIG_BT_BCM4354) += board-bluetooth-bcm4354.o
 
 obj-$(CONFIG_HAS_MACH_MEMUTILS) += memutils/
+obj-$(CONFIG_MSM_LIMITER) += msm_limiter.o
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
 obj-$(CONFIG_PERFMAP) += perfmap.o
 
