@@ -422,26 +422,34 @@ __und_usr:
 
 	mov	r2, r4
 	mov	r3, r5
-
+	
+	@ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
+	@      faulting instruction depending on Thumb mode.
+	@ r3 = regs->ARM_cpsr
 	@
-	@ fall through to the emulation code, which returns using r9 if
-	@ it has emulated the instruction, or the more conventional lr
-	@ if we are to treat this as a real undefined instruction
-	@
-	@  r0 - instruction
+	@ The emulation code returns using r9 if it has emulated the
+	@ instruction, or the more conventional lr if we are to treat
+	@ this as a real undefined instruction
 	@
 	adr	r9, BSYM(ret_from_exception)
 	adr	lr, BSYM(__und_usr_unknown)
 	tst	r3, #PSR_T_BIT			@ Thumb mode?
-	itet	eq				@ explicit IT needed for the 1f label
-	subeq	r4, r2, #4			@ ARM instr at LR - 4
-	subne	r4, r2, #2			@ Thumb instr at LR - 2
-1:	ldreqt	r0, [r4]
+	bne	__und_usr_thumb
+	sub	r4, r2, #4			@ ARM instr at LR - 4
+1:	ldrt	r0, [r4]
 #ifdef CONFIG_CPU_ENDIAN_BE8
-	reveq	r0, r0				@ little endian instruction
+	rev	r0, r0				@ little endian instruction
 #endif
-	beq	call_fpe
+	@ r0 = 32-bit ARM instruction which caused the exception
+	@ r2 = PC value for the following instruction (:= regs->ARM_pc)
+	@ r4 = PC value for the faulting instruction
+	@ lr = 32-bit undefined instruction function
+	adr	lr, BSYM(__und_usr_fault_32)
+	b	call_fpe
+
+__und_usr_thumb:
 	@ Thumb instruction
+	sub	r4, r2, #2			@ First half of thumb instr at LR - 2
 #if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
 /*
  * Thumb-2 instruction handling.  Note that because pre-v6 and >= v6 platforms
@@ -659,15 +667,17 @@ ENTRY(fp_enter)
 	.popsection
 
 ENTRY(no_fp)
-	mov	pc, lr
-ENDPROC(no_fp)
 
-__und_usr_unknown:
-	enable_irq
+__und_usr_fault_32:
+	mov	r1, #4
+	b	1f
+__und_usr_fault_16:
+	mov	r1, #2
 	mov	r0, sp
 	adr	lr, BSYM(ret_from_exception)
-	b	do_undefinstr
-ENDPROC(__und_usr_unknown)
+	b	__und_fault
+ENDPROC(__und_usr_fault_32)
+ENDPROC(__und_usr_fault_16)
 
 	.align	5
 __pabt_usr:
