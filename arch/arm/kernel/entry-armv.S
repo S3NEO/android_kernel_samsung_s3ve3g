@@ -197,7 +197,6 @@ __dabt_svc:
 	@ IRQs off again before pulling preserved data off the stack
 	@
 	disable_irq_notrace
-
 #ifdef CONFIG_TRACE_IRQFLAGS
 	tst	r5, #PSR_I_BIT
 	bleq	trace_hardirqs_on
@@ -277,22 +276,29 @@ __und_svc:
 #ifndef	CONFIG_THUMB2_KERNEL
 	ldr	r0, [r4, #-4]
 #else
+	mov	r1, #2
 	ldrh	r0, [r4, #-2]			@ Thumb instruction at LR - 2
 	cmp	r0, #0xe800			@ 32-bit instruction if xx >= 0
-	ldrhhs	r9, [r4]			@ bottom 16 bits
-	orrhs	r0, r9, r0, lsl #16
+	blo	__und_svc_fault
+ 	ldrh	r9, [r4]			@ bottom 16 bits
+ 	add	r4, r4, #2
+ 	str	r4, [sp, #S_PC]
+ 	orr	r0, r9, r0, lsl #16
 #endif
-	adr	r9, BSYM(1f)
+	adr	r9, BSYM(__und_svc_finish)
 	mov	r2, r4
 	bl	call_fpe
 
+		mov	r1, #4				@ PC correction to apply
+		__und_svc_fault:
 	mov	r0, sp				@ struct pt_regs *regs
-	bl	do_undefinstr
+	bl	__und_fault
 
 	@
 	@ IRQs off again before pulling preserved data off the stack
 	@
-1:	disable_irq_notrace
+__und_svc_finish:
+ 	disable_irq_notrace
 
 	@
 	@ restore SPSR and restart the instruction
@@ -476,7 +482,7 @@ __und_usr_thumb:
 	ldr	r5, .LCcpu_architecture
 	ldr	r5, [r5]
 	cmp	r5, #CPU_ARCH_ARMv7
-	blo	__und_usr_unknown
+	__und_usr_fault_16		@ 16bit undefined instruction
 /*
  * The following code won't get run unless the running CPU really is v7, so
  * coding round the lack of ldrht on older arches is pointless.  Temporarily
@@ -484,15 +490,18 @@ __und_usr_thumb:
  */
 	.arch	armv6t2
 #endif
-2:
- ARM(	ldrht	r5, [r4], #2	)
- THUMB(	ldrht	r5, [r4]	)
- THUMB(	add	r4, r4, #2	)
+2:	ldrht	r5, [r4]
 	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
-	blo	__und_usr_unknown
-3:	ldrht	r0, [r4]
+	blo	__und_usr_fault_16		@ 16bit undefined instruction
+3:	ldrht	r0, [r2]
 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
+	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
 	orr	r0, r0, r5, lsl #16
+	adr	lr, BSYM(__und_usr_fault_32)
+ 	@ r0 = the two 16-bit Thumb instructions which caused the exception
+ 	@ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
+ 	@ r4 = PC value for the first 16-bit Thumb instruction
+ 	@ lr = 32bit undefined instruction function
 
 #if __LINUX_ARM_ARCH__ < 7
 /* If the target arch was overridden, change it back: */
@@ -503,17 +512,13 @@ __und_usr_thumb:
 #endif
 #endif /* __LINUX_ARM_ARCH__ < 7 */
 #else /* !(CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7) */
-	b	__und_usr_unknown
+	b	__und_usr_fault_16
 #endif
- UNWIND(.fnend		)
+ UNWIND(.fnend	)
 ENDPROC(__und_usr)
 
-	@
-	@ fallthrough to call_fpe
-	@
-
 /*
- * The out of line fixup for the ldrt above.
+ * The out of line fixup for the ldrt instructions above.
  */
 	.pushsection .fixup, "ax"
 4:	mov	pc, r9
@@ -544,8 +549,8 @@ ENDPROC(__und_usr)
  * NEON handler code.
  *
  * Emulators may wish to make use of the following registers:
- *  r0  = instruction opcode.
- *  r2  = PC+4
+ *  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
+ *  r2  = PC value to resume execution after successful emulation
  *  r9  = normal "successful" return address
  *  r10 = this threads thread_info structure.
  *  lr  = unrecognised instruction return address
@@ -686,6 +691,7 @@ __und_usr_fault_32:
 	b	1f
 __und_usr_fault_16:
 	mov	r1, #2
+1:	enable_irq
 	mov	r0, sp
 	adr	lr, BSYM(ret_from_exception)
 	b	__und_fault
