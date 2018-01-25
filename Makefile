@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 4
-SUBLEVEL = 0
-EXTRAVERSION =
+SUBLEVEL = 1
+EXTRAVERSION = -By_Ramon_and_Thomas
 NAME = Saber-toothed Squirrel
 
 # *DOCUMENTATION*
