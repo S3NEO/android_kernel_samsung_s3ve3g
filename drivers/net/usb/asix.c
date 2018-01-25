@@ -37,6 +37,7 @@
 #include <linux/mii.h>
 #include <linux/usb.h>
 #include <linux/crc32.h>
+#include <linux/if_vlan.h>
 
 #include "axusbnet.c"
 #include "asix.h"
@@ -141,6 +142,7 @@ static void ax88178_status(struct usbnet *dev, struct urb *urb)
 	if (ax178dataptr->EepromData == PHY_MODE_MAC_TO_MAC_GMII)
 		return;
 
+<<<<<<< HEAD
 	event = urb->transfer_buffer;
 	link = event->link & 0x01;
 	if (netif_carrier_ok(dev->net) != link) {
@@ -152,6 +154,17 @@ static void ax88178_status(struct usbnet *dev, struct urb *urb)
 		devwarn(dev, "ax88178 - Link status is: %d", link);
 	}
 }
+=======
+		if ((size > dev->net->mtu + ETH_HLEN + VLAN_HLEN) ||
+		    (size + offset > skb->len)) {
+			netdev_err(dev->net, "asix_rx_fixup() Bad RX Length %d\n",
+				   size);
+			return 0;
+		}
+		ax_skb = netdev_alloc_skb_ip_align(dev->net, size);
+		if (!ax_skb)
+			return 0;
+>>>>>>> 4cf901c... Linux Kernel v3.4.2
 
 static void ax8817x_status(struct usbnet *dev, struct urb *urb)
 {
