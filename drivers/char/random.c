@@ -651,7 +651,7 @@ struct timer_rand_state {
  * problem of the nonblocking pool having similar initial state
  * across largely identical devices.
  */
-+void add_device_randomness(const void *buf, unsigned int size)
+void add_device_randomness(const void *buf, unsigned int size)
 {
 	unsigned long time = get_cycles() ^ jiffies;
 
