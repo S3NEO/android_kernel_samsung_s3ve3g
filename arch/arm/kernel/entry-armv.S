@@ -244,16 +244,16 @@ svc_preempt:
 #endif
 
 __und_fault:
-	@ Correct the PC such that it is pointing at the instruction
-	@ which caused the fault.  If the faulting instruction was ARM
-	@ the PC will be pointing at the next instruction, and have to
-	@ subtract 4.  Otherwise, it is Thumb, and the PC will be
-	@ pointing at the second half of the Thumb instruction.  We
-	@ have to subtract 2.
-	ldr	r2, [r0, #S_PC]
-	sub	r2, r2, r1
-	str	r2, [r0, #S_PC]
-	b	do_undefinstr
+ 	@ Correct the PC such that it is pointing at the instruction
+ 	@ which caused the fault.  If the faulting instruction was ARM
+ 	@ the PC will be pointing at the next instruction, and have to
+ 	@ subtract 4.  Otherwise, it is Thumb, and the PC will be
+ 	@ pointing at the second half of the Thumb instruction.  We
+ 	@ have to subtract 2.
+ 	ldr	r2, [r0, #S_PC]
+ 	sub	r2, r2, r1
+ 	str	r2, [r0, #S_PC]
+ 	b	do_undefinstr
 ENDPROC(__und_fault)
 
 	.align	5
@@ -289,8 +289,8 @@ __und_svc:
 	mov	r2, r4
 	bl	call_fpe
 
-		mov	r1, #4				@ PC correction to apply
-		__und_svc_fault:
+	mov	r1, #4				@ PC correction to apply
+__und_svc_fault:
 	mov	r0, sp				@ struct pt_regs *regs
 	bl	__und_fault
 
@@ -441,7 +441,7 @@ __und_usr:
 
 	mov	r2, r4
 	mov	r3, r5
-	
+
 	@ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
 	@      faulting instruction depending on Thumb mode.
 	@ r3 = regs->ARM_cpsr
@@ -482,7 +482,7 @@ __und_usr_thumb:
 	ldr	r5, .LCcpu_architecture
 	ldr	r5, [r5]
 	cmp	r5, #CPU_ARCH_ARMv7
-	__und_usr_fault_16		@ 16bit undefined instruction
+	blo	__und_usr_fault_16		@ 16bit undefined instruction
 /*
  * The following code won't get run unless the running CPU really is v7, so
  * coding round the lack of ldrht on older arches is pointless.  Temporarily
@@ -492,7 +492,7 @@ __und_usr_thumb:
 #endif
 2:	ldrht	r5, [r4]
 	cmp	r5, #0xe800			@ 32bit instruction if xx != 0
-	blo	__und_usr_fault_16		@ 16bit undefined instruction
+blo	__und_usr_fault_16		@ 16bit undefined instruction
 3:	ldrht	r0, [r2]
 	add	r2, r2, #2			@ r2 is PC + 2, make it PC + 4
 	str	r2, [sp, #S_PC]			@ it's a 2x16bit instr, update
@@ -514,7 +514,7 @@ __und_usr_thumb:
 #else /* !(CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7) */
 	b	__und_usr_fault_16
 #endif
- UNWIND(.fnend	)
+ UNWIND(.fnend)
 ENDPROC(__und_usr)
 
 /*
@@ -552,8 +552,9 @@ ENDPROC(__und_usr)
  *  r0  = instruction opcode (32-bit ARM or two 16-bit Thumb)
  *  r2  = PC value to resume execution after successful emulation
  *  r9  = normal "successful" return address
- *  r10 = this threads thread_info structure.
+ *  r10 = this threads thread_info structure
  *  lr  = unrecognised instruction return address
+ * IRQs disabled, FIQs enabled.
  */
 	@
 	@ Fall-through from Thumb-2 __und_usr
