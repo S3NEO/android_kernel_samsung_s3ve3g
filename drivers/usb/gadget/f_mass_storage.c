@@ -831,6 +831,7 @@ static int sleep_thread(struct fsg_common *common)
 	__set_current_state(TASK_RUNNING);
 	spin_lock_irq(&common->lock);
 	common->thread_wakeup_needed = 0;
+	smp_rmb();	/* ensure the latest bh->state is visible */
 	spin_unlock_irq(&common->lock);
 	return rc;
 }
