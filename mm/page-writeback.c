@@ -37,7 +37,7 @@
 #include <linux/mm_inline.h>
 #include <trace/events/writeback.h>
 #ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
-#include <linux/earlysuspend.h>
+#include <linux/state_notifier.h>
 #endif
 
 #include "internal.h"
@@ -100,7 +100,8 @@ unsigned long vm_dirty_bytes;
  * The default intervals between `kupdate'-style writebacks
  */
 #define DEFAULT_DIRTY_WRITEBACK_INTERVAL	 5 * 100 /* centiseconds */
-#define HIGH_DIRTY_WRITEBACK_INTERVAL		15 * 100 /* centiseconds */
+#define ACTIVE_WRITEBACK_INTERVAL		30 * 100 /* centiseconds */
+#define SUSPEND_WRITEBACK_INTERVAL		60 * 100 /* centiseconds */
 
 /*
  * The interval between `kupdate'-style writebacks
@@ -118,13 +119,13 @@ EXPORT_SYMBOL_GPL(dyn_dirty_writeback_enabled);
 /*
  * The interval between `kupdate'-style writebacks when the system is active
  */
-unsigned int dirty_writeback_active_interval = HIGH_DIRTY_WRITEBACK_INTERVAL; /* centiseconds */
+unsigned int dirty_writeback_active_interval = ACTIVE_WRITEBACK_INTERVAL; /* centiseconds */
 EXPORT_SYMBOL_GPL(dirty_writeback_active_interval);
 
 /*
  * The interval between `kupdate'-style writebacks when the system is suspended
  */
-unsigned int dirty_writeback_suspend_interval = DEFAULT_DIRTY_WRITEBACK_INTERVAL; /* centiseconds */
+unsigned int dirty_writeback_suspend_interval = SUSPEND_WRITEBACK_INTERVAL; /* centiseconds */
 EXPORT_SYMBOL_GPL(dirty_writeback_suspend_interval);
 #endif
 
@@ -1583,9 +1584,13 @@ int dirty_writeback_centisecs_handler(ctl_table *table, int write,
 static void set_dirty_writeback_status(bool active) {
 	/* Change the current dirty writeback interval according to the
 	 * status provided */
-	dirty_writeback_interval = (active) ?
-								dirty_writeback_active_interval :
-								dirty_writeback_suspend_interval;
+	if (state_suspended) {
+		if (dirty_writeback_interval != dirty_writeback_suspend_interval)
+			dirty_writeback_interval = dirty_writeback_suspend_interval;
+	} else {
+		if (dirty_writeback_interval != dirty_writeback_active_interval)
+			dirty_writeback_interval = dirty_writeback_active_interval;
+	}
 
 	/* Update the timer related to dirty writebacks interval */
 	bdi_arm_supers_timer();
@@ -1719,7 +1724,7 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 /*
  * Sets the dirty page writebacks interval for suspended system
  */
-static void dirty_writeback_early_suspend(struct early_suspend *handler)
+static void dirty_writeback_suspend(void)
 {
 	if (dyn_dirty_writeback_enabled)
 		set_dirty_writeback_status(false);
@@ -1728,7 +1733,7 @@ static void dirty_writeback_early_suspend(struct early_suspend *handler)
 /*
  * Sets the dirty page writebacks interval for active system
  */
-static void dirty_writeback_late_resume(struct early_suspend *handler)
+static void dirty_writeback_resume(void)
 {
 	if (dyn_dirty_writeback_enabled)
 		set_dirty_writeback_status(true);
@@ -1737,11 +1742,28 @@ static void dirty_writeback_late_resume(struct early_suspend *handler)
 /*
  * Struct for the dirty page writeback management during suspend/resume
  */
-static struct early_suspend dirty_writeback_suspend = {
-	.suspend = dirty_writeback_early_suspend,
-	.resume = dirty_writeback_late_resume,
-};
+static int state_notifier_callback(struct notifier_block *this,
+				unsigned long event, void *data)
+{
+	switch (event) {
+		case STATE_NOTIFIER_ACTIVE:
+			dirty_writeback_resume();
+			break;
+		case STATE_NOTIFIER_SUSPEND:
+			dirty_writeback_suspend();
+			break;
+		default:
+			break;
+ 	}
+ 
+ 	return NOTIFY_OK;
+}
 #endif
+
+static struct notifier_block notif = {
+	.notifier_call = state_notifier_callback,
+	.priority = INT_MAX,
+};
 
 /*
  * Called early on to tune the page writeback dirty limits.
@@ -1765,16 +1787,16 @@ void __init page_writeback_init(void)
 {
 	int shift;
 
-#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
-	/* Register the dirty page writeback management during suspend/resume */
-	register_early_suspend(&dirty_writeback_suspend);
-#endif
-
 	writeback_set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
 
 	shift = calc_period_shift();
 	prop_descriptor_init(&vm_completions, shift);
+
+#ifdef CONFIG_DYNAMIC_PAGE_WRITEBACK
+	/* Register the dirty page writeback management during suspend/resume */
+	state_register_client(&notif);
+#endif
 }
 
 /**
