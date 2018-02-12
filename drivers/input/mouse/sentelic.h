@@ -112,14 +112,14 @@ struct fsp_data {
 };
 
 #ifdef CONFIG_MOUSE_PS2_SENTELIC
-extern int fsp_detect(struct psmouse *psmouse, bool set_properties);
-extern int fsp_init(struct psmouse *psmouse);
+static extern int fsp_detect(struct psmouse *psmouse, bool set_properties);
+static extern int fsp_init(struct psmouse *psmouse);
 #else
-inline int fsp_detect(struct psmouse *psmouse, bool set_properties)
+static inline int fsp_detect(struct psmouse *psmouse, bool set_properties)
 {
 	return -ENOSYS;
 }
-inline int fsp_init(struct psmouse *psmouse)
+static inline int fsp_init(struct psmouse *psmouse)
 {
 	return -ENOSYS;
 }

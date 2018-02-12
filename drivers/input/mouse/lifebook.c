@@ -254,7 +254,7 @@ static void lifebook_disconnect(struct psmouse *psmouse)
 	psmouse->private = NULL;
 }
 
-int lifebook_detect(struct psmouse *psmouse, bool set_properties)
+static int lifebook_detect(struct psmouse *psmouse, bool set_properties)
 {
         if (!lifebook_present)
                 return -1;
@@ -312,7 +312,7 @@ static int lifebook_create_relative_device(struct psmouse *psmouse)
 	return error;
 }
 
-int lifebook_init(struct psmouse *psmouse)
+static int lifebook_init(struct psmouse *psmouse)
 {
 	struct input_dev *dev1 = psmouse->dev;
 	int max_coord = lifebook_use_6byte_proto ? 4096 : 1024;

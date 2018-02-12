@@ -947,7 +947,7 @@ static int fsp_set_input_params(struct psmouse *psmouse)
 	return 0;
 }
 
-int fsp_detect(struct psmouse *psmouse, bool set_properties)
+static int fsp_detect(struct psmouse *psmouse, bool set_properties)
 {
 	int id;
 
@@ -997,7 +997,7 @@ static int fsp_reconnect(struct psmouse *psmouse)
 	return 0;
 }
 
-int fsp_init(struct psmouse *psmouse)
+static int fsp_init(struct psmouse *psmouse)
 {
 	struct fsp_data *priv;
 	int ver, rev;

@@ -1,3 +1,5 @@
+CFLAGS_KERNEL               :=  -Wno-bool-compare
+
 ccflags-$(CONFIG_POWER_SUPPLY_DEBUG) := -DDEBUG
 
 power_supply-y				:= power_supply_core.o
