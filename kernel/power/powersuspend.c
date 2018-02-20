@@ -33,7 +33,7 @@
 #define MAJOR_VERSION	1
 #define MINOR_VERSION	5
 
-//#define POWER_SUSPEND_DEBUG
+//#define POWER_SUSPEND_DEBUG // Add debugging prints in dmesg
 
 struct workqueue_struct *suspend_work_queue;
 
@@ -157,7 +157,7 @@ void set_power_suspend_state(int new_state)
 	spin_unlock_irqrestore(&state_lock, irqflags);
 }
 
-void set_power_suspend_state_hook(int new_state)
+void set_power_suspend_state_autosleep_hook(int new_state)
 {
 	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] autosleep resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
@@ -192,9 +192,10 @@ static ssize_t power_suspend_state_show(struct kobject *kobj,
 static ssize_t power_suspend_state_store(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
-	int data = 0;
+	int new_state = 0;
 
-	if (mode != POWER_SUSPEND_USERSPACE) // Yank555.lu : Only allow sysfs changes in userspace mode
+	// Yank555.lu : Only allow sysfs changes from userspace mode
+	if (mode != POWER_SUSPEND_USERSPACE)
 		return -EINVAL;
 
 	sscanf(buf, "%d\n", &new_state);
@@ -205,10 +206,6 @@ static ssize_t power_suspend_state_store(struct kobject *kobj,
 	if(new_state == POWER_SUSPEND_ACTIVE || new_state == POWER_SUSPEND_INACTIVE)
 		set_power_suspend_state(new_state);
 
-	if(data == 1 || data == 0) {
-		set_power_suspend_state(data);
-		pr_info("power suspend state requested => %d\n", data);
-	}
 	return count;
 }
 
