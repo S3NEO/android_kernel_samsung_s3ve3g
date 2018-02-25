@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  */
 
-//#define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
+#define pr_fmt(fmt) "MSM-CPP %s:%d " fmt, __func__, __LINE__
 
 
 #include <linux/delay.h>
@@ -67,11 +67,7 @@ typedef struct _msm_cpp_timer_t {
 
 msm_cpp_timer_t cpp_timers;
 
-#if CONFIG_MSM_CPP_DBG
 #define CPP_DBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CPP_DBG(fmt, args...) pr_debug(fmt, ##args)
-#endif
 
 #define ERR_USER_COPY(to) pr_err("copy %s user\n", \
 			((to) ? "to" : "from"))

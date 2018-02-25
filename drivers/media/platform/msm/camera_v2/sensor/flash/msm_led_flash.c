@@ -15,13 +15,8 @@
 
 #include "msm_led_flash.h"
 
-/*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
 
 static long msm_led_flash_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)

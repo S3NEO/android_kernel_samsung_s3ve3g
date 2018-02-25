@@ -13,14 +13,10 @@
 #include <mach/camera2.h>
 #include "msm_camera_spi.h"
 
+
 #undef SPIDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define SPIDBG(fmt, args...) pr_err(fmt, ##args)
 #define S_I2C_DBG(fmt, args...) pr_debug(fmt, ##args)
-#else
-#define SPIDBG(fmt, args...) do { } while (0)
-#define S_I2C_DBG(fmt, args...) do { } while (0)
-#endif
 
 static int msm_camera_spi_txfr(struct spi_device *spi, char *txbuf,
 			       char *rxbuf, int num_byte)

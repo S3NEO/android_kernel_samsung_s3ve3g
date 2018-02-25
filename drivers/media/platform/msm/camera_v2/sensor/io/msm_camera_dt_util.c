@@ -21,14 +21,9 @@
 static struct regulator *sub_ldo3, *sub_ldo4;
 #endif
 
-//#define CONFIG_MSM_CAMERA_DT_DEBUG
-
 #undef CDBG
-#ifdef CONFIG_MSM_CAMERA_DT_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
+
 
 extern int led_torch_en;
 extern int led_flash_en;

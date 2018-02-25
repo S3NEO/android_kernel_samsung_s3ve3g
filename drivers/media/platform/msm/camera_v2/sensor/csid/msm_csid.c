@@ -29,12 +29,9 @@
 #define TRUE   1
 #define FALSE  0
 
+
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
 
 static int msm_csid_cid_lut(
 	struct msm_camera_csid_lut_params *csid_lut_params,

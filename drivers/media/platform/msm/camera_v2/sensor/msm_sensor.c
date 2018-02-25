@@ -17,16 +17,12 @@
 #include "msm_camera_io_util.h"
 #include "msm_camera_i2c_mux.h"
 
-//#ifndef CONFIG_MSMB_CAMERA_DEBUG
-//#define CONFIG_MSMB_CAMERA_DEBUG
-//#endif
+#ifndef CONFIG_MSMB_CAMERA_DEBUG
+#define CONFIG_MSMB_CAMERA_DEBUG
+#endif
 
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
 
 #if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01KTT)\
 	|| defined(CONFIG_MACH_KS01LGT)

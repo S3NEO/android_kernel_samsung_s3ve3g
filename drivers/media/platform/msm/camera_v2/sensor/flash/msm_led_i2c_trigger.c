@@ -22,13 +22,8 @@
 
 #define FLASH_NAME "camera-led-flash"
 
-/*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
 
 int32_t msm_led_i2c_trigger_get_subdev_id(struct msm_led_flash_ctrl_t *fctrl,
 	void *arg)

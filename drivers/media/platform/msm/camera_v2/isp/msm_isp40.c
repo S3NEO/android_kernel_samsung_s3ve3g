@@ -22,7 +22,7 @@
 #include "msm.h"
 #include "msm_camera_io_util.h"
 
-/*#define CONFIG_MSM_ISP_DBG*/
+#define CONFIG_MSM_ISP_DBG
 #undef CDBG
 #ifdef CONFIG_MSM_ISP_DBG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)

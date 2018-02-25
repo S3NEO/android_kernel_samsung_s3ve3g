@@ -32,14 +32,9 @@
 #include "sr030pc50.h"
 #endif
 
-//#define MSM_SENSOR_DRIVER_DEBUG
 /* Logging macro */
 #undef CDBG
-#ifdef MSM_SENSOR_DRIVER_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) pr_debug(fmt, ##args)
-#endif
 
 #if defined(CONFIG_SR352)
 static struct msm_sensor_fn_t sr352_sensor_func_tbl = {

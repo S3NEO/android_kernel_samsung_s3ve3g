@@ -45,11 +45,8 @@
 #define CSID_VERSION_V30 0x30000000
 
 #undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
+
 
 static void msm_camera_io_dump_3(void __iomem *addr, int size)
 {
