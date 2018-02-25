@@ -51,7 +51,6 @@ static char rt_ert_flag;
 static char formatting_dir;
 static unsigned char sig_blend = CTRL_ON;
 static DEFINE_MUTEX(iris_fm);
-static int transport_ready = -1;
 
 module_param(rds_buf, uint, 0);
 MODULE_PARM_DESC(rds_buf, "RDS buffer entries: *100*");
@@ -3218,7 +3217,7 @@ static int iris_vidioc_s_ext_ctrls(struct file *file, void *priv,
 			struct v4l2_ext_controls *ctrl)
 {
 	int retval = 0;
-	int bytes_to_copy;
+	size_t bytes_to_copy;
 	struct hci_fm_tx_ps tx_ps;
 	struct hci_fm_tx_rt tx_rt;
 	struct hci_fm_def_data_wr_req default_data;
@@ -3227,14 +3226,20 @@ static int iris_vidioc_s_ext_ctrls(struct file *file, void *priv,
 	struct iris_device *radio = video_get_drvdata(video_devdata(file));
 	char *data = NULL;
 
+	if ((ctrl == NULL) || (ctrl->controls == NULL)
+		|| (ctrl->count == 0)) {
+		retval = -EINVAL;
+		return retval;
+	}
+
 	switch ((ctrl->controls[0]).id) {
 	case V4L2_CID_RDS_TX_PS_NAME:
 		FMDBG("In V4L2_CID_RDS_TX_PS_NAME\n");
 		/*Pass a sample PS string */
 
 		memset(tx_ps.ps_data, 0, MAX_PS_LENGTH);
-		bytes_to_copy = min((int)(ctrl->controls[0]).size,
-			MAX_PS_LENGTH);
+		bytes_to_copy = min(ctrl->controls[0].size,
+			(size_t)MAX_PS_LENGTH);
 		data = (ctrl->controls[0]).string;
 
 		if (copy_from_user(tx_ps.ps_data,
@@ -3251,7 +3256,7 @@ static int iris_vidioc_s_ext_ctrls(struct file *file, void *priv,
 		break;
 	case V4L2_CID_RDS_TX_RADIO_TEXT:
 		bytes_to_copy =
-		    min((int)(ctrl->controls[0]).size, MAX_RT_LENGTH);
+		    min((ctrl->controls[0]).size, (size_t)MAX_RT_LENGTH);
 		data = (ctrl->controls[0]).string;
 
 		memset(tx_rt.rt_data, 0, MAX_RT_LENGTH);
@@ -3772,13 +3777,26 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		radio->riva_data_req.cmd_params.start_addr = ctrl->value;
 		break;
 	case V4L2_CID_PRIVATE_IRIS_RIVA_ACCS_LEN:
+		if ((ctrl->value > 0) &&
+			(ctrl->value <= MAX_RIVA_PEEK_RSP_SIZE)) {
 			radio->riva_data_req.cmd_params.length = ctrl->value;
+		} else {
+			FMDERR("Length %d is more than the buffer size %d\n",
+			ctrl->value, MAX_RIVA_PEEK_RSP_SIZE);
+			retval = -EINVAL;
+		}
 		break;
 	case V4L2_CID_PRIVATE_IRIS_RIVA_POKE:
+		if (radio->riva_data_req.cmd_params.length <= MAX_RIVA_PEEK_RSP_SIZE) {
 			memcpy(radio->riva_data_req.data, (void *)ctrl->value,
 						radio->riva_data_req.cmd_params.length);
 			radio->riva_data_req.cmd_params.subopcode = RIVA_POKE_OPCODE;
 			retval = hci_poke_data(&radio->riva_data_req , radio->fm_hdev);
+		} else {
+			FMDERR("Can not copy into driver's buffer. Length %d is more than"
+			 "the buffer size %d\n", ctrl->value, MAX_RIVA_PEEK_RSP_SIZE);
+			retval = -EINVAL;
+		}
 		break;
 	case V4L2_CID_PRIVATE_IRIS_SSBI_ACCS_ADDR:
 		radio->ssbi_data_accs.start_addr = ctrl->value;
@@ -4600,23 +4618,10 @@ static const struct v4l2_ioctl_ops iris_ioctl_ops = {
 	.vidioc_g_ext_ctrls           = iris_vidioc_g_ext_ctrls,
 };
 
-#ifndef MODULE
-extern int radio_hci_smd_init(void);
-static int iris_fops_open(struct file *f) {
-	if (transport_ready < 0) {
-		transport_ready = radio_hci_smd_init();
-	}
-	return transport_ready;
-}
-#endif
-
 static const struct v4l2_file_operations iris_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = video_ioctl2,
 	.release        = iris_fops_release,
-#ifndef MODULE
-	.open           = iris_fops_open,
-#endif
 };
 
 static struct video_device iris_viddev_template = {
