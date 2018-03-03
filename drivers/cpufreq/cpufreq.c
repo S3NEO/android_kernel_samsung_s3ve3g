@@ -17,16 +17,21 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/cpu.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/notifier.h>
 #include <linux/cpufreq.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
+#include <linux/spinlock.h>
 #include <linux/device.h>
-#include <linux/init.h>
-#include <linux/kernel_stat.h>
-#include <linux/module.h>
-#include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
+#include <linux/completion.h>
+#include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <linux/kernel_stat.h>
 #include <linux/tick.h>
 
 #include <trace/events/power.h>
