@@ -2264,66 +2264,6 @@ no_policy:
 }
 EXPORT_SYMBOL(cpufreq_update_policy);
 
-/*
- *	cpufreq_set_gov - set governor for a cpu
- *	@cpu: CPU whose governor needs to be changed
- *	@target_gov: new governor to be set
- */
-int cpufreq_set_gov(char *target_gov, unsigned int cpu)
-{
-	int ret = 0;
-	struct cpufreq_policy new_policy;
-	struct cpufreq_policy *cur_policy;
-
-	if (target_gov == NULL)
-		return -EINVAL;
-
-	/* Get current governer */
-	cur_policy = cpufreq_cpu_get(cpu);
-	if (!cur_policy)
-		return -EINVAL;
-
-	if (lock_policy_rwsem_read(cur_policy->cpu) < 0) {
-		ret = -EINVAL;
-		goto err_out;
-	}
-
-	if (cur_policy->governor)
-		ret = strncmp(cur_policy->governor->name, target_gov,
-					strlen(target_gov));
-	else {
-		unlock_policy_rwsem_read(cur_policy->cpu);
-		ret = -EINVAL;
-		goto err_out;
-	}
-	unlock_policy_rwsem_read(cur_policy->cpu);
-
-	if (!ret) {
-		pr_debug(" Target governer & current governer is same\n");
-		ret = -EINVAL;
-		goto err_out;
-	} else {
-		new_policy = *cur_policy;
-		if (cpufreq_parse_governor(target_gov, &new_policy.policy,
-				&new_policy.governor)) {
-			ret = -EINVAL;
-			goto err_out;
-		}
-
-		if (lock_policy_rwsem_write(cur_policy->cpu) < 0) {
-			ret = -EINVAL;
-			goto err_out;
-		}
-
-		ret = __cpufreq_set_policy(cur_policy, &new_policy);
-
-		cur_policy->user_policy.policy = cur_policy->policy;
-		cur_policy->user_policy.governor = cur_policy->governor;
-
-		unlock_policy_rwsem_write(cur_policy->cpu);
-	}
-err_out:
-	cpufreq_cpu_put(cur_policy);
 #ifdef CONFIG_MSM_LIMITER
 /*
  *	cpufreq_set_freq - set max/min freq for a cpu
