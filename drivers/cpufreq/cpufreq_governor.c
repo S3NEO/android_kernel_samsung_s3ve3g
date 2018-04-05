@@ -383,7 +383,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 					kcpustat_cpu(j).cpustat[CPUTIME_NICE];
 
 			mutex_init(&j_cdbs->timer_mutex);
-			INIT_DELAYED_WORK_DEFERRABLE(&j_cdbs->work,
+			INIT_DEFERRABLE_WORK(&j_cdbs->work,
 					     dbs_data->cdata->gov_dbs_timer);
 		}
 
