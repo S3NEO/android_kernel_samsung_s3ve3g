@@ -3994,7 +3994,7 @@ CONFIG_SEC_MONITOR_BATTERY_REMOVAL=y
 # Samsung Rooting Restriction Feature
 #
 # CONFIG_SEC_RESTRICT_ROOTING is not set
-CONFIG_RESTART_REASON_DDR=y
+# CONFIG_RESTART_REASON_DDR is not set
 
 #
 # Security options
