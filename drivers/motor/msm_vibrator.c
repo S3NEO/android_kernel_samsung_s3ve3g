@@ -126,7 +126,7 @@ static int msm_vibrator_suspend(struct device *dev)
 #endif
 
 static SIMPLE_DEV_PM_OPS(vibrator_pm_ops, msm_vibrator_suspend, NULL);
-extern int system_rev;
+extern unsigned int system_rev;
 extern int expander_gpio_config(unsigned config, unsigned disable);
 static int msm_vibrator_probe(struct platform_device *pdev)
 {
