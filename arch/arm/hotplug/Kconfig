@@ -4,3 +4,10 @@ config INTELLI_PLUG
         help
           Generic Intelli-plug cpu hotplug driver for ARM SOCs
 
+# Kconfig file for hotplugs
+
+config INTELLI_PLUG
+	bool "Enable intelli-plug cpu hotplug driver"
+	default n
+	help
+Generic Intelli-plug cpu hotplug driver for ARM SOCs
