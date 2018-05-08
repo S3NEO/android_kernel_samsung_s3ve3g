@@ -62,6 +62,15 @@ config IOSCHED_CFQ
 
 	  Note: If BLK_CGROUP=m, then CFQ can be built only as module.
 
+	  
+config IOSCHED_ZEN
+	tristate "Zen I/O scheduler"
+	default y
+	---help---
+	  FCFS, dispatches are back-inserted, deadlines ensure fairness.
+	  Should work best with devices where there is no travel delay.
+	  
+	  
 config CFQ_GROUP_IOSCHED
 	bool "CFQ Group Scheduling support"
 	depends on IOSCHED_CFQ && BLK_CGROUP
@@ -81,6 +90,7 @@ config IOSCHED_BFQ
 	  guarantee low latency to interactive and soft real-time
 	  applications. If compiled built-in (saying Y here), BFQ can
 	  be configured to support hierarchical scheduling.
+
 
 config CGROUP_BFQIO
 	bool "BFQ hierarchical scheduling support"
@@ -162,6 +172,10 @@ choice
 
 	config DEFAULT_FIOPS
 		bool "FIOPS" if IOSCHED_FIOPS=y
+		
+		
+	config DEFAULT_ZEN
+		bool "ZEN" if IOSCHED_ZEN=y
 
 	config DEFAULT_NOOP
 		bool "No-op"
@@ -187,6 +201,7 @@ config DEFAULT_IOSCHED
 	default "cfq" if DEFAULT_CFQ
 	default "bfq" if DEFAULT_BFQ
 	default "fiops" if DEFAULT_FIOPS
+	default "zen" if DEFAULT_ZEN
 	default "noop" if DEFAULT_NOOP
 	default "maple" if DEFAULT_MAPLE
 	default "sio" if DEFAULT_SIO
