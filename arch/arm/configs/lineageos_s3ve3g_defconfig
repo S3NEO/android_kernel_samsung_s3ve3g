@@ -260,6 +260,11 @@ CONFIG_MUTEX_SPIN_ON_OWNER=y
 CONFIG_FREEZER=y
 
 #
+#Hotplugs
+#
+CONFIG_INTELLI_PLUG=y
+
+#
 # System Type
 #
 CONFIG_MMU=y
