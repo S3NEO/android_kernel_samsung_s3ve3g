@@ -124,6 +124,29 @@ config CPU_FREQ_DEFAULT_GOV_BIOSHOCK
 	help
 Default governor of BioShock kernel
 
+config CPU_FREQ_DEFAULT_GOV_ZZMOOVE
+          bool "zzmoove"
+          select CPU_FREQ_GOV_ZZMOOVE
+          help
+          Use the CPUFreq governor 'zzmoove' as default, using predefined
+          frequency lookup tables and optimized scaling triggers instead of
+          % frequency steps to get smooth up/downscaling dependant on CPU load.
+          
+config CPU_FREQ_DEFAULT_GOV_ALUCARD
+	bool "alucard"
+	select CPU_FREQ_GOV_ALUCARD
+	help
+	
+config CPU_FREQ_DEFAULT_GOV_DARKNESS
+	bool "darkness"
+	select CPU_FREQ_GOV_DARKNESS
+	help
+	
+config CPU_FREQ_DEFAULT_GOV_NIGHTMARE
+	bool "nightmare"
+	select CPU_FREQ_GOV_NIGHTMARE
+	help
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -227,6 +250,33 @@ config CPU_FREQ_GOV_BIOSHOCK
 	depends on CPU_FREQ
 	help
 'bioshock' - More aggressive version of conservative
+
+
+config CPU_FREQ_GOV_ZZMOOVE
+        tristate "'zzmoove' cpufreq governor"
+        depends on CPU_FREQ
+        help
+          'zzmoove' - based on cpufreq_conservative, using predefined
+          frequency lookup tables and optimized scaling triggers instead of
+          % frequency steps to get smooth up/downscaling dependant on CPU load.
+          If in doubt, say N.
+          
+config CPU_FREQ_GOV_ALUCARD
+	tristate "'alucard' cpufreq governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
+	
+
+config CPU_FREQ_GOV_DARKNESS
+	tristate "'darkness' cpufreq governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
+	
+
+config CPU_FREQ_GOV_NIGHTMARE
+	tristate "'nightmare' cpufreq governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
