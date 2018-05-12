@@ -341,7 +341,6 @@ void alarm_restart(struct alarm *alarm)
 	hrtimer_restart(&alarm->timer);
 	alarmtimer_enqueue(base, alarm);
 	spin_unlock_irqrestore(&base->lock, flags);
-	return ret;
 }
 
 /**
