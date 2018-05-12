@@ -338,6 +338,7 @@ int alarm_start(struct alarm *alarm, ktime_t start)
 {
 	struct alarm_base *base = &alarm_bases[alarm->type];
 	unsigned long flags;
+	int ret;
 
 	spin_lock_irqsave(&base->lock, flags);
 	if (alarmtimer_active(alarm))
