@@ -6770,7 +6770,7 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	mutex_init(&chip->jeita_configure_lock);
 	hrtimer_init(&chip->hrtimer_reduce_power_stage_alarm, CLOCK_BOOTTIME,
 			HRTIMER_MODE_ABS);
-	chip->hrtimer_reduce_power_stage_alarm.function = 					&qpnp_chg_reduce_power_stage_callback
+	chip->hrtimer_reduce_power_stage_alarm.function = &qpnp_chg_reduce_power_stage_callback;
 	INIT_WORK(&chip->reduce_power_stage_work,
 			qpnp_chg_reduce_power_stage_work);
 	mutex_init(&chip->batfet_vreg_lock);
