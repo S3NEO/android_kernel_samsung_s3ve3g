@@ -584,7 +584,7 @@ static void handle_event_change(enum command_response cmd, void *data)
 				"V4L2_EVENT_SEQ_CHANGED_SUFFICIENT\n");
 			inst->prop.height[CAPTURE_PORT] = event_notify->height;
 			inst->prop.width[CAPTURE_PORT] = event_notify->width;
-			if (!msm_comm_get_stream_output_mode(inst) ==
+			if (msm_comm_get_stream_output_mode(inst) !=
 				HAL_VIDEO_DECODER_SECONDARY) {
 				inst->prop.height[OUTPUT_PORT] =
 					event_notify->height;
