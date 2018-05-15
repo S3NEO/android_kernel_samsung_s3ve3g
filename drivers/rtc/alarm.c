@@ -184,7 +184,7 @@ static void alarm_enqueue_locked(struct alarm *alarm)
  * @type:	the alarm type to be used
  * @function:	alarm callback function
  */
-void alarm_init(struct alarm *alarm,
+void android_alarm_init(struct alarm *alarm,
 	enum android_alarm_type type, void (*function)(struct alarm *))
 {
 	RB_CLEAR_NODE(&alarm->node);
@@ -201,7 +201,7 @@ void alarm_init(struct alarm *alarm,
  * @start:	earliest expiry time
  * @end:	expiry time
  */
-void alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end)
+void android_alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end)
 {
 	unsigned long flags;
 
@@ -222,7 +222,7 @@ void alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end)
  * -1 when the alarm may currently be excuting the callback function and
  *    cannot be stopped (it may also be inactive)
  */
-int alarm_try_to_cancel(struct alarm *alarm)
+int android_alarm_try_to_cancel(struct alarm *alarm)
 {
 	struct alarm_queue *base = &alarms[alarm->type];
 	unsigned long flags;
@@ -260,10 +260,10 @@ int alarm_try_to_cancel(struct alarm *alarm)
  *  0 when the alarm was not active
  *  1 when the alarm was active
  */
-int alarm_cancel(struct alarm *alarm)
+int android_alarm_cancel(struct alarm *alarm)
 {
 	for (;;) {
-		int ret = alarm_try_to_cancel(alarm);
+		int ret = android_alarm_try_to_cancel(alarm);
 		if (ret >= 0)
 			return ret;
 		cpu_relax();
@@ -274,7 +274,7 @@ int alarm_cancel(struct alarm *alarm)
  * alarm_set_rtc - set the kernel and rtc walltime
  * @new_time:	timespec value containing the new time
  */
-int alarm_set_rtc(struct timespec new_time)
+int android_alarm_set_rtc(struct timespec new_time)
 {
 	int i;
 	int ret;
@@ -322,17 +322,17 @@ int alarm_set_rtc(struct timespec new_time)
 	}
 	spin_unlock_irqrestore(&alarm_slock, flags);
 	if (ret < 0) {
-		pr_alarm(ERROR, "alarm_set_rtc: Failed to set time\n");
+		pr_alarm(ERROR, "android_alarm_set_rtc: Failed to set time\n");
 		goto err;
 	}
 	if (!alarm_rtc_dev) {
 		pr_alarm(ERROR,
-			"alarm_set_rtc: no RTC, time will be lost on reboot\n");
+			"android_alarm_set_rtc: no RTC, time will be lost on reboot\n");
 		goto err;
 	}
 	ret = rtc_set_time(alarm_rtc_dev, &rtc_new_rtc_time);
 	if (ret < 0)
-		pr_alarm(ERROR, "alarm_set_rtc: "
+		pr_alarm(ERROR, "android_alarm_set_rtc: "
 			"Failed to set RTC, time will be lost on reboot\n");
 err:
 	wake_unlock(&alarm_rtc_wake_lock);
@@ -353,7 +353,7 @@ extern int rtc_set_bootalarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm);
 #define BOOTALM_BIT_MIN 	11
 #define BOOTALM_BIT_TOTAL	13
 
-int alarm_set_alarm(char* alarm_data)
+int android_alarm_set_alarm(char* alarm_data)
 {
 	struct rtc_wkalrm alm;
 	int ret;
@@ -368,7 +368,7 @@ int alarm_set_alarm(char* alarm_data)
 
 	if (!alarm_rtc_dev) {
 		pr_alarm(ERROR,
-			"alarm_set_alarm: no RTC, time will be lost on reboot\n");
+			"android_alarm_set_alarm: no RTC, time will be lost on reboot\n");
 		return -1;
 	}
 
@@ -434,7 +434,7 @@ int alarm_set_alarm(char* alarm_data)
 	}
 	ret = rtc_set_bootalarm(alarm_rtc_dev, &alm);
 	if (ret < 0) {
-		pr_alarm(ERROR, "alarm_set_alarm: "
+		pr_alarm(ERROR, "android_alarm_set_alarm: "
 			"Failed to set ALARM, time will be lost on reboot\n");
 		return -2;
 	}
@@ -443,7 +443,7 @@ int alarm_set_alarm(char* alarm_data)
 #endif
 
 void
-alarm_update_timedelta(struct timespec tmp_time, struct timespec new_time)
+android_alarm_update_timedelta(struct timespec tmp_time, struct timespec new_time)
 {
 	int i;
 	unsigned long flags;
@@ -470,7 +470,7 @@ alarm_update_timedelta(struct timespec tmp_time, struct timespec new_time)
  *
  * returns the time in ktime_t format
  */
-ktime_t alarm_get_elapsed_realtime(void)
+ktime_t android_alarm_get_elapsed_realtime(void)
 {
 	ktime_t now;
 	unsigned long flags;

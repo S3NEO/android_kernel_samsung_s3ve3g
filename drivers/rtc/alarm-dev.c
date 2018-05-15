@@ -97,7 +97,7 @@ static long alarm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		mutex_lock(&alarm_mutex);
 		spin_lock_irqsave(&alarm_slock, flags);
 		pr_alarm(IO, "alarm %d clear\n", alarm_type);
-		alarm_try_to_cancel(&alarms[alarm_type]);
+		android_alarm_try_to_cancel(&alarms[alarm_type]);
 		if (alarm_pending) {
 			alarm_pending &= ~alarm_type_mask;
 			if (!alarm_pending && !wait_pending)
@@ -134,7 +134,7 @@ from_old_alarm_set:
 		pr_alarm(IO, "alarm %d set %ld.%09ld\n", alarm_type,
 			new_alarm_time.tv_sec, new_alarm_time.tv_nsec);
 		alarm_enabled |= alarm_type_mask;
-		alarm_start_range(&alarms[alarm_type],
+		android_alarm_start_range(&alarms[alarm_type],
 			timespec_to_ktime(new_alarm_time),
 			timespec_to_ktime(new_alarm_time));
 		spin_unlock_irqrestore(&alarm_slock, flags);
@@ -170,7 +170,7 @@ from_old_alarm_set:
 			rv = -EFAULT;
 			goto err1;
 		}
-		rv = alarm_set_rtc(new_rtc_time);
+		rv = android_alarm_set_rtc(new_rtc_time);
 		spin_lock_irqsave(&alarm_slock, flags);
 		alarm_pending |= ANDROID_ALARM_TIME_CHANGE_MASK;
 		wake_up(&alarm_wait_queue);
@@ -185,7 +185,7 @@ from_old_alarm_set:
 			rv = -EFAULT;
 			goto err1;
 		}
-		rv = alarm_set_alarm(bootalarm_data);
+		rv = android_alarm_set_alarm(bootalarm_data);
 		break;
 #endif
 	case ANDROID_ALARM_GET_TIME(0):
@@ -198,7 +198,7 @@ from_old_alarm_set:
 		case ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP:
 		case ANDROID_ALARM_ELAPSED_REALTIME:
 			tmp_time =
-				ktime_to_timespec(alarm_get_elapsed_realtime());
+				ktime_to_timespec(android_alarm_get_elapsed_realtime());
 			break;
 		case ANDROID_ALARM_TYPE_COUNT:
 		case ANDROID_ALARM_SYSTEMTIME:
@@ -242,7 +242,7 @@ static int alarm_release(struct inode *inode, struct file *file)
 				alarm_enabled &= ~alarm_type_mask;
 			}
 			spin_unlock_irqrestore(&alarm_slock, flags);
-			alarm_cancel(&alarms[i]);
+			android_alarm_cancel(&alarms[i]);
 			spin_lock_irqsave(&alarm_slock, flags);
 		}
 		if (alarm_pending | wait_pending) {
@@ -298,7 +298,7 @@ static int __init alarm_dev_init(void)
 		return err;
 
 	for (i = 0; i < ANDROID_ALARM_TYPE_COUNT; i++)
-		alarm_init(&alarms[i], i, alarm_triggered);
+		android_alarm_init(&alarms[i], i, alarm_triggered);
 	wake_lock_init(&alarm_wake_lock, WAKE_LOCK_SUSPEND, "alarm");
 
 	return 0;
