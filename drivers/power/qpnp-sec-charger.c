@@ -4135,7 +4135,7 @@ qpnp_chg_reduce_power_stage(struct qpnp_chg_chip *chip)
 	if (usb_present && usb_ma_above_wall) {
 		getnstimeofday(&ts);
 		ts.tv_sec += POWER_STAGE_REDUCE_CHECK_PERIOD_SECONDS;
-		alarm_start_range(&chip->reduce_power_stage_alarm,
+		android_alarm_start_range(&chip->reduce_power_stage_alarm,
 					timespec_to_ktime(ts),
 					timespec_to_ktime(ts));
 	} else {
@@ -5723,7 +5723,7 @@ static void sec_bat_event_program_alarm(
         ktime_t next;
 
         next = ktime_add(chip->last_event_time, low_interval);
-        alarm_start_range(&chip->event_termination_alarm,
+        android_alarm_start_range(&chip->event_termination_alarm,
                 next, ktime_add(next, slack));
 }
 
@@ -5774,7 +5774,7 @@ static void sec_bat_event_set(
                 return;
         }
 
-        alarm_cancel(&chip->event_termination_alarm);
+        android_alarm_cancel(&chip->event_termination_alarm);
         chip->event &= (~chip->event_wait);
 
         if (enable) {
@@ -5792,7 +5792,7 @@ static void sec_bat_event_set(
 			__func__ , event, chip->event);
 
                 chip->event_wait = event;
-                chip->last_event_time = alarm_get_elapsed_realtime();
+                chip->last_event_time = android_alarm_get_elapsed_realtime();
 
                 sec_bat_event_program_alarm(chip,
                         chip->batt_pdata->event_waiting_time);
@@ -5823,7 +5823,7 @@ static bool sec_chg_time_management(struct qpnp_chg_chip *chip)
 	struct timespec ts;
 	int batt_capacity = 0;
 
-	current_time = alarm_get_elapsed_realtime();
+	current_time = android_alarm_get_elapsed_realtime();
 	ts = ktime_to_timespec(current_time);
 
 	/* device discharging */
@@ -6075,7 +6075,7 @@ static void sec_handle_cable_insertion_removal(struct qpnp_chg_chip *chip)
 			prev_batt_status,chip->batt_status);
 	}
 
-	// alarm_cancel(&chip->event_termination_alarm);
+	// android_alarm_cancel(&chip->event_termination_alarm);
 	schedule_delayed_work(&chip->sec_bat_monitor_work, 0);
 	wake_lock_timeout(&chip->cable_wake_lock, 3*HZ);
 
@@ -6130,7 +6130,7 @@ static void sec_pm8226_start_charging(struct qpnp_chg_chip *chip)
         ktime_t current_time;
         struct timespec ts;
 
-        current_time = alarm_get_elapsed_realtime();
+        current_time = android_alarm_get_elapsed_realtime();
         ts = ktime_to_timespec(current_time);
 
 	if(chip->ovp_uvlo_state != 0) {
@@ -6366,7 +6366,7 @@ static void sec_bat_monitor(struct work_struct *work)
 					if (chip->recent_reported_soc == 100) {
 						ktime_t current_time;
 						struct timespec ts;
-						current_time = alarm_get_elapsed_realtime();
+						current_time = android_alarm_get_elapsed_realtime();
 						ts = ktime_to_timespec(current_time);
 						pr_err("first phase charging done: update battery UI FULL \n");
 						chip->batt_status = POWER_SUPPLY_STATUS_FULL;
@@ -6598,10 +6598,10 @@ static void sec_bat_program_alarm(struct qpnp_chg_chip *chip, int polling_time)
 	ktime_t slack = ktime_set(10, 0);
 	ktime_t next;
 
-	chip->last_update_time = alarm_get_elapsed_realtime();
+	chip->last_update_time = android_alarm_get_elapsed_realtime();
 
 	next = ktime_add(chip->last_update_time, low_interval);
-	alarm_start_range(&chip->polling_alarm,
+	android_alarm_start_range(&chip->polling_alarm,
 		next, ktime_add(next, slack));
 }
 
@@ -6679,7 +6679,7 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	}
 
 	mutex_init(&chip->jeita_configure_lock);
-	alarm_init(&chip->reduce_power_stage_alarm, ANDROID_ALARM_RTC_WAKEUP,
+	android_alarm_init(&chip->reduce_power_stage_alarm, ANDROID_ALARM_RTC_WAKEUP,
 			qpnp_chg_reduce_power_stage_callback);
 	INIT_WORK(&chip->reduce_power_stage_work,
 			qpnp_chg_reduce_power_stage_work);
@@ -7055,10 +7055,10 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	sec_bat_create_attrs(chip->batt_psy.dev);
 	//sec_fg_create_attrs(chip->fg_psy.dev);
 
-	alarm_init(&chip->event_termination_alarm,
+	android_alarm_init(&chip->event_termination_alarm,
 			ANDROID_ALARM_ELAPSED_REALTIME,
 			sec_bat_event_expired_timer_func);
-	alarm_init(&chip->polling_alarm,
+	android_alarm_init(&chip->polling_alarm,
 		ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
 		sec_bat_polling_alarm_expired);
 
@@ -7193,9 +7193,9 @@ static int sec_qpnp_chg_prepare(struct device *dev)
 	}
 
 	cancel_delayed_work(&chip->sec_bat_monitor_work);
-	alarm_cancel(&chip->polling_alarm);
+	android_alarm_cancel(&chip->polling_alarm);
 
-	chip->last_update_time = alarm_get_elapsed_realtime();
+	chip->last_update_time = android_alarm_get_elapsed_realtime();
 	sec_bat_program_alarm(chip, chip->polling_time);
 #ifdef SEC_CHARGER_DEBUG
 	pr_err("%s battery update time (%d seconds) !!\n",
@@ -7213,7 +7213,7 @@ static void sec_qpnp_chg_complete(struct device *dev)
         pr_err("%s start\n", __func__);
 #endif
 	cancel_delayed_work(&chip->sec_bat_monitor_work);
-	alarm_cancel(&chip->polling_alarm);
+	android_alarm_cancel(&chip->polling_alarm);
 
 	chip->polling_time = chip->update_time;
 	schedule_delayed_work(&chip->sec_bat_monitor_work, 0);
