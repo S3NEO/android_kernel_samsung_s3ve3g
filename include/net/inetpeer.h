@@ -52,6 +52,7 @@ struct inet_peer {
 	union {
 		struct {
 			atomic_t			rid;		/* Frag reception counter */
+			atomic_t	ip_id_count; /* IP ID for the next packet */
 			__u32				tcp_ts;
 			__u32				tcp_ts_stamp;
 		};
@@ -108,5 +109,21 @@ static inline void inet_peer_refcheck(const struct inet_peer *p)
 {
 	WARN_ON_ONCE(atomic_read(&p->refcnt) <= 0);
 }
+
+/* can be called with or without local BH being disabled */
+static inline int inet_getid(struct inet_peer *p, int more)
+{
+       int old, new;
+       more++;
+       inet_peer_refcheck(p);
+       do {
+               old = atomic_read(&p->ip_id_count);
+               new = old + more;
+               if (!new)
+                       new = 1;
+       } while (atomic_cmpxchg(&p->ip_id_count, old, new) != old);
+       return new;
+}
+
 
 #endif /* _NET_INETPEER_H */
