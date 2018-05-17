@@ -401,8 +401,10 @@ static inline unsigned int cpufreq_quick_get_min(unsigned int cpu)
 #endif
 
 enum {
-	BOOT_CPU = 0,
+       BOOT_CPU = 0,
 };
+
+#define MAX_FREQ_LIMIT 2457600
 
 #if defined (CONFIG_SEC_DVFS) || defined (CONFIG_CPU_FREQ_LIMIT_USERSPACE)
 enum {
