@@ -332,9 +332,6 @@ config MDP_NEGATIVE_SUPPORT
 	bool "Support MDP negative color"
 	default n
 
-
-	  MDSS support for Framebuffer quickdraw
-
 config FB_MSM_MDSS_KCAL_CTRL
 	depends on FB_MSM_MDSS
 	bool "MDSS color control"
