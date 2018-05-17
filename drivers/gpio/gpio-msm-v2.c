@@ -137,12 +137,26 @@ unsigned __msm_gpio_get_intr_status(unsigned gpio)
 
 void __msm_gpio_set_intr_status(unsigned gpio)
 {
-	__raw_writel(BIT(INTR_STATUS_BIT), GPIO_INTR_STATUS(gpio));
+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, d->irq);
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&tlmm_lock, irq_flags);
+	writel(TARGET_PROC_NONE, GPIO_INTR_CFG_SU(gpio));
+	clear_gpio_bits(BIT(INTR_RAW_STATUS_EN) | BIT(INTR_ENABLE), GPIO_INTR_CFG(gpio));
+	__clear_bit(gpio, msm_gpio.enabled_irqs);
+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
 }
 
 unsigned __msm_gpio_get_intr_config(unsigned gpio)
 {
-	return __raw_readl(GPIO_INTR_CFG(gpio));
+	int gpio = msm_irq_to_gpio(&msm_gpio.gpio_chip, d->irq);
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&tlmm_lock, irq_flags);
+	__set_bit(gpio, msm_gpio.enabled_irqs);
+	set_gpio_bits(BIT(INTR_RAW_STATUS_EN) | BIT(INTR_ENABLE), GPIO_INTR_CFG(gpio));
+	writel(TARGET_PROC_SCORPION, GPIO_INTR_CFG_SU(gpio));
+	spin_unlock_irqrestore(&tlmm_lock, irq_flags);
 }
 
 void __msm_gpio_set_intr_cfg_enable(unsigned gpio, unsigned val)

@@ -723,9 +723,27 @@ __request_firmware(const struct firmware **firmware_p, const char *name,
  **/
 int
 request_firmware(const struct firmware **firmware_p, const char *name,
-		 struct device *device)
+                 struct device *device)
 {
-	return __request_firmware(firmware_p, name, device, 0, 0);
+	struct firmware_priv *fw_priv;
+	int ret;
+	if (!name || name[0] == '\0')
+		return -EINVAL;
+	fw_priv = _request_firmware_prepare(firmware_p, name, device, true,
+					    false);
+	if (IS_ERR_OR_NULL(fw_priv))
+		return PTR_RET(fw_priv);
+	ret = usermodehelper_read_trylock();
+	if (WARN_ON(ret)) {
+		dev_err(device, "firmware: %s will not be loaded\n", name);
+	} else {
+		ret = _request_firmware_load(fw_priv, true,
+					firmware_loading_timeout());
+		usermodehelper_read_unlock();
+	}
+	if (ret)
+		_request_firmware_cleanup(firmware_p);
+	return ret;
 }
 
 /**
@@ -740,10 +758,10 @@ request_firmware(const struct firmware **firmware_p, const char *name,
  *      the firmware that was loaded at dest_addr.
 */
 int request_firmware_direct(const char *name, struct device *device,
-			phys_addr_t dest_addr, size_t dest_size)
+                       phys_addr_t dest_addr, size_t dest_size)
 {
-	const struct firmware *fp = NULL;
-	int ret;
+       const struct firmware *fp = NULL;
+       int ret;
 
 	ret = __request_firmware(&fp, name, device, dest_addr, dest_size);
 	if (ret)
