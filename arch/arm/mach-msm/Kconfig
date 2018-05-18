@@ -3102,6 +3102,19 @@ config MSM_DALRPC_TEST
 
 if CPU_FREQ_MSM
 
+config CPU_UNDERCLOCK
+	bool "underclock cpufreq"
+	default y
+	help
+	  Allow CPU underclock frequencies.
+
+
+config CPU_OVERCLOCK
+	bool "enable CPU overclocking of Cortex A7"
+	default y
+	help
+	Allow CPU Overclocking upto 1.6 GHz
+
 config MSM_CPU_FREQ_SET_MIN_MAX
 	bool "Set Min/Max CPU frequencies."
 	default n
@@ -3112,12 +3125,12 @@ config MSM_CPU_FREQ_SET_MIN_MAX
 config MSM_CPU_FREQ_MAX
 	int "Max CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 384000
+	default 1401600
 
 config MSM_CPU_FREQ_MIN
 	int "Min CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 245760
+	default 96000
 
 endif # CPU_FREQ_MSM
 
