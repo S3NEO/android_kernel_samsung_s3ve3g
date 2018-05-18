@@ -205,9 +205,6 @@ void __init msm8226_add_drivers(void)
 	defined(CONFIG_SEC_MS01_PROJECT)
 #ifdef CONFIG_SEC_THERMISTOR
 	platform_device_register(&sec_device_thermistor);
-#ifdef CONFIG_ANDROID_RAM_CONSOLE
-	 sensor polling support.
-#endif
 #endif
 #endif
 }
