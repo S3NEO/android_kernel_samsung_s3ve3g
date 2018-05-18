@@ -562,7 +562,8 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized)
 else
-KBUILD_CFLAGS	+= -O2
+KBUILD_CFLAGS	+= -O2 -march=armv7-a+crc+crypto -mtune=cortex-a7 -mcpu-cortex-a7 -marm -mfpu=neon-vfpv4  \
+					-mfloat-abi=hard -std=gnu89
 KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized) -fno-inline-functions
 KBUILD_CFLAGS	+= $(call cc-disable-warning,array-bounds) \
 					$(call cc-disable-warning, misleading-indentation)
