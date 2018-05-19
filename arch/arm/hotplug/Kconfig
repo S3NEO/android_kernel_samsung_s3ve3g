@@ -19,3 +19,9 @@ config ALUCARD_HOTPLUG
 	default y
 	help
 Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
+
+config MAKO_HOTPLUG
+        bool "Enable mako-hotplug cpu hotplug driver"
+        default n
+        help
+Generic Intelli-plug cpu hotplug driver for ARM SOCs 
