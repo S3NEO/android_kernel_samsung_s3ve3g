@@ -71,6 +71,14 @@ config IOSCHED_SIOPLUS
 	  ensure fairness. The algorithm does not do any sorting but
 	  basic merging, trying to keep a minimum overhead. It is aimed
 	  mainly for aleatory access devices (eg: flash devices).
+
+config IOSCHED_TRIPNDROID
+	tristate "TripNDroid IO Scheduler"
+	default y
+	---help---
+	  The TripNDroid IO Scheduler is based on noop, deadline and vr
+	  it uses deadlines to ensure some fairness. The scheduler is build
+	  to keep a minimum overhead. It is mainly build for mobile devices.
 	  
 	  
 config IOSCHED_CFQ
@@ -175,6 +183,9 @@ choice
 		
 	config DEFAULT_SIOPLUS
 		bool "SIOPLUS" if IOSCHED_SIOPLUS=y
+	
+	config DEFAULT_TRIPNDROID
+	bool "TD" if IOSCHED_TRIPNDROID=y
 
 	config DEFAULT_NOOP
 		bool "No-op"
@@ -192,6 +203,7 @@ config DEFAULT_IOSCHED
 	default "noop" if DEFAULT_NOOP
 	default "sio" if DEFAULT_SIO
 	default "sioplus" if DEFAULT_SIOPLUS
+	default "tripndroid" if DEFAULT_TRIPNDROID
 
 endmenu
 
