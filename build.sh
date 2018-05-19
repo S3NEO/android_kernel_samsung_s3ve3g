@@ -105,7 +105,9 @@ function clean() {
 	echo -e "Cleaning build environment...$nocol";
 	make -j${JOBS} mrproper;
 
-	rm_if_exist ${*.zip};
+	if [ -e *.zip ]; then
+		rm *.zip;
+	fi;
 	rm_if_exist ${OUTPUT_PATH};
 	rm_if_exist ${MODULES_PATH};
 	rm_if_exist ${DT_IMG};
