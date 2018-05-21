@@ -18,9 +18,9 @@
  *
  *  v1.6 - remove autosleep and hybrid modes (autosleep not working on shamu)
  *
- *  v1.7 - do only run state change if change actually requests a new state
+ *  v1.6.1 - add autosleep and hybrid modes and hybrid default (UpInTheAir@XDA)
  *
- *  v1.7.1 - Add auto-sleep and hybrid modes back
+ *  v1.7 - do only run state change if change actually requests a new state
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -39,7 +39,6 @@
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	7
 #define SUB_MINOR_VERSION 1
 #define MINOR_VERSION	5
 
@@ -165,12 +164,22 @@ void set_power_suspend_state(int new_state)
 			state = new_state;
 			queue_work(suspend_work_queue, &power_resume_work);
 		}
-		spin_unlock_irqrestore(&state_lock, irqflags);		
+		spin_unlock_irqrestore(&state_lock, irqflags);
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	} else {
 		pr_info("[POWERSUSPEND] state change requested, but unchanged ?! Ignored !\n");
 	#endif
 	}
+}
+
+void set_power_suspend_state_autosleep_hook(int new_state)
+{
+#ifdef POWER_SUSPEND_DEBUG
+	pr_info("[POWERSUSPEND] autosleep resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
+#endif
+	// Only allow autosleep hook changes in autosleep & hybrid mode
+	if (mode == POWER_SUSPEND_AUTOSLEEP || mode == POWER_SUSPEND_HYBRID)
+		set_power_suspend_state(new_state);
 }
 
 void set_power_suspend_state_autosleep_hook(int new_state)		
@@ -190,8 +199,8 @@ void set_power_suspend_state_panel_hook(int new_state)
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] panel resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
 	#endif
-	// Yank555.lu : Only allow autosleep hook changes in autosleep & hybrid mode
-	if (mode == POWER_SUSPEND_PANEL || mode == POWER_SUSPEND_HYBRID)
+	// Only allow autosleep hook changes in autosleep & hybrid mode
+	if (mode == POWER_SUSPEND_AUTOSLEEP || mode == POWER_SUSPEND_HYBRID)
 		set_power_suspend_state(new_state);
 }
 
@@ -246,7 +255,7 @@ static ssize_t power_suspend_mode_store(struct kobject *kobj,
 	switch (data) {
 		case POWER_SUSPEND_AUTOSLEEP:
 		case POWER_SUSPEND_PANEL:
-		case POWER_SUSPEND_USERSPACE:
+		case POWER_SUSPEND_USERSPACE:	mode = data;
 		case POWER_SUSPEND_HYBRID:	mode = data;
 						return count;
 		default:
