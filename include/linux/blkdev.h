@@ -82,6 +82,10 @@ struct request {
 	struct list_head queuelist;
 	struct call_single_data csd;
 
+	union {
+		unsigned long fifo_time;
+	};
+
 	struct request_queue *q;
 
 	unsigned int cmd_flags;
