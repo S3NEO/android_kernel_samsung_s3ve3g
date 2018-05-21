@@ -243,8 +243,11 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
 
-HOSTCC       = gcc
-HOSTCXX      = g++
+O3_OPTS := -finline-functions -funswitch-loops -fpredictive-commoning -fgcse-after-reload -ftree-loop-vectorize -ftree-loop-distribution -ftree-loop-distribute-patterns -ftree-slp-vectorize -fvect-cost-model -ftree-partial-pre -fpeel-loops
+O3_OPTS2 := -fgraphite-identity -floop-interchange -floop-strip-mine -ftree-loop-if-convert -floop-block -floop-interchange
+
+HOSTCC  =  gcc
+HOSTCXX =  g++
 HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer -std=gnu89
 HOSTCXXFLAGS = -O2
 
@@ -368,7 +371,16 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fno-asynchronous-unwind-tables \
+		   -fno-delete-null-pointer-checks \
+		   -std=gnu89 \
+		   -Wno-deprecated-declarations \
+		   -Wno-misleading-indentation \
+		   -Wno-shift-overflow \
+		   -Wno-memset-transposed-args \
+		   -Wno-discarded-array-qualifiers \
+		   -Wno-tautological-compare -Wno-array-bounds \
+		   -Wno-nonnull
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -562,11 +574,12 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized)
 else
-KBUILD_CFLAGS	+= -O2 -march=armv7-a+crc+crypto -mtune=cortex-a7 -mcpu-cortex-a7 -marm -mfpu=neon-vfpv4  \
-					-mfloat-abi=hard -std=gnu89
-KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized) -fno-inline-functions
+KBUILD_CFLAGS	+= -O2 -std=gnu89
+
+KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,array-bounds) \
-					$(call cc-disable-warning, misleading-indentation)
+					$(call cc-disable-warning, misleading-indentation) \
+
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
