@@ -574,7 +574,7 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized)
 else
-KBUILD_CFLAGS	+= -O2 -std=gnu89
+KBUILD_CFLAGS	+= -O2 -std=gnu89 -march=armv7ve -mtune=cortex-a7 -mcpu=cortex-a7 -marm -mfloat-abi=softfp -mfpu=neon-vfpv4
 
 KBUILD_CFLAGS	+= $(call cc-disable-warning,maybe-uninitialized)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,array-bounds) \
