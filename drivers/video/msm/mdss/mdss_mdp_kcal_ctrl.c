@@ -32,7 +32,7 @@
 
 #include "mdss_mdp.h"
 
-#define NUM_QLUT 0x100
+#define DEF_PCC 0x100
 #define DEF_PA 0xff
 #define PCC_ADJ 0x80
 
@@ -547,7 +547,7 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	int ret;
 	struct kcal_lut_data *lut_data;
 
-	lut_data = kzalloc(sizeof(*lut_data), GFP_KERNEL);
+	lut_data = devm_kzalloc(&pdev->dev, sizeof(*lut_data), GFP_KERNEL);
 	if (!lut_data) {
 		pr_err("%s: failed to allocate memory for lut_data\n",
 			__func__);
@@ -556,16 +556,22 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, lut_data);
 
-	lut_data->red = lut_data->green = lut_data->blue = NUM_QLUT;
-	lut_data->minimum = 35;
-	lut_data->enable = 1;
-	lut_data->invert = 0;
+	lut_data->enable = 0x1;
+	lut_data->red = DEF_PCC;
+	lut_data->green = DEF_PCC;
+	lut_data->blue = DEF_PCC;
+	lut_data->minimum = 0x23;
+	lut_data->invert = 0x0;
+	lut_data->hue = 0x0;
 	lut_data->sat = DEF_PA;
-	lut_data->hue = 0;
 	lut_data->val = DEF_PA;
 	lut_data->cont = DEF_PA;
 
 	lut_data->queue_changes = false;
+
+	mdss_mdp_kcal_update_pcc(lut_data);
+	mdss_mdp_kcal_update_pa(lut_data);
+	mdss_mdp_kcal_update_igc(lut_data);
 
 #if defined(CONFIG_MMI_PANEL_NOTIFICATIONS)
 	lut_data->panel_nb.display_on = mdss_mdp_kcal_update_queue;
@@ -573,7 +579,7 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	ret = mmi_panel_register_notifier(&lut_data->panel_nb);
 	if (ret) {
 		pr_err("%s: unable to register MMI notifier\n", __func__);
-		goto out_free_mem;
+		return ret;
 	}
 #elif defined(CONFIG_FB)
 	lut_data->dev = pdev->dev;
@@ -581,7 +587,7 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	ret = fb_register_client(&lut_data->panel_nb);
 	if (ret) {
 		pr_err("%s: unable to register fb notifier\n", __func__);
-		goto out_free_mem;
+		return ret;
 	}
 #endif
 
@@ -595,13 +601,17 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	ret |= device_create_file(&pdev->dev, &dev_attr_kcal_cont);
 	if (ret) {
 		pr_err("%s: unable to create sysfs entries\n", __func__);
-		goto out_free_mem;
+		goto out_notifier;
 	}
 
 	return 0;
 
-out_free_mem:
-	kfree(lut_data);
+out_notifier:
+#if defined(CONFIG_MMI_PANEL_NOTIFICATIONS)
+	mmi_panel_unregister_notifier(&lut_data->panel_nb);
+#elif defined(CONFIG_FB)
+	fb_unregister_client(&lut_data->panel_nb);
+#endif
 	return ret;
 }
 
@@ -623,8 +633,6 @@ static int kcal_ctrl_remove(struct platform_device *pdev)
 #elif defined(CONFIG_FB)
 	fb_unregister_client(&lut_data->panel_nb);
 #endif
-
-	kfree(lut_data);
 
 	return 0;
 }
