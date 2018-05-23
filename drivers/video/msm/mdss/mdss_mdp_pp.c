@@ -21,6 +21,10 @@
 #include <linux/delay.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
+
+
+#include "mdss_mdp_kcal_ctrl.h"
+
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
 struct mdp_csc_cfg mdp_csc_convert_wideband = {
 	0,
@@ -460,7 +464,7 @@ static void pp_ad_bypass_config(struct mdss_ad_info *ad,
 				struct mdss_mdp_ctl *ctl, u32 num, u32 *opmode);
 static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd);
 static void pp_ad_cfg_lut(char __iomem *addr, u32 *data);
-
+static struct msm_fb_data_type *mdss_get_mfd_from_index(int index);
 static u32 pp_ad_attenuate_bl(u32 bl, struct mdss_ad_info *ad);
 
 static struct msm_fb_data_type *mdss_get_mfd_from_index(int index);
@@ -1794,6 +1798,8 @@ int mdss_mdp_pp_resume(struct mdss_mdp_ctl *ctl, u32 dspp_num)
 			mdss_pp_res->gamut_disp_cfg[disp_num].flags |=
 				MDP_PP_OPS_WRITE;
 	}
+	if (!disp_num)
+			pp_sts.pgc_sts |= PP_STS_ENABLE;
 	if (pp_sts.pgc_sts & PP_STS_ENABLE) {
 		flags |= PP_FLAGS_DIRTY_PGC;
 		if (!(mdss_pp_res->pgc_disp_cfg[disp_num].flags
@@ -1821,6 +1827,42 @@ void mdss_mdp_pp_kcal_update(struct kcal_lut_data *lut_data)
 	pcc_config.b.b = lut_data->blue * PCC_ADJ;
 
 	mdss_mdp_pcc_config(&pcc_config, &copyback);
+void mdss_mdp_pp_kcal_enable(bool enable)
+{
+	u32 disp_num = 0;
+	struct mdp_pgc_lut_data *pgc_config;
+
+	pgc_config = &mdss_pp_res->pgc_disp_cfg[disp_num];
+	pgc_config->block = MDP_LOGICAL_BLOCK_DISP_0;
+
+	if (enable) {
+		pgc_config->flags = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+		pgc_config->r_data = &mdss_pp_res->gc_lut_r[disp_num][0];
+		pgc_config->g_data = &mdss_pp_res->gc_lut_g[disp_num][0];
+		pgc_config->b_data = &mdss_pp_res->gc_lut_b[disp_num][0];
+	} else
+		pgc_config->flags = MDP_PP_OPS_WRITE | MDP_PP_OPS_DISABLE;
+
+	mdss_pp_res->pgc_disp_cfg[disp_num] = *pgc_config;
+	mdss_pp_res->pp_disp_flags[disp_num] |= PP_FLAGS_DIRTY_PGC;
+}
+
+void mdss_mdp_pp_kcal_update(int kr, int kg, int kb)
+{
+	int i;
+	u32 disp_num = 0;
+	struct mdp_pgc_lut_data *pgc_config;
+
+	pgc_config = &mdss_pp_res->pgc_disp_cfg[disp_num];
+
+	for (i = 0; i < GC_LUT_SEGMENTS; i++) {
+		pgc_config->r_data[i].slope = kr;
+		pgc_config->g_data[i].slope = kg;
+		pgc_config->b_data[i].slope = kb;
+	}
+
+	mdss_pp_res->pgc_disp_cfg[disp_num] = *pgc_config;
+	mdss_pp_res->pp_disp_flags[disp_num] |= PP_FLAGS_DIRTY_PGC;
 }
 
 void mdss_mdp_pp_kcal_pa(struct kcal_lut_data *lut_data)
@@ -1864,6 +1906,20 @@ void mdss_mdp_pp_kcal_pa(struct kcal_lut_data *lut_data)
 }
 
 void mdss_mdp_pp_kcal_invert(struct kcal_lut_data *lut_data)
+
+	memset(&pa_config, 0, sizeof(struct mdp_pa_cfg_data));
+
+	pa_config.block = MDP_LOGICAL_BLOCK_DISP_0;
+	pa_config.pa_data.flags = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
+	pa_config.pa_data.sat_adj = lut_data->sat;
+	pa_config.pa_data.hue_adj = lut_data->hue;
+	pa_config.pa_data.val_adj = lut_data->val;
+	pa_config.pa_data.cont_adj = lut_data->cont;
+
+	mdss_mdp_pa_config(&pa_config, &copyback);
+}
+
+void mdss_mdp_pp_kcal_invert(int enable)
 {
 	int i;
 	u32 disp_num = 0, copyback = 0, copy_from_kernel = 1;
@@ -1878,7 +1934,7 @@ void mdss_mdp_pp_kcal_invert(struct kcal_lut_data *lut_data)
 	igc_config->block = MDP_LOGICAL_BLOCK_DISP_0;
 	igc_config->len = IGC_LUT_ENTRIES;
 
-	if (igc_mfd && lut_data->invert) {
+	if (igc_mfd && enable) {
 		igc_config->ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_ENABLE;
 		for (i = 0; i < IGC_LUT_ENTRIES; i++) {
 			igc_c0_c1[i] = (igc_Table_RGB[i] & 0xfff) |
@@ -1888,6 +1944,7 @@ void mdss_mdp_pp_kcal_invert(struct kcal_lut_data *lut_data)
 		igc_config->c0_c1_data = &igc_c0_c1[0];
 		igc_config->c2_data = &igc_c2[0];
 	} else if (igc_mfd && !lut_data->invert)
+	} else if (igc_mfd && !enable)
 		igc_config->ops = MDP_PP_OPS_WRITE | MDP_PP_OPS_DISABLE;
 	else
 		return;

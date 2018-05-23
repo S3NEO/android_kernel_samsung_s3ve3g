@@ -157,3 +157,6 @@ obj-$(CONFIG_FB_MSM_MDSS_HX8394C_TFT_VIDEO_720P_PANEL) += isl98611-backlight.o
 obj-$(CONFIG_MDSS_QUICKDRAW) += mdss_quickdraw.o
 obj-$(CONFIG_FB_MSM_MDSS_KCAL_CTRL) += mdss_mdp_kcal_ctrl.o
 
+obj-$(CONFIG_FB_MSM_MDSS) += lcd_notify.o
+
+obj-$(CONFIG_FB_MSM_MDSS_KCAL_CTRL) += mdss_mdp_kcal_ctrl.o
