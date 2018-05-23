@@ -54,8 +54,8 @@ config FB_MSM_MDSS_KCAL_CTRL
 	depends on FB_MSM_MDSS
 	bool "MDSS color control"
 	---help---
-	  Enable sysfs for rgb/lut control for mdss-mdp display controllers
-	  in the MDSS sub-system.
+ 	Enable sysfs for post-processing control of mdss-mdp5 SAMSUNG_DEBUG_DISPLAY
+	 controllers in MDSS.
 
 config FB_MSM_MDSS_DBG_SEQ_TICK
 	bool "SEQ tick dbg support"
