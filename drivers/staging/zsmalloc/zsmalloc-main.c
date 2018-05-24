@@ -653,102 +653,6 @@ static inline void __zs_cpu_down(struct mapping_area *area)
 	area->vm = NULL;
 }
 
-static inline void *__zs_map_object(struct mapping_area *area,
-				struct page *pages[2], int off, int size)
-{
-	BUG_ON(map_vm_area(area->vm, PAGE_KERNEL, &pages));
-	area->vm_addr = area->vm->addr;
-	return area->vm_addr + off;
-}
-
-static inline void __zs_unmap_object(struct mapping_area *area,
-				struct page *pages[2], int off, int size)
-{
-	unsigned long addr = (unsigned long)area->vm_addr;
-
-	unmap_kernel_range(addr, PAGE_SIZE * 2);
-}
-
-#else /* USE_PGTABLE_MAPPING */
-
-static inline int __zs_cpu_up(struct mapping_area *area)
-{
-	/*
-	 * Make sure we don't leak memory if a cpu UP notification
-	 * and zs_init() race and both call zs_cpu_up() on the same cpu
-	 */
-	if (area->vm_buf)
-		return 0;
-	area->vm_buf = (char *)__get_free_page(GFP_KERNEL);
-	if (!area->vm_buf)
-		return -ENOMEM;
-	return 0;
-}
-
-static inline void __zs_cpu_down(struct mapping_area *area)
-{
-	if (area->vm_buf)
-		free_page((unsigned long)area->vm_buf);
-	area->vm_buf = NULL;
-}
-
-static void *__zs_map_object(struct mapping_area *area,
-			struct page *pages[2], int off, int size)
-{
-	int sizes[2];
-	void *addr;
-	char *buf = area->vm_buf;
-
-	/* disable page faults to match kmap_atomic() return conditions */
-	pagefault_disable();
-
-	/* no read fastpath */
-	if (area->vm_mm == ZS_MM_WO)
-		goto out;
-
-	sizes[0] = PAGE_SIZE - off;
-	sizes[1] = size - sizes[0];
-
-	/* copy object to per-cpu buffer */
-	addr = kmap_atomic(pages[0]);
-	memcpy(buf, addr + off, sizes[0]);
-	kunmap_atomic(addr);
-	addr = kmap_atomic(pages[1]);
-	memcpy(buf + sizes[0], addr, sizes[1]);
-	kunmap_atomic(addr);
-out:
-	return area->vm_buf;
-}
-
-static void __zs_unmap_object(struct mapping_area *area,
-			struct page *pages[2], int off, int size)
-{
-	int sizes[2];
-	void *addr;
-	char *buf = area->vm_buf;
-
-	/* no write fastpath */
-	if (area->vm_mm == ZS_MM_RO)
-		goto out;
-
-	sizes[0] = PAGE_SIZE - off;
-	sizes[1] = size - sizes[0];
-
-	/* copy per-cpu buffer to object */
-	addr = kmap_atomic(pages[0]);
-	memcpy(addr + off, buf, sizes[0]);
-	kunmap_atomic(addr);
-	addr = kmap_atomic(pages[1]);
-	memcpy(addr, buf + sizes[0], sizes[1]);
-	kunmap_atomic(addr);
-
-out:
-	/* enable page faults to match kunmap_atomic() return conditions */
-	pagefault_enable();
-}
-
-#endif /* USE_PGTABLE_MAPPING */
-
 static int zs_cpu_notifier(struct notifier_block *nb, unsigned long action,
 				void *pcpu)
 {
@@ -838,6 +742,7 @@ struct zs_pool *zs_create_pool(gfp_t flags)
 	}
 
 	pool->flags = flags;
+	pool->name = name;
 
 	return pool;
 }

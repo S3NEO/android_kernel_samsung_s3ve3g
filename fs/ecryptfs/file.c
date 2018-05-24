@@ -158,47 +158,6 @@ static int read_or_initialize_metadata(struct dentry *dentry)
 	crypt_stat = &ecryptfs_inode_to_private(inode)->crypt_stat;
 	mount_crypt_stat = &ecryptfs_superblock_to_private(
 						inode->i_sb)->mount_crypt_stat;
-
-#ifdef CONFIG_WTL_ENCRYPTION_FILTER
-	if (crypt_stat->flags & ECRYPTFS_STRUCT_INITIALIZED
-		&& crypt_stat->flags & ECRYPTFS_POLICY_APPLIED
-		&& crypt_stat->flags & ECRYPTFS_ENCRYPTED
-		&& !(crypt_stat->flags & ECRYPTFS_KEY_VALID)
-		&& !(crypt_stat->flags & ECRYPTFS_KEY_SET)
-		&& crypt_stat->flags & ECRYPTFS_I_SIZE_INITIALIZED) {
-		crypt_stat->flags |= ECRYPTFS_ENCRYPTED_OTHER_DEVICE;
-	}
-	mutex_lock(&crypt_stat->cs_mutex);
-	if ((mount_crypt_stat->flags & ECRYPTFS_ENABLE_NEW_PASSTHROUGH)
-			&& (crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
-		if (ecryptfs_read_metadata(dentry)) {
-			crypt_stat->flags &= ~(ECRYPTFS_I_SIZE_INITIALIZED
-					| ECRYPTFS_ENCRYPTED);
-			rc = 0;
-			goto out;
-		}
-	} else if ((mount_crypt_stat->flags & ECRYPTFS_ENABLE_FILTERING)
-			&& (crypt_stat->flags & ECRYPTFS_ENCRYPTED)) {
-		struct dentry *fp_dentry =
-			ecryptfs_inode_to_private(inode)->lower_file->f_dentry;
-		char filename[NAME_MAX+1] = {0};
-		if (fp_dentry->d_name.len <= NAME_MAX)
-			memcpy(filename, fp_dentry->d_name.name,
-					fp_dentry->d_name.len + 1);
-
-		if (is_file_name_match(mount_crypt_stat, fp_dentry)
-			|| is_file_ext_match(mount_crypt_stat, filename)) {
-			if (ecryptfs_read_metadata(dentry))
-				crypt_stat->flags &=
-				~(ECRYPTFS_I_SIZE_INITIALIZED
-				| ECRYPTFS_ENCRYPTED);
-			rc = 0;
-			goto out;
-		}
-	}
-	mutex_unlock(&crypt_stat->cs_mutex);
-#endif
-
 	mutex_lock(&crypt_stat->cs_mutex);
 
 	if (crypt_stat->flags & ECRYPTFS_POLICY_APPLIED &&
@@ -244,24 +203,12 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 {
 	int rc = 0;
 	struct ecryptfs_crypt_stat *crypt_stat = NULL;
-	struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
 	struct dentry *ecryptfs_dentry = file->f_path.dentry;
 	/* Private value of ecryptfs_dentry allocated in
 	 * ecryptfs_lookup() */
 	struct dentry *lower_dentry;
 	struct ecryptfs_file_info *file_info;
 
-	mount_crypt_stat = &ecryptfs_superblock_to_private(
-		ecryptfs_dentry->d_sb)->mount_crypt_stat;
-	if ((mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED)
-	    && ((file->f_flags & O_WRONLY) || (file->f_flags & O_RDWR)
-		|| (file->f_flags & O_CREAT) || (file->f_flags & O_TRUNC)
-		|| (file->f_flags & O_APPEND))) {
-		printk(KERN_WARNING "Mount has encrypted view enabled; "
-		       "files may only be read\n");
-		rc = -EPERM;
-		goto out;
-	}
 	/* Released in ecryptfs_release or end of function if failure */
 	file_info = kmem_cache_zalloc(ecryptfs_file_info_cache, GFP_KERNEL);
 	ecryptfs_set_file_private(file, file_info);
@@ -404,9 +351,22 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 #endif
 	if (ecryptfs_file_to_private(file))
 		lower_file = ecryptfs_file_to_lower(file);
-	if (lower_file && lower_file->f_op && lower_file->f_op->unlocked_ioctl)
+	if (!(lower_file && lower_file->f_op && lower_file->f_op->unlocked_ioctl))
+		return rc;
+
+	switch (cmd) {
+	case FITRIM:
+	case FS_IOC_GETFLAGS:
+	case FS_IOC_SETFLAGS:
+	case FS_IOC_GETVERSION:
+	case FS_IOC_SETVERSION:
 		rc = lower_file->f_op->unlocked_ioctl(lower_file, cmd, arg);
-	return rc;
+		fsstack_copy_attr_all(file->f_path.dentry->d_inode,
+				      lower_file->f_path.dentry->d_inode);
+		return rc;
+	default:
+		return rc;
+	}
 }
 
 #ifdef CONFIG_COMPAT
@@ -418,9 +378,22 @@ ecryptfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	if (ecryptfs_file_to_private(file))
 		lower_file = ecryptfs_file_to_lower(file);
-	if (lower_file && lower_file->f_op && lower_file->f_op->compat_ioctl)
+	if (!(lower_file && lower_file->f_op && lower_file->f_op->compat_ioctl))
+		return rc;
+
+	switch (cmd) {
+	case FITRIM:
+	case FS_IOC32_GETFLAGS:
+	case FS_IOC32_SETFLAGS:
+	case FS_IOC32_GETVERSION:
+	case FS_IOC32_SETVERSION:
 		rc = lower_file->f_op->compat_ioctl(lower_file, cmd, arg);
-	return rc;
+		fsstack_copy_attr_all(file->f_path.dentry->d_inode,
+				      lower_file->f_path.dentry->d_inode);
+		return rc;
+	default:
+		return rc;
+	}
 }
 #endif
 
