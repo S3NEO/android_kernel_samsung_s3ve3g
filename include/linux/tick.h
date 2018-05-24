@@ -52,6 +52,7 @@ struct tick_sched {
 	unsigned long			check_clocks;
 	enum tick_nohz_mode		nohz_mode;
 	ktime_t				idle_tick;
+	ktime_t				sleep_length;
 	int				inidle;
 	int				tick_stopped;
 	unsigned long			idle_jiffies;

@@ -37,7 +37,6 @@ struct fib6_config {
 	int		fc_ifindex;
 	u32		fc_flags;
 	u32		fc_protocol;
-	u32		fc_type;	/* only 8 bits are used */
 
 	struct in6_addr	fc_dst;
 	struct in6_addr	fc_src;
@@ -267,7 +266,7 @@ extern void			inet6_rt_notify(int event, struct rt6_info *rt,
 						struct nl_info *info);
 
 extern void			fib6_run_gc(unsigned long expires,
-					    struct net *net, bool force);
+					    struct net *net);
 
 extern void			fib6_gc_cleanup(void);
 
