@@ -28,7 +28,6 @@ KERNEL_ZIP_NAME=${NAME}-${VERSION}-${DATE}.zip
 KERNEL_IMAGE=${KERNEL_ZIP}/zImage
 DT_IMG=${KERNEL_ZIP}/dt.img
 MODULES_PATH=${KERNEL_ZIP}/modules/system/lib/modules
-OUTPUT_PATH=${KERNEL_PATH}/output
 
 JOBS=`grep processor /proc/cpuinfo | wc -l`
 
@@ -56,23 +55,19 @@ function build() {
 	echo -e "***********************************************$nocol";
 	echo -e "$red";
 
-	if [ ! -e ${OUTPUT_PATH} ]; then
-		mkdir ${OUTPUT_PATH};
-	fi;
-
 	if [ ! -e ${MODULES_PATH} ]; then
 		mkdir -p ${MODULES_PATH};
 	fi;
 
 	echo -e "$red";
 	echo -e "Initializing defconfig...$nocol";
-	make O=output ${DEFCONFIG};
+	make  ${DEFCONFIG};
 	echo -e "$red";
 	echo -e "Building kernel...$nocol";
-	make O=output -j${JOBS} CONFIG_NO_ERROR_ON_MISMATCH=y;
-	make O=output -j${JOBS} dtbs;
+	make -j${JOBS} CONFIG_NO_ERROR_ON_MISMATCH=y;
+	make -j${JOBS} dtbs;
 	gcc -o ${KERNEL_PATH}/scripts/dtbTool ${KERNEL_PATH}/scripts/dtbtool.c
-	./scripts/dtbTool -o ${DT_IMG} -s 2048 -p $(pwd)/output/scripts/dtc/ $(pwd)/output/arch/arm/boot/;
+	./scripts/dtbTool -o ${DT_IMG} -s 2048 -p $(pwd)/scripts/dtc/ $(pwd)/arch/arm/boot/;
 	find ${KERNEL_PATH} -name "zImage" -exec mv -f {} ${KERNEL_ZIP} \;
 	find ${KERNEL_PATH} -name "*.ko" -exec mv -f {} ${MODULES_PATH} \;
 
@@ -108,7 +103,6 @@ function clean() {
 	if [ -e *.zip ]; then
 		rm *.zip;
 	fi;
-	rm_if_exist ${OUTPUT_PATH};
 	rm_if_exist ${MODULES_PATH};
 	rm_if_exist ${DT_IMG};
 	rm_if_exist ${KERNEL_IMAGE};
@@ -145,7 +139,7 @@ function main() {
 #Main Menu
 while :
 	do
-	echo -e "$BCya===================${NONE} ${BGre}[!]${NONE} ${BBlu}Trident Kernel Menu${NONE} ${BGre}[!]${NONE} $BCya===================${NONE}";
+	echo -e "$BCya===================${NONE} ${BGre}[!]${NONE} ${BBlu}Project AX Kernel Menu${NONE} ${BGre}[!]${NONE} $BCya===================${NONE}";
 	echo -e "$Whi"
 	echo "[1] Cleanup source";
 	echo "[2] Build kernel";

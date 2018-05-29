@@ -29,6 +29,12 @@ chmod -R 755 $ramdisk
 ## AnyKernel install
 dump_boot;
 
+# insert casuals init modding
+backup_file init.rc
+insert_line init.rc "import /init.apollo.rc" after "import .*\.rc" "import /init.apollo.rc"
+
+# end ramdisk changes
+
 write_boot;
 
 ## end install

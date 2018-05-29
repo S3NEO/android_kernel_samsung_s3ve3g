@@ -1,0 +1,74 @@
+on boot
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq 1190400
+	write /sys/devices/system/cpu/cpu1/cpufreq/scaling_max_freq 1190400
+    	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_max_freq 1190400
+	write /sys/devices/system/cpu/cpu3/cpufreq/scaling_max_freq 1190400
+
+on nonencrypted
+	# zzmoove tunables
+     	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "zzmoove"
+     	write /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor "zzmoove"
+     	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "zzmoove"
+     	write /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor "zzmoove"
+     	write /sys/devices/system/cpu/cpufreq/zzmoove/profile_number 4
+	write /sys/devices/system/cpu/cpufreq/zzmoove/scaling_responsiveness_freq 998400
+
+   	# intelliactive tunables
+    	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor interactive
+    	write /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor interactive
+    	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor interactive
+	write /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor interactive
+	write /sys/devices/system/cpu/cpufreq/interactive/above_hispeed_delay "20000 600000:30000 998400:20000"
+	write /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load 99
+	write /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq 384000
+	write /sys/devices/system/cpu/cpufreq/interactive/io_is_busy 0
+	write /sys/devices/system/cpu/cpufreq/interactive/target_loads "85 787200:90 1305600:95"
+	write /sys/devices/system/cpu/cpufreq/interactive/min_sample_time 30000
+	write /sys/devices/system/cpu/cpufreq/interactive/timer_rate 20000
+	write /sys/devices/system/cpu/cpufreq/interactive/timer_slack 60000
+
+    	# intelli_plug tunables
+	write /sys/module/intelli_plug/parameters/intelli_plug_active 1
+	write /sys/module/intelli_plug/parameters/cpu_nr_run_threshold 1000
+	write /sys/module/intelli_plug/parameters/touch_boost_active 0
+
+on property:dev.bootcomplete=1
+   	# acc. to qcom this improves first launch latencies
+   	# stock value is 512k
+    	# from franciscofranco
+	setprop dalvik.vm.heapminfree 2m
+    	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 192000
+    	write /sys/devices/system/cpu/cpu1/cpufreq/scaling_min_freq 192000
+    	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq 192000
+	write /sys/devices/system/cpu/cpu3/cpufreq/scaling_min_freq 192000
+
+	write /sys/module/cpu_boost/parameters/cpu_boost 1
+	write /sys/module/cpu_boost/parameters/boost_ms 20
+	write /sys/module/cpu_boost/parameters/input_boost_ms 40
+	write /sys/module/cpu_boost/parameters/sync_threshold 499200
+	write /sys/module/cpu_boost/parameters/input_boost_freq 787200
+
+	# ksm
+	write /sys/kernel/mm/ksm/sleep_millisecs 1500
+	write /sys/kernel/mm/ksm/pages_to_scan 256
+	write /sys/kernel/mm/ksm/deferred_timer 1
+	write /sys/kernel/mm/ksm/run 0
+
+	# enable laptop mode
+	write /proc/sys/vm/laptop_mode 1
+
+  	rm /data/system/perfd/default_values
+
+    	# Overriding iosched from ramdisk
+    	setprop sys.io.scheduler row
+    	# In case the above doesn't work
+    	write /sys/block/mmcblk0/queue/scheduler row
+    	# Set separated iosched for SD card
+    	write /sys/block/mmcblk1/queue/scheduler zen
+
+    	write /sys/block/mmcblk0/queue/rq_affinity 0
+    	write /sys/block/mmcblk1/queue/rq_affinity 0
+
+    	# Since we use kernel-space hotplug driver, we don't need mpdecision
+    	# now, so forcibly stop it (in case it's been started somewhere else)
+	stop mpdecision
