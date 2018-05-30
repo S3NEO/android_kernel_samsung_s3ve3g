@@ -287,3 +287,4 @@ config MDSS_DSI_EVENT_HANDLER_PANEL
 config CLK_TUNING
 	bool "Support CLK tuning"
 	default n
+	
