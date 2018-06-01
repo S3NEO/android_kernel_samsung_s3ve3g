@@ -40,6 +40,22 @@ static struct v4l2_subdev_ops msm_sensor_init_subdev_ops = {
 
 static const struct v4l2_subdev_internal_ops msm_sensor_init_internal_ops;
 
+static int msm_sensor_wait_for_probe_done(struct msm_sensor_init_t *s_init)
+{
+	int rc;
+	int tm = 10000;
+	if (s_init->module_init_status == 1) {
+		CDBG("msm_cam_get_module_init_status -2\n");
+		return 0;
+	}
+	rc = wait_event_timeout(s_init->state_wait,
+		(s_init->module_init_status == 1), msecs_to_jiffies(tm));
+	if (rc == 0)
+		pr_err("%s:%d wait timeout\n", __func__, __LINE__);
+
+	return rc;
+}
+
 /* Static function definition */
 static long msm_sensor_driver_cmd(struct msm_sensor_init_t *s_init, void *arg)
 {
@@ -59,6 +75,16 @@ static long msm_sensor_driver_cmd(struct msm_sensor_init_t *s_init, void *arg)
 		if (rc < 0)
 			pr_err("failed: msm_sensor_driver_probe rc %d", rc);
 		break;
+
+	case CFG_SINIT_PROBE_DONE:
+		s_init->module_init_status = 1;
+		wake_up(&s_init->state_wait);
+		break;
+
+	case CFG_SINIT_PROBE_WAIT_DONE:
+		msm_sensor_wait_for_probe_done(s_init);
+		break;
+
 	default:
             pr_err("%s : default", __func__);
 		break;

@@ -50,6 +50,9 @@ static void camera_pack_event(struct file *filep, int evt_id,
 	struct msm_video_device *pvdev = video_drvdata(filep);
 	struct camera_v4l2_private *sp = fh_to_private(filep->private_data);
 
+	pr_err("%s : E", __func__);
+	pr_err("%s : evt_id=%d command=%d value=%d", __func__, evt_id, command, value);
+
 	/* always MSM_CAMERA_V4L2_EVENT_TYPE */
 	event->type = MSM_CAMERA_V4L2_EVENT_TYPE;
 	event->id = evt_id;
@@ -57,6 +60,8 @@ static void camera_pack_event(struct file *filep, int evt_id,
 	event_data->session_id = pvdev->vdev->num;
 	event_data->stream_id = sp->stream_id;
 	event_data->arg_value = value;
+
+	pr_err("%s : X", __func__);
 }
 
 static int camera_check_event_status(struct v4l2_event *event)
@@ -78,6 +83,8 @@ static int camera_v4l2_querycap(struct file *filep, void *fh,
 	int rc;
 	struct v4l2_event event;
 
+	pr_err("%s : E", __func__);
+
 	/* can use cap->driver to make differentiation */
 	camera_pack_event(filep, MSM_CAMERA_GET_PARM,
 		MSM_CAMERA_PRIV_QUERY_CAP, -1, &event);
@@ -89,6 +96,8 @@ static int camera_v4l2_querycap(struct file *filep, void *fh,
 	}
 
 	rc = camera_check_event_status(&event);
+	
+	pr_err("%s : X", __func__);
 
 	return rc;
 }
