@@ -34,6 +34,13 @@
 #include <linux/qpnp-revid.h>
 #include <linux/android_alarm.h>
 
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
+
+#ifdef CONFIG_STATE_HELPER
+#include <linux/state_helper.h>
+#endif
+
 /* SAMSUNG charging specification */
 #include <linux/android_alarm.h>
 #if defined(CONFIG_USB_SWITCH_RT8973)
@@ -2950,6 +2957,9 @@ qpnp_batt_power_get_property(struct power_supply *psy,
 			val->intval = get_prop_capacity(chip);
 #else
 		val->intval = get_prop_capacity(chip);
+#endif
+#ifdef CONFIG_STATE_HELPER
+		batt_level_notify(val->intval);
 #endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
