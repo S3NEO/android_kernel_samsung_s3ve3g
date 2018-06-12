@@ -30,19 +30,23 @@
 
 #define dbgarg(cmd, fmt, arg...) \
 		do {							\
-			pr_err("%s: ",  vfd->name);			\
+		    if (vfd->debug & V4L2_DEBUG_IOCTL_ARG) {		\
+			printk(KERN_DEBUG "%s: ",  vfd->name);		\
 			v4l_printk_ioctl(cmd);				\
-			pr_err(" " fmt,  ## arg);			\
+			printk(" " fmt,  ## arg);			\
+		    }							\
 		} while (0)
 
 #define dbgarg2(fmt, arg...) \
 		do {							\
-			pr_err("%s: " fmt, vfd->name, ## arg);		\
+		    if (vfd->debug & V4L2_DEBUG_IOCTL_ARG)		\
+			printk(KERN_DEBUG "%s: " fmt, vfd->name, ## arg);\
 		} while (0)
 
 #define dbgarg3(fmt, arg...) \
 		do {							\
-			pr_err("%s: " fmt, vfd->name, ## arg);		\
+		    if (vfd->debug & V4L2_DEBUG_IOCTL_ARG)		\
+			printk(KERN_CONT "%s: " fmt, vfd->name, ## arg);\
 		} while (0)
 
 /* Zero out the end of the struct pointed to by p.  Everything after, but
@@ -293,7 +297,7 @@ void v4l_printk_ioctl(unsigned int cmd)
 			type = "v4l2";
 			break;
 		}
-		pr_err("%s", v4l2_ioctls[_IOC_NR(cmd)]);
+		printk("%s", v4l2_ioctls[_IOC_NR(cmd)]);
 		return;
 	default:
 		type = "unknown";
@@ -306,7 +310,7 @@ void v4l_printk_ioctl(unsigned int cmd)
 	case _IOC_READ | _IOC_WRITE: dir = "rw"; break;
 	default:                     dir = "*ERR*"; break;
 	}
-	pr_err("%s ioctl '%c', dir=%s, #%d (0x%08x)",
+	printk("%s ioctl '%c', dir=%s, #%d (0x%08x)",
 		type, _IOC_TYPE(cmd), dir, _IOC_NR(cmd), cmd);
 }
 EXPORT_SYMBOL(v4l_printk_ioctl);
@@ -395,16 +399,19 @@ static inline void v4l_print_ext_ctrls(unsigned int cmd,
 {
 	__u32 i;
 
+	if (!(vfd->debug & V4L2_DEBUG_IOCTL_ARG))
+		return;
 	dbgarg(cmd, "");
-	pr_err("class=0x%x", c->ctrl_class);
+	printk(KERN_CONT "class=0x%x", c->ctrl_class);
 	for (i = 0; i < c->count; i++) {
 		if (show_vals && !c->controls[i].size)
-			pr_err(" id/val=0x%x/0x%x",
+			printk(KERN_CONT " id/val=0x%x/0x%x",
 				c->controls[i].id, c->controls[i].value);
 		else
-			pr_err(" id=0x%x,size=%u",
+			printk(KERN_CONT " id=0x%x,size=%u",
 				c->controls[i].id, c->controls[i].size);
 	}
+	printk(KERN_CONT "\n");
 };
 
 static inline int check_ext_ctrls(struct v4l2_ext_controls *c, int allow_priv)
@@ -506,8 +513,11 @@ static long __video_do_ioctl(struct file *file,
 		return ret;
 	}
 
-	v4l_printk_ioctl(cmd);
-	pr_err("%s: %s cmd=%d", __func__, vfd->name, cmd);
+	if ((vfd->debug & V4L2_DEBUG_IOCTL) &&
+				!(vfd->debug & V4L2_DEBUG_IOCTL_ARG)) {
+		v4l_print_ioctl(vfd->name, cmd);
+		printk(KERN_CONT "\n");
+	}
 
 	if (test_bit(V4L2_FL_USES_V4L2_FH, &vfd->flags)) {
 		vfh = file->private_data;
@@ -2282,6 +2292,13 @@ static long __video_do_ioctl(struct file *file,
 		ret = ops->vidioc_default(file, fh, ret_prio >= 0, cmd, arg);
 		break;
 	} /* switch */
+
+	if (vfd->debug & V4L2_DEBUG_IOCTL_ARG) {
+		if (ret < 0) {
+			v4l_print_ioctl(vfd->name, cmd);
+			printk(KERN_CONT " error %ld\n", ret);
+		}
+	}
 
 	return ret;
 }
