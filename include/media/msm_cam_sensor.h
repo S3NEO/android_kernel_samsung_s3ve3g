@@ -682,8 +682,6 @@ struct msm_camera_led_cfg_t {
 /* sensor init structures and enums */
 enum msm_sensor_init_cfg_type_t {
 	CFG_SINIT_PROBE,
-	CFG_SINIT_PROBE_DONE,
-	CFG_SINIT_PROBE_WAIT_DONE,
 };
 
 struct sensor_init_cfg_data {

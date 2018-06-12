@@ -18,8 +18,6 @@
 struct msm_sensor_init_t {
 	struct mutex imutex;
 	struct msm_sd_subdev msm_sd;
-	int module_init_status;
-	wait_queue_head_t state_wait;
 };
 
 #endif
