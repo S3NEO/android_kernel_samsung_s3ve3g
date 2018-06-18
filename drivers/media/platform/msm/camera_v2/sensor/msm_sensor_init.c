@@ -19,9 +19,14 @@
 #include "msm_sensor.h"
 #include "msm_sd.h"
 
+//#define CONFIG_MSMB_CAMERA_DEBUG
 /* Logging macro */
 #undef CDBG
+#ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
+#else
+#define CDBG(fmt, args...) do { } while (0)
+#endif
 
 struct class *camera_class;
 
