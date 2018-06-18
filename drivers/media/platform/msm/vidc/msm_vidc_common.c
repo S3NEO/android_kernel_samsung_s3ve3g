@@ -573,13 +573,24 @@ static void handle_event_change(enum command_response cmd, void *data)
 					__func__, inst,
 					event_notify->packet_buffer,
 					event_notify->exra_data_buffer);
-				if (inst->state == MSM_VIDC_CORE_INVALID ||
-					inst->core->state ==
-						VIDC_CORE_INVALID) {
-					dprintk(VIDC_DBG,
-						"Event release buf ref received in invalid state - discard\n");
+				/*
+				 * If buffer release event is received with inst->state
+				 * greater than STOP means client called STOP directly
+				 * without FLUSH. This also means that they don't expect
+				 * these buffers back. Processing these commands will not
+				 * add any value. This can also results deadlocks between
+				 * try_state and event_notify due to inst->sync_lock.
+				 */
+
+				mutex_lock(&inst->lock);
+				if (inst->state >= MSM_VIDC_STOP ||
+						inst->core->state == VIDC_CORE_INVALID) {
+					dprintk(VIDC_ERR,
+							"Event release buf ref received in invalid state - discard\n");
+					mutex_unlock(&inst->lock);
 					return;
 				}
+				mutex_unlock(&inst->lock);
 
 				/*
 				* Get the buffer_info entry for the
@@ -637,10 +648,16 @@ static void handle_event_change(enum command_response cmd, void *data)
 		} else {
 			dprintk(VIDC_DBG,
 				"V4L2_EVENT_SEQ_CHANGED_SUFFICIENT\n");
-			inst->prop.height[CAPTURE_PORT] = event_notify->height;
-			inst->prop.width[CAPTURE_PORT] = event_notify->width;
-			if (!msm_comm_get_stream_output_mode(inst) ==
+			if (msm_comm_get_stream_output_mode(inst) !=
 				HAL_VIDEO_DECODER_SECONDARY) {
+				dprintk(VIDC_DBG,
+					"event_notify->height = %d event_notify->width = %d\n",
+					event_notify->height,
+					event_notify->width);
+				inst->prop.height[CAPTURE_PORT] =
+					event_notify->height;
+				inst->prop.width[CAPTURE_PORT] =
+					event_notify->width;
 				inst->prop.height[OUTPUT_PORT] =
 					event_notify->height;
 				inst->prop.width[OUTPUT_PORT] =
@@ -761,8 +778,8 @@ void validate_output_buffers(struct msm_vidc_inst *inst)
 			return;
 		}
 		if (binfo->buffer_ownership != DRIVER) {
-			dprintk(VIDC_ERR,
-					"Failed : This buffer is with FW 0x%lx\n",
+			dprintk(VIDC_DBG,
+					"This buffer is with FW 0x%lx\n",
 					binfo->handle->device_addr);
 			return;
 		}
@@ -776,16 +793,71 @@ void validate_output_buffers(struct msm_vidc_inst *inst)
 
 	return;
 }
+
+int msm_comm_queue_output_buffers(struct msm_vidc_inst *inst)
+{
+	struct internal_buf *binfo;
+	struct hfi_device *hdev;
+	struct msm_smem *handle;
+	struct vidc_frame_data frame_data = {0};
+	struct hal_buffer_requirements *output_buf;
+	int rc = 0;
+
+	if (!inst || !inst->core || !inst->core->device) {
+		dprintk(VIDC_ERR, "%s invalid parameters\n", __func__);
+		return -EINVAL;
+	}
+	hdev = inst->core->device;
+	output_buf = get_buff_req_buffer(inst, HAL_BUFFER_OUTPUT);
+	if (!output_buf) {
+		dprintk(VIDC_DBG,
+			"This output buffer not required, buffer_type: %x\n",
+			HAL_BUFFER_OUTPUT);
+		return 0;
+	}
+	dprintk(VIDC_DBG,
+		"output: num = %d, size = %d\n",
+		output_buf->buffer_count_actual,
+		output_buf->buffer_size);
+
+	list_for_each_entry(binfo, &inst->outputbufs, list) {
+		if (binfo->buffer_ownership != DRIVER)
+			continue;
+		handle = binfo->handle;
+		frame_data.alloc_len = output_buf->buffer_size;
+		frame_data.filled_len = 0;
+		frame_data.offset = 0;
+		frame_data.device_addr = handle->device_addr;
+		frame_data.flags = 0;
+		frame_data.extradata_addr = handle->device_addr +
+		output_buf->buffer_size;
+		frame_data.buffer_type = HAL_BUFFER_OUTPUT;
+		rc = call_hfi_op(hdev, session_ftb,
+			(void *) inst->session, &frame_data);
+		binfo->buffer_ownership = FIRMWARE;
+	}
+	return 0;
+}
+
 static void handle_session_flush(enum command_response cmd, void *data)
 {
 	struct msm_vidc_cb_cmd_done *response = data;
 	struct msm_vidc_inst *inst;
+	int rc;
 	if (response) {
 		inst = (struct msm_vidc_inst *)response->session_id;
 		if (msm_comm_get_stream_output_mode(inst) ==
 			HAL_VIDEO_DECODER_SECONDARY) {
 			mutex_lock(&inst->lock);
 			validate_output_buffers(inst);
+			if (!inst->in_reconfig) {
+				rc = msm_comm_queue_output_buffers(inst);
+				if (rc) {
+					dprintk(VIDC_ERR,
+						"Failed to queue output buffers: %d\n",
+						rc);
+				}
+			}
 			mutex_unlock(&inst->lock);
 		}
 		msm_vidc_queue_v4l2_event(inst, V4L2_EVENT_MSM_VIDC_FLUSH_DONE);
@@ -3074,6 +3146,40 @@ void msm_comm_flush_dynamic_buffers(struct msm_vidc_inst *inst)
 	mutex_unlock(&inst->lock);
 }
 
+void msm_comm_flush_pending_dynamic_buffers(struct msm_vidc_inst *inst)
+{
+	struct buffer_info *binfo = NULL;
+	struct list_head *list = NULL;
+
+	if (!inst)
+		return;
+
+	if (inst->buffer_mode_set[CAPTURE_PORT] != HAL_BUFFER_MODE_DYNAMIC)
+		return;
+
+	if (list_empty(&inst->pendingq) || list_empty(&inst->registered_bufs))
+		return;
+
+	list = &inst->registered_bufs;
+
+	/*
+	* Dynamic Buffer mode - Since pendingq is not empty
+	* no output buffers have been sent to firmware yet.
+	* Hence remove reference to all pendingq o/p buffers
+	* before flushing them.
+	*/
+
+	list_for_each_entry(binfo, list, list) {
+		if (binfo && binfo->type ==
+			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+			dprintk(VIDC_DBG,
+				"%s: binfo = %p device_addr = 0x%pa\n",
+				__func__, binfo, &binfo->device_addr[0]);
+			buf_ref_put(inst, binfo);
+		}
+	}
+}
+
 int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 {
 	int rc =  0;
@@ -3139,6 +3245,8 @@ int msm_comm_flush(struct msm_vidc_inst *inst, u32 flags)
 
 	} else {
 		if (!list_empty(&inst->pendingq)) {
+			msm_comm_flush_pending_dynamic_buffers(inst);
+
 			/*If flush is called after queueing buffers but before
 			 * streamon driver should flush the pending queue*/
 			list_for_each_safe(ptr, next, &inst->pendingq) {
@@ -3415,19 +3523,25 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst)
 				capability->height.min);
 			rc = -ENOTSUPP;
 		}
-		if (!rc) {
-			rc = call_hfi_op(hdev, capability_check,
-				inst->fmts[OUTPUT_PORT]->fourcc,
+		if (msm_vp8_low_tier &&
+			inst->fmts[OUTPUT_PORT]->fourcc == V4L2_PIX_FMT_VP8) {
+			capability->width.max = DEFAULT_WIDTH;
+			capability->width.max = DEFAULT_HEIGHT;
+		}
+		if (!rc && (inst->prop.width[CAPTURE_PORT] >
+			capability->width.max)) {
+			dprintk(VIDC_ERR,
+				"Unsupported width = %u supported max width = %u\n",
 				inst->prop.width[CAPTURE_PORT],
-				&capability->width.max,
-				&capability->height.max);
+				capability->width.max);
+				rc = -ENOTSUPP;
 		}
 
 		if (!rc && (inst->prop.height[CAPTURE_PORT]
 			* inst->prop.width[CAPTURE_PORT] >
 			capability->width.max * capability->height.max)) {
 			dprintk(VIDC_ERR,
-			"Unsupported WxH = (%u)x(%u), Max supported is - (%u)x(%u)",
+			"Unsupported WxH = (%u)x(%u), Max supported is - (%u)x(%u)\n",
 			inst->prop.width[CAPTURE_PORT],
 			inst->prop.height[CAPTURE_PORT],
 			capability->width.max, capability->height.max);
