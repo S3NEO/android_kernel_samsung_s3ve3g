@@ -263,9 +263,9 @@ CONFIG_MUTEX_SPIN_ON_OWNER=y
 CONFIG_FREEZER=y
 
 #
-#Hotplugs
+# Hotplugs
 #
-CONFIG_INTELLI_PLUG=y
+# CONFIG_INTELLI_PLUG is not set
 
 #
 # System Type
