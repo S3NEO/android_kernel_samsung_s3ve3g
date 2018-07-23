@@ -5729,7 +5729,7 @@ static void sec_bat_event_program_alarm(
         ktime_t next;
 
         next = ktime_add(chip->last_event_time, low_interval);
-        alarm_start_relative(&chip->event_termination_alarm,
+        alarm_start(&chip->event_termination_alarm,
                 next);
 }
 
@@ -5830,7 +5830,7 @@ static bool sec_chg_time_management(struct qpnp_chg_chip *chip)
 	struct timespec ts;
 	int batt_capacity = 0;
 
-	ts = ktime_to_timespec(ktime_get_boottime());
+	get_monotonic_boottime(&ts);
 
 	/* device discharging */
 	if (chip->charging_start_time == 0) {
@@ -6134,7 +6134,7 @@ static void sec_pm8226_stop_charging(struct qpnp_chg_chip *chip)
 static void sec_pm8226_start_charging(struct qpnp_chg_chip *chip)
 {
 		struct timespec ts;
-        ts = ktime_to_timespec(ktime_get_boottime());
+        get_monotonic_boottime(&ts);
 
 	if(chip->ovp_uvlo_state != 0) {
 		chip->batt_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
@@ -6368,7 +6368,7 @@ static void sec_bat_monitor(struct work_struct *work)
 
 					if (chip->recent_reported_soc == 100) {
 						struct timespec ts;
-						ts = ktime_to_timespec(ktime_get_boottime());
+						get_monotonic_boottime(&ts);
 						pr_err("first phase charging done: update battery UI FULL \n");
 						chip->batt_status = POWER_SUPPLY_STATUS_FULL;
 						chip->ui_full_chg = 1;
@@ -6601,7 +6601,7 @@ static void sec_bat_program_alarm(struct qpnp_chg_chip *chip, int polling_time)
 	chip->last_update_time = ktime_get_boottime();
 
 	next = ktime_add(chip->last_update_time, low_interval);
-	alarm_start_relative(&chip->polling_alarm, next);
+	alarm_start(&chip->polling_alarm, next);
 }
 
 
@@ -7057,7 +7057,7 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	//sec_fg_create_attrs(chip->fg_psy.dev);
 
 	alarm_init(&chip->event_termination_alarm,
-			CLOCK_BOOTTIME,
+			ALARM_BOOTTIME,
 			sec_bat_event_expired_timer_func);
 	alarm_init(&chip->polling_alarm,
 		ALARM_BOOTTIME,
