@@ -410,8 +410,6 @@ struct qpnp_chg_chip {
 	struct mutex			batfet_vreg_lock;
 	struct alarm			reduce_power_stage_alarm;
 	struct hrtimer			hrtimer_reduce_power_stage_alarm;
-	//struct alarm			reduce_power_stage_alarm;
-	struct alarm			reduce_power_stage_alarm;
 	struct work_struct		reduce_power_stage_work;
 	bool				power_stage_workaround_running;
 
