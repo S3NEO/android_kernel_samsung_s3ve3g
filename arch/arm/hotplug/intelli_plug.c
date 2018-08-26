@@ -19,7 +19,6 @@
 #include <linux/mutex.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/input.h>
 #include <linux/cpufreq.h>
 
 #ifdef CONFIG_POWERSUSPEND
@@ -35,8 +34,6 @@
 
 #define INTELLI_PLUG_MAJOR_VERSION	4
 #define INTELLI_PLUG_MINOR_VERSION	0
-#define INTELLI_PLUG_MAJOR_VERSION	3
-#define INTELLI_PLUG_MINOR_VERSION	8
 
 #define DEF_SAMPLING_MS			(268)
 
@@ -49,7 +46,6 @@
 static DEFINE_MUTEX(intelli_plug_mutex);
 
 static struct delayed_work intelli_plug_work;
-static struct delayed_work intelli_plug_boost;
 
 static struct workqueue_struct *intelliplug_wq;
 static struct workqueue_struct *intelliplug_boost_wq;
@@ -59,13 +55,6 @@ module_param(intelli_plug_active, uint, 0664);
 
 static unsigned int nr_run_profile_sel = 0;
 module_param(nr_run_profile_sel, uint, 0664);
-module_param(intelli_plug_active, uint, 0644);
-
-static unsigned int touch_boost_active = 1;
-module_param(touch_boost_active, uint, 0644);
-
-static unsigned int nr_run_profile_sel = 0;
-module_param(nr_run_profile_sel, uint, 0644);
 
 //default to something sane rather than zero
 static unsigned int sampling_time = DEF_SAMPLING_MS;
@@ -90,11 +79,6 @@ module_param(screen_off_max, uint, 0664);
 #if defined(CONFIG_ARCH_APQ8084) || defined(CONFIG_ARM64)
 #define THREAD_CAPACITY (430 - CAPACITY_RESERVE)
 #elif defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_APQ8064) || \
-module_param(screen_off_max, uint, 0644);
-
-#define CAPACITY_RESERVE	50
-
-#if defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_APQ8064) || \
 defined(CONFIG_ARCH_MSM8974)
 #define THREAD_CAPACITY	(339 - CAPACITY_RESERVE)
 #elif defined(CONFIG_ARCH_MSM8226) || defined (CONFIG_ARCH_MSM8926) || \
@@ -168,10 +152,6 @@ module_param(cpu_nr_run_threshold, uint, 0664);
 
 static unsigned int nr_run_hysteresis = NR_RUN_HYSTERESIS_QUAD;
 module_param(nr_run_hysteresis, uint, 0664);
-module_param(cpu_nr_run_threshold, uint, 0644);
-
-static unsigned int nr_run_hysteresis = NR_RUN_HYSTERESIS_QUAD;
-module_param(nr_run_hysteresis, uint, 0644);
 
 static unsigned int nr_run_last;
 
@@ -216,17 +196,6 @@ static unsigned int calculate_thread_stats(void)
 	return nr_run;
 }
 
-static void __cpuinit intelli_plug_boost_fn(struct work_struct *work)
-{
-
-	int nr_cpus = num_online_cpus();
-
-	if (intelli_plug_active)
-		if (touch_boost_active)
-			if (nr_cpus < 2)
-				cpu_up(1);
-}
-
 /*
 static int cmp_nr_running(const void *a, const void *b)
 {
@@ -268,7 +237,6 @@ static void unplug_cpu(int min_active_cpu)
 }
 
 static void __ref intelli_plug_work_fn(struct work_struct *work)
-static void __cpuinit intelli_plug_work_fn(struct work_struct *work)
 {
 	unsigned int nr_run_stat;
 	unsigned int cpu_count = 0;
@@ -490,9 +458,6 @@ static void wakeup_boost(void)
 static void __ref intelli_plug_resume(struct power_suspend *handler)
 #else
 static void __ref intelli_plug_resume(struct early_suspend *handler)
-static void __cpuinit intelli_plug_resume(struct power_suspend *handler)
-#else
-static void __cpuinit intelli_plug_resume(struct early_suspend *handler)
 #endif
 {
 
@@ -534,80 +499,6 @@ static struct early_suspend intelli_plug_early_suspend_driver = {
 };
 #endif	/* CONFIG_HAS_EARLYSUSPEND */
 
-static void intelli_plug_input_event(struct input_handle *handle,
-		unsigned int type, unsigned int code, int value)
-{
-#ifdef DEBUG_INTELLI_PLUG
-	pr_info("intelli_plug touched!\n");
-#endif
-	queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_boost,
-		msecs_to_jiffies(10));
-}
-
-static int intelli_plug_input_connect(struct input_handler *handler,
-		struct input_dev *dev, const struct input_device_id *id)
-{
-	struct input_handle *handle;
-	int error;
-
-	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
-	if (!handle)
-		return -ENOMEM;
-
-	handle->dev = dev;
-	handle->handler = handler;
-	handle->name = "intelliplug";
-
-	error = input_register_handle(handle);
-	if (error)
-		goto err2;
-
-	error = input_open_device(handle);
-	if (error)
-		goto err1;
-	pr_info("%s found and connected!\n", dev->name);
-	return 0;
-err1:
-	input_unregister_handle(handle);
-err2:
-	kfree(handle);
-	return error;
-}
-
-static void intelli_plug_input_disconnect(struct input_handle *handle)
-{
-	input_close_device(handle);
-	input_unregister_handle(handle);
-	kfree(handle);
-}
-
-static const struct input_device_id intelli_plug_ids[] = {
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-			 INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.evbit = { BIT_MASK(EV_ABS) },
-		.absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
-			    BIT_MASK(ABS_MT_POSITION_X) |
-			    BIT_MASK(ABS_MT_POSITION_Y) },
-	}, /* multi-touch touchscreen */
-	{
-		.flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
-			 INPUT_DEVICE_ID_MATCH_ABSBIT,
-		.keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
-		.absbit = { [BIT_WORD(ABS_X)] =
-			    BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
-	}, /* touchpad */
-	{ },
-};
-
-static struct input_handler intelli_plug_input_handler = {
-	.event          = intelli_plug_input_event,
-	.connect        = intelli_plug_input_connect,
-	.disconnect     = intelli_plug_input_disconnect,
-	.name           = "intelliplug_handler",
-	.id_table       = intelli_plug_ids,
-};
-
 int __init intelli_plug_init(void)
 {
 	int rc;
@@ -637,7 +528,6 @@ int __init intelli_plug_init(void)
 	l_ip_info->cur_max = policy->max;
 #endif
 
-	rc = input_register_handler(&intelli_plug_input_handler);
 #ifdef CONFIG_POWERSUSPEND
 	register_power_suspend(&intelli_plug_power_suspend_driver);
 #endif
@@ -664,10 +554,6 @@ int __init intelli_plug_init(void)
 
 	if (rc)
 		kobject_put(intelli_plug_perf_boost_kobj);
-
-	INIT_DELAYED_WORK(&intelli_plug_boost, intelli_plug_boost_fn);
-	queue_delayed_work_on(0, intelliplug_wq, &intelli_plug_work,
-		msecs_to_jiffies(10));
 
 	return 0;
 }
