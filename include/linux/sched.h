@@ -1360,8 +1360,6 @@ struct task_struct {
 	unsigned irq_thread:1;
 #endif
 
-	unsigned long atomic_flags; /* Flags needing atomic access. */
-
 	pid_t pid;
 	pid_t tgid;
 
