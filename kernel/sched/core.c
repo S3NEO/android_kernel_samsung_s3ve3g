@@ -4732,7 +4732,7 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	get_task_struct(p);
 	rcu_read_unlock();
 
-	if (p->flags & PF_NO_SETAFFINITY) {
+	if (p->flags & PF_THREAD_BOUND) {
 		retval = -EINVAL;
 		goto out_put_task;
 	}

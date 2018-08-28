@@ -43,9 +43,6 @@
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	5
-
-#define POWER_SUSPEND_DEBUG // Add debugging prints in dmesg
 #define MINOR_VERSION	8
 
 /*
@@ -182,17 +179,7 @@ void set_power_suspend_state_autosleep_hook(int new_state)
 		set_power_suspend_state(new_state);
 }
 
-void set_power_suspend_state_autosleep_hook(int new_state)		
-{		
-	#ifdef POWER_SUSPEND_DEBUG		
-	pr_info("[POWERSUSPEND] autosleep resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");		
-	#endif		
-	// Yank555.lu : Only allow autosleep hook changes in autosleep & hybrid mode		
-	if (mode == POWER_SUSPEND_AUTOSLEEP || mode == POWER_SUSPEND_HYBRID)		
-		set_power_suspend_state(new_state);		
-}		
-		
-EXPORT_SYMBOL(set_power_suspend_state_autosleep_hook);	
+EXPORT_SYMBOL(set_power_suspend_state_autosleep_hook);
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
@@ -267,7 +254,7 @@ static struct kobj_attribute power_suspend_mode_attribute =
 static ssize_t power_suspend_version_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION, SUB_MINOR_VERSION);
+	return sprintf(buf, "version: %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
 }
 
 static struct kobj_attribute power_suspend_version_attribute =
@@ -312,8 +299,10 @@ static int __init power_suspend_init(void)
 	return -ENOMEM;
 	}
 
+//	mode = POWER_SUSPEND_AUTOSLEEP;	// Yank555.lu : Default to autosleep mode
 //	mode = POWER_SUSPEND_USERSPACE;	// Yank555.lu : Default to userspace mode
-	mode = POWER_SUSPEND_PANEL;	// Yank555.lu : Default to display panel mode
+//	mode = POWER_SUSPEND_PANEL;	// Yank555.lu : Default to display panel mode
+	mode = POWER_SUSPEND_HYBRID;	// Yank555.lu : Default to display panel / autosleep hybrid mode
 
 	return 0;
 }

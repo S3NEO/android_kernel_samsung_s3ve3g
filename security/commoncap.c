@@ -1002,7 +1002,6 @@ int cap_task_prctl(int option, unsigned long arg2, unsigned long arg3,
 			return commit_creds(new);
 		}
 
-	case PR_CAP_AMBIENT:
 		if (arg2 == PR_CAP_AMBIENT_CLEAR_ALL) {
 			if (arg3 | arg4 | arg5)
 				return -EINVAL;
