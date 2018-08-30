@@ -1139,8 +1139,6 @@ int queue_delayed_work_on(int cpu, struct workqueue_struct *wq,
 		BUG_ON(timer_pending(timer));
 		BUG_ON(!list_empty(&work->entry));
 
-		timer_stats_timer_set_start_info(&dwork->timer);
-
 		/*
 		 * This stores cwq for the moment, for the timer_fn.
 		 * Note that the work's gcwq is preserved to allow
@@ -1450,6 +1448,12 @@ static void destroy_worker(struct worker *worker)
 	if (worker->flags & WORKER_IDLE)
 		pool->nr_idle--;
 
+	/*
+	 * Once WORKER_DIE is set, the kworker may destroy itself at any
+	 * point.  Pin to ensure the task stays until we're done with it.
+	 */
+	get_task_struct(worker->task);
+
 	list_del_init(&worker->entry);
 	worker->flags |= WORKER_DIE;
 
@@ -1727,6 +1731,16 @@ static void move_linked_works(struct work_struct *work, struct list_head *head,
 		*nextp = n;
 }
 
+static void cwq_activate_delayed_work(struct work_struct *work)
+{
+	struct cpu_workqueue_struct *cwq = get_work_cwq(work);
+
+	trace_workqueue_activate_work(work);
+	move_linked_works(work, &cwq->pool->worklist, NULL);
+	__clear_bit(WORK_STRUCT_DELAYED_BIT, work_data_bits(work));
+	cwq->nr_active++;
+}
+
 static void cwq_activate_first_delayed(struct cpu_workqueue_struct *cwq)
 {
 	struct work_struct *work = list_first_entry(&cwq->delayed_works,
@@ -1867,9 +1881,9 @@ __acquires(&gcwq->lock)
 	lock_map_acquire(&lockdep_map);
 	trace_workqueue_execute_start(work);
 #ifdef CONFIG_SEC_DEBUG
-	secdbg_sched_msg("@%pS", f);
+	secdbg_sched_msg("@%pS", worker->current_func);
 #endif
-	f(work);
+	worker->current_func(work);
 	/*
 	 * While we must be careful to not use "work" after this, the trace
 	 * point will only record its address.
@@ -3630,6 +3644,19 @@ static int __devinit workqueue_cpu_callback(struct notifier_block *nfb,
 	spin_unlock_irqrestore(&gcwq->lock, flags);
 
 	return notifier_from_errno(0);
+
+err_destroy:
+	if (new_trustee)
+		kthread_stop(new_trustee);
+
+	spin_lock_irqsave(&gcwq->lock, flags);
+	for (i = 0; i < NR_WORKER_POOLS; i++)
+		if (new_workers[i])
+			destroy_worker(new_workers[i]);
+	spin_unlock_irqrestore(&gcwq->lock, flags);
+
+	return NOTIFY_BAD;
+}
 
 err_destroy:
 	if (new_trustee)
