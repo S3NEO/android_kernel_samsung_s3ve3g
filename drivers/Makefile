@@ -153,7 +153,7 @@ obj-$(CONFIG_VIBETONZ)		+= motor/
 obj-$(CONFIG_MSM_VIBRATOR)	+= motor/
 obj-$(CONFIG_HAPTIC_ISA1200)	+=motor/
 
-obj-$(CONFIG_FELICA) 		+= felica/
+obj-$(CONFIG_FELICA)		+= felica/
 
 obj-$(CONFIG_SENSORS_SSP)	+= sensorhub/
 obj-$(CONFIG_SENSORS_FINGERPRINT)	+= fingerprint/
@@ -161,5 +161,4 @@ obj-$(CONFIG_SENSORS_FINGERPRINT)	+= fingerprint/
 obj-$(CONFIG_EXTCON)		+= extcon/
 obj-$(CONFIG_IR_REMOCON_MC96FR116)	+= irda/
 obj-$(CONFIG_IRDA_COMMON_LDO)	+= irda/
-obj-$(CONFIG_SEC_NET_FILTER)	+= secfilter/
 
