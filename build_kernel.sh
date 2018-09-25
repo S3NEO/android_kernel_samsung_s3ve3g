@@ -1,10 +1,10 @@
 #!/bin/bash
 
 export ARCH=arm
-export CROSS_COMPILE=/opt/toolchains/arm-eabi-4.6/bin/arm-eabi-
+export CROSS_COMPILE=/home/fcuzzocrea/bin/arm-eabi-4.8/arm-eabi/bin/
 mkdir output
 
-make -C $(pwd) O=output msm8226-sec_defconfig VARIANT_DEFCONFIG=msm8226-sec_s3ve3g_eur_defconfig SELINUX_DEFCONFIG=selinux_defconfig
-make -C $(pwd) O=output
+make -C $(pwd) O=output lineageos_s3ve3g_defconfig
+make -C $(pwd) -j4 O=output
 
-cp output/arch/arm/boot/Image $(pwd)/arch/arm/boot/zImage
+#cp output/arch/arm/boot/Image $(pwd)/arch/arm/boot/zImage
