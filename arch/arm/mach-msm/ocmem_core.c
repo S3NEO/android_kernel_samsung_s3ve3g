@@ -1060,6 +1060,14 @@ static int ocmem_power_show_sw_state(struct seq_file *f, void *dummy)
 {
 	unsigned i, j;
 	unsigned m_state;
+	int rc;
+
+	rc = ocmem_enable_core_clock();
+	if (rc < 0) {
+		pr_err("can't enable ocmem core clock\n");
+		return rc;
+	}
+
 	mutex_lock(&region_ctrl_lock);
 
 	seq_printf(f, "OCMEM Aggregated Power States\n");
@@ -1078,6 +1086,7 @@ static int ocmem_power_show_sw_state(struct seq_file *f, void *dummy)
 		seq_printf(f, "\n");
 	}
 	mutex_unlock(&region_ctrl_lock);
+	ocmem_disable_core_clock();
 	return 0;
 }
 

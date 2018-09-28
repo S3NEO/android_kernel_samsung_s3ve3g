@@ -19,40 +19,42 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/leds.h>
-#include <linux/pwm.h>
+#include <linux/qpnp/pwm.h>
 #include <linux/err.h>
 
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+#include <linux/mutex.h>
+#if defined(CONFIG_LCD_CLASS_DEVICE)
+#include <linux/lcd.h>
+#include <linux/of_platform.h>
+#include "mdss_fb.h"
+#if defined(CONFIG_CLK_TUNING)
+#include <linux/syscalls.h>
+#include <asm/uaccess.h>
+#endif /* CONFIG_CLK_TUNING */
+#endif /* CONFIG_LCD_CLASS_DEVICE */
+#endif /* CONFIG_FB_MSM_MDSS_MDP3 */
 #include "mdss_dsi.h"
+
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+static struct mdss_dsi_driver_data msd;
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+#include "mdnie_lite_tuning.h"
+#endif	/* CONFIG_MDNIE_LITE_TUNING */
+#endif	/* CONFIG_FB_MSM_MDSS_MDP3 */
 
 #define DT_CMD_HDR 6
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 
+/*static struct mdss_dsi_phy_ctrl phy_params;*/
+
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
-	int ret;
-
-	if (!gpio_is_valid(ctrl->pwm_pmic_gpio)) {
-		pr_err("%s: pwm_pmic_gpio=%d Invalid\n", __func__,
-				ctrl->pwm_pmic_gpio);
-		ctrl->pwm_pmic_gpio = -1;
-		return;
-	}
-
-	ret = gpio_request(ctrl->pwm_pmic_gpio, "disp_pwm");
-	if (ret) {
-		pr_err("%s: pwm_pmic_gpio=%d request failed\n", __func__,
-				ctrl->pwm_pmic_gpio);
-		ctrl->pwm_pmic_gpio = -1;
-		return;
-	}
-
 	ctrl->pwm_bl = pwm_request(ctrl->pwm_lpg_chan, "lcd-bklt");
 	if (ctrl->pwm_bl == NULL || IS_ERR(ctrl->pwm_bl)) {
-		pr_err("%s: lpg_chan=%d pwm request failed", __func__,
-				ctrl->pwm_lpg_chan);
-		gpio_free(ctrl->pwm_pmic_gpio);
-		ctrl->pwm_pmic_gpio = -1;
+		pr_err("%s: Error: lpg_chan=%d pwm request failed",
+				__func__, ctrl->pwm_lpg_chan);
 	}
 }
 
@@ -88,9 +90,9 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		ctrl->pwm_enabled = 0;
 	}
 
-	ret = pwm_config(ctrl->pwm_bl, duty, ctrl->pwm_period);
+	ret = pwm_config_us(ctrl->pwm_bl, duty, ctrl->pwm_period);
 	if (ret) {
-		pr_err("%s: pwm_config() failed err=%d.\n", __func__, ret);
+		pr_err("%s: pwm_config_us() failed err=%d.\n", __func__, ret);
 		return;
 	}
 
@@ -127,6 +129,27 @@ u32 mdss_dsi_panel_cmd_read(struct mdss_dsi_ctrl_pdata *ctrl, char cmd0,
 
 	return 0;
 }
+
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *cmds, int cnt)
+{
+	struct dcs_cmd_req cmdreq;
+
+	memset(&cmdreq, 0, sizeof(cmdreq));
+
+	cmdreq.cmds = cmds;
+	cmdreq.cmds_cnt = cnt;
+	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
+	cmdreq.rlen = 0;
+	cmdreq.cb = NULL;
+
+	dsi_set_tx_power_mode(0);
+
+	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+
+	dsi_set_tx_power_mode(1);
+}
+#endif
 
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds)
@@ -319,6 +342,59 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	}
 }
 
+#if defined(CONFIG_MDSS_DSI_EVENT_HANDLER_PANEL)
+static int mdss_dsi_panel_registered(struct mdss_panel_data *pdata)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
+	msd.pdata = pdata;
+	msd.ctrl_pdata = ctrl_pdata;
+
+	if(!msd.mfd) {
+		pr_info("%s mds.mfd is null!!\n",__func__);
+	} else {
+		pr_info("%s mds.mfd is ok!!\n",__func__);
+	}
+
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+	mdnie_lite_tuning_init(&msd);
+#endif
+#endif
+
+	pr_info("%s:%d, Panel registered succesfully\n", __func__, __LINE__);
+
+	return 0;
+}
+
+static int mdss_dsi_panel_event_handler(int event)
+{
+	pr_info("%s : %d",__func__,event);
+	switch (event) {
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+		case MDSS_EVENT_MDNIE_DEFAULT_UPDATE:
+			pr_info("%s : send CONFIG_MDNIE_LITE_TUNING... \n",__func__);
+			mDNIe_Set_Mode();
+			break;
+#endif
+		default:
+			pr_err("%s : unknown event (%d)\n", __func__, event);
+			break;
+	}
+
+	return 0;
+}
+#endif
+
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mipi_panel_info *mipi;
@@ -366,6 +442,49 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 	return 0;
 }
 
+static void mdss_dsi_parse_lane_swap(struct device_node *np, char *dlane_swap)
+{
+	const char *data;
+
+	*dlane_swap = DSI_LANE_MAP_0123;
+	data = of_get_property(np, "qcom,mdss-dsi-lane-map", NULL);
+	if (data) {
+		if (!strcmp(data, "lane_map_3012"))
+			*dlane_swap = DSI_LANE_MAP_3012;
+		else if (!strcmp(data, "lane_map_2301"))
+			*dlane_swap = DSI_LANE_MAP_2301;
+		else if (!strcmp(data, "lane_map_1230"))
+			*dlane_swap = DSI_LANE_MAP_1230;
+		else if (!strcmp(data, "lane_map_0321"))
+			*dlane_swap = DSI_LANE_MAP_0321;
+		else if (!strcmp(data, "lane_map_1032"))
+			*dlane_swap = DSI_LANE_MAP_1032;
+		else if (!strcmp(data, "lane_map_2103"))
+			*dlane_swap = DSI_LANE_MAP_2103;
+		else if (!strcmp(data, "lane_map_3210"))
+			*dlane_swap = DSI_LANE_MAP_3210;
+	}
+}
+
+static void mdss_dsi_parse_trigger(struct device_node *np, char *trigger,
+		char *trigger_key)
+{
+	const char *data;
+
+	*trigger = DSI_CMD_TRIGGER_SW;
+	data = of_get_property(np, trigger_key, NULL);
+	if (data) {
+		if (!strcmp(data, "none"))
+			*trigger = DSI_CMD_TRIGGER_NONE;
+		else if (!strcmp(data, "trigger_te"))
+			*trigger = DSI_CMD_TRIGGER_TE;
+		else if (!strcmp(data, "trigger_sw_seof"))
+			*trigger = DSI_CMD_TRIGGER_SW_SEOF;
+		else if (!strcmp(data, "trigger_sw_te"))
+			*trigger = DSI_CMD_TRIGGER_SW_TE;
+	}
+}
+
 
 static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
@@ -398,7 +517,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		if (dchdr->dlen > len) {
 			pr_err("%s: dtsi cmd=%x error, len=%d",
 				__func__, dchdr->dtype, dchdr->dlen);
-			return -ENOMEM;
+			goto exit_free;
 		}
 		bp += sizeof(*dchdr);
 		len -= sizeof(*dchdr);
@@ -410,14 +529,13 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 	if (len != 0) {
 		pr_err("%s: dcs_cmd=%x len=%d error!",
 				__func__, buf[0], blen);
-		kfree(buf);
-		return -ENOMEM;
+		goto exit_free;
 	}
 
 	pcmds->cmds = kzalloc(cnt * sizeof(struct dsi_cmd_desc),
 						GFP_KERNEL);
 	if (!pcmds->cmds)
-		return -ENOMEM;
+		goto exit_free;
 
 	pcmds->cmd_cnt = cnt;
 	pcmds->buf = buf;
@@ -436,7 +554,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 	}
 
 	data = of_get_property(np, link_key, NULL);
-	if (!strncmp(data, "dsi_hs_mode", 11))
+	if (data && !strcmp(data, "dsi_hs_mode"))
 		pcmds->link_state = DSI_HS_MODE;
 	else
 		pcmds->link_state = DSI_LP_MODE;
@@ -445,6 +563,10 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		pcmds->buf[0], pcmds->blen, pcmds->cmd_cnt, pcmds->link_state);
 
 	return 0;
+
+exit_free:
+	kfree(buf);
+	return -ENOMEM;
 }
 
 
@@ -652,8 +774,10 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	data = of_get_property(np, "qcom,mdss-dsi-panel-type", NULL);
 	if (data && !strncmp(data, "dsi_cmd_mode", 12))
 		pinfo->mipi.mode = DSI_CMD_MODE;
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-pixel-packing", &tmp);
-	tmp = (!rc ? tmp : 0);
+	tmp = 0;
+	data = of_get_property(np, "qcom,mdss-dsi-pixel-packing", NULL);
+	if (data && !strcmp(data, "loose"))
+		tmp = 1;
 	rc = mdss_panel_dt_get_dst_fmt(pinfo->bpp,
 		pinfo->mipi.mode, tmp,
 		&(pinfo->mipi.dst_format));
@@ -666,18 +790,23 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	pdest = of_get_property(np,
 		"qcom,mdss-dsi-panel-destination", NULL);
 
-	if (strlen(pdest) != 9) {
-		pr_err("%s: Unknown pdest specified\n", __func__);
+	if (pdest) {
+		if (strlen(pdest) != 9) {
+			pr_err("%s: Unknown pdest specified\n", __func__);
+			return -EINVAL;
+		}
+		if (!strcmp(pdest, "display_1"))
+			pinfo->pdest = DISPLAY_1;
+		else if (!strcmp(pdest, "display_2"))
+			pinfo->pdest = DISPLAY_2;
+		else {
+			pr_debug("%s: pdest not specified. Set Default\n",
+								__func__);
+			pinfo->pdest = DISPLAY_1;
+		}
+	} else {
+		pr_err("%s: pdest not specified\n", __func__);
 		return -EINVAL;
-	}
-	if (!strncmp(pdest, "display_1", 9))
-		pinfo->pdest = DISPLAY_1;
-	else if (!strncmp(pdest, "display_2", 9))
-		pinfo->pdest = DISPLAY_2;
-	else {
-		pr_debug("%s: pdest not specified. Set Default\n",
-							__func__);
-		pinfo->pdest = DISPLAY_1;
 	}
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-h-front-porch", &tmp);
 	pinfo->lcdc.h_front_porch = (!rc ? tmp : 6);
@@ -733,6 +862,8 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			ctrl_pdata->bklt_ctrl = BL_DCS_CMD;
 		}
 	}
+	rc = of_property_read_u32(np, "qcom,mdss-brightness-max-level", &tmp);
+	pinfo->brightness_max = (!rc ? tmp : MDSS_MAX_BL_BRIGHTNESS);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-bl-min-level", &tmp);
 	pinfo->bl_min = (!rc ? tmp : 0);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-bl-max-level", &tmp);
@@ -761,10 +892,14 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-bllp-power-mode");
 	pinfo->mipi.eof_bllp_power_stop = of_property_read_bool(
 		np, "qcom,mdss-dsi-bllp-eof-power-mode");
-	rc = of_property_read_u32(np,
-		"qcom,mdss-dsi-traffic-mode", &tmp);
-	pinfo->mipi.traffic_mode =
-			(!rc ? tmp : DSI_NON_BURST_SYNCH_PULSE);
+	pinfo->mipi.traffic_mode = DSI_NON_BURST_SYNCH_PULSE;
+	data = of_get_property(np, "qcom,mdss-dsi-traffic-mode", NULL);
+	if (data) {
+		if (!strcmp(data, "non_burst_sync_event"))
+			pinfo->mipi.traffic_mode = DSI_NON_BURST_SYNCH_EVENT;
+		else if (!strcmp(data, "burst_mode"))
+			pinfo->mipi.traffic_mode = DSI_BURST_MODE;
+	}
 	rc = of_property_read_u32(np,
 		"qcom,mdss-dsi-te-dcs-command", &tmp);
 	pinfo->mipi.insert_dcs_cmd =
@@ -783,8 +918,20 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			(!rc ? tmp : 1);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-virtual-channel-id", &tmp);
 	pinfo->mipi.vc = (!rc ? tmp : 0);
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-color-order", &tmp);
-	pinfo->mipi.rgb_swap = (!rc ? tmp : DSI_RGB_SWAP_RGB);
+	pinfo->mipi.rgb_swap = DSI_RGB_SWAP_RGB;
+	data = of_get_property(np, "mdss-dsi-color-order", NULL);
+	if (data) {
+		if (!strcmp(data, "rgb_swap_rbg"))
+			pinfo->mipi.rgb_swap = DSI_RGB_SWAP_RBG;
+		else if (!strcmp(data, "rgb_swap_bgr"))
+			pinfo->mipi.rgb_swap = DSI_RGB_SWAP_BGR;
+		else if (!strcmp(data, "rgb_swap_brg"))
+			pinfo->mipi.rgb_swap = DSI_RGB_SWAP_BRG;
+		else if (!strcmp(data, "rgb_swap_grb"))
+			pinfo->mipi.rgb_swap = DSI_RGB_SWAP_GRB;
+		else if (!strcmp(data, "rgb_swap_gbr"))
+			pinfo->mipi.rgb_swap = DSI_RGB_SWAP_GBR;
+	}
 	pinfo->mipi.data_lane0 = of_property_read_bool(np,
 		"qcom,mdss-dsi-lane-0-state");
 	pinfo->mipi.data_lane1 = of_property_read_bool(np,
@@ -794,9 +941,6 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	pinfo->mipi.data_lane3 = of_property_read_bool(np,
 		"qcom,mdss-dsi-lane-3-state");
 
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-lane-map", &tmp);
-	pinfo->mipi.dlane_swap = (!rc ? tmp : 0);
-
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-t-clk-pre", &tmp);
 	pinfo->mipi.t_clk_pre = (!rc ? tmp : 0x24);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-t-clk-post", &tmp);
@@ -805,26 +949,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-stream", &tmp);
 	pinfo->mipi.stream = (!rc ? tmp : 0);
 
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-mdp-trigger", &tmp);
-	pinfo->mipi.mdp_trigger =
-			(!rc ? tmp : DSI_CMD_TRIGGER_SW);
-	if (pinfo->mipi.mdp_trigger > 6) {
-		pr_err("%s:%d, Invalid mdp trigger. Forcing to sw trigger",
-						 __func__, __LINE__);
-		pinfo->mipi.mdp_trigger =
-					DSI_CMD_TRIGGER_SW;
-	}
-
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-dma-trigger", &tmp);
-	pinfo->mipi.dma_trigger =
-			(!rc ? tmp : DSI_CMD_TRIGGER_SW);
-	if (pinfo->mipi.dma_trigger > 6) {
-		pr_err("%s:%d, Invalid dma trigger. Forcing to sw trigger",
-						 __func__, __LINE__);
-		pinfo->mipi.dma_trigger =
-					DSI_CMD_TRIGGER_SW;
-	}
-	data = of_get_property(np, "qcom,mdss-dsi-panel-mode-gpio-state", &tmp);
+	data = of_get_property(np, "qcom,mdss-dsi-panel-mode-gpio-state", NULL);
 	if (data) {
 		if (!strcmp(data, "high"))
 			pinfo->mode_gpio_state = MODE_GPIO_HIGH;
@@ -834,9 +959,9 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mode_gpio_state = MODE_GPIO_NOT_VALID;
 	}
 
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-frame-rate", &tmp);
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate", &tmp);
 	pinfo->mipi.frame_rate = (!rc ? tmp : 60);
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-clock-rate", &tmp);
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-clockrate", &tmp);
 	pinfo->clk_rate = (!rc ? tmp : 0);
 	data = of_get_property(np, "qcom,mdss-dsi-panel-timings", &len);
 	if ((!data) || (len != 12)) {
@@ -854,6 +979,14 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	mdss_dsi_parse_fbc_params(np, pinfo);
 
+	mdss_dsi_parse_trigger(np, &(pinfo->mipi.mdp_trigger),
+		"qcom,mdss-dsi-mdp-trigger");
+
+	mdss_dsi_parse_trigger(np, &(pinfo->mipi.dma_trigger),
+		"qcom,mdss-dsi-dma-trigger");
+
+	mdss_dsi_parse_lane_swap(np, &(pinfo->mipi.dlane_swap));
+
 	mdss_dsi_parse_reset_seq(np, pinfo->rst_seq, &(pinfo->rst_seq_len),
 		"qcom,mdss-dsi-reset-sequence");
 
@@ -868,6 +1001,404 @@ static int mdss_panel_parse_dt(struct device_node *np,
 error:
 	return -EINVAL;
 }
+#if defined(CONFIG_LCD_CLASS_DEVICE)
+static ssize_t mdss_disp_get_power(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	return 0;
+}
+
+static ssize_t mdss_disp_set_power(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+
+static DEVICE_ATTR(lcd_power, S_IRUGO | S_IWUSR | S_IWGRP,
+			mdss_disp_get_power,
+			mdss_disp_set_power);
+
+static ssize_t mdss_disp_lcdtype_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	char temp[20] = {0,};
+
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+	if(msd.panel_name) {
+		snprintf(temp, 20, msd.panel_name);
+	} else {
+		snprintf(temp, 20, "NOT_DEFINED");
+	}
+#endif
+
+	strncat(buf, temp, 20);
+	return strnlen(buf, 20);
+}
+static DEVICE_ATTR(lcd_type, S_IRUGO, mdss_disp_lcdtype_show, NULL);
+
+#if defined(CONFIG_CLK_TUNING)
+static bool clk_tuning_status = 0;
+
+#define STR_HFP	"qcom,mdss-dsi-h-front-porch = <"
+#define STR_HBP	"qcom,mdss-dsi-h-back-porch = <"
+#define STR_HPW	"qcom,mdss-dsi-h-pulse-width = <"
+#define STR_VBP	"qcom,mdss-dsi-v-back-porch = <"
+#define STR_VFP	"qcom,mdss-dsi-v-front-porch = <"
+#define STR_VPW	"qcom,mdss-dsi-v-pulse-width = <"
+#define STR_TBL "qcom,mdss-dsi-panel-timings = ["
+#define STR_POST "qcom,mdss-dsi-t-clk-post = <0x"
+#define STR_PRE "qcom,mdss-dsi-t-clk-pre = <0x"
+
+#define CLK_TUNING_FILE_NAME	"/data/clk_tuning.txt"
+
+
+static void mdss_dsi_parse_clk_tuning(char *src)
+{
+	char *ret = NULL;
+	int i = 0;
+	char str_hfp[4] = {0,};
+	char str_hbp[4] = {0,};
+	char str_hpw[4] = {0,};
+	char str_vbp[4] = {0,};
+	char str_vfp[4] = {0,};
+	char str_vpw[4] = {0,};
+	char str_tbl[13][3] = {{0,},};
+	char str_post[3] = {0,};
+	char str_pre[3] = {0,};
+	struct mdss_panel_info *pinfo = &(msd.ctrl_pdata->panel_data.panel_info);
+
+	pr_info("[LCD] **** before ****\n");
+
+	pr_info("[LCD] hfp=%d, hbp=%d, hpw=%d, vbp=%d, vfp=%d, vpw=%d\n",
+		pinfo->lcdc.h_front_porch,
+		pinfo->lcdc.h_back_porch,
+		pinfo->lcdc.h_pulse_width,
+		pinfo->lcdc.v_back_porch,
+		pinfo->lcdc.v_front_porch,
+		pinfo->lcdc.v_pulse_width);
+
+	pr_info("[LCD] dsi_phy_db.timing=[%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X]\n",
+		pinfo->mipi.dsi_phy_db.timing[0],
+		pinfo->mipi.dsi_phy_db.timing[1],
+		pinfo->mipi.dsi_phy_db.timing[2],
+		pinfo->mipi.dsi_phy_db.timing[3],
+		pinfo->mipi.dsi_phy_db.timing[4],
+		pinfo->mipi.dsi_phy_db.timing[5],
+		pinfo->mipi.dsi_phy_db.timing[6],
+		pinfo->mipi.dsi_phy_db.timing[7],
+		pinfo->mipi.dsi_phy_db.timing[8],
+		pinfo->mipi.dsi_phy_db.timing[9],
+		pinfo->mipi.dsi_phy_db.timing[10],
+		pinfo->mipi.dsi_phy_db.timing[11]);
+
+	pr_info("[LCD] t_clk_post=0x%02X, t_clk_pre=0x%02X\n",
+		pinfo->mipi.t_clk_post,
+		pinfo->mipi.t_clk_pre);
+
+
+	ret = strstr(src, STR_HFP);
+	if( ret != NULL ) {
+		ret += sizeof(STR_HFP) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_hfp[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.h_front_porch = simple_strtol(str_hfp, NULL, 10);
+	}
+
+	ret = strstr(src, STR_HBP);
+	if( ret != NULL ) {
+		ret += sizeof(STR_HBP) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_hbp[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.h_back_porch = simple_strtol(str_hbp, NULL, 10);
+	}
+
+	ret = strstr(src, STR_HPW);
+	if( ret != NULL ) {
+		ret += sizeof(STR_HPW) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_hpw[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.h_pulse_width = simple_strtol(str_hpw, NULL, 10);
+	}
+
+	ret = strstr(src, STR_VBP);
+	if( ret != NULL ) {
+		ret += sizeof(STR_VBP) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_vbp[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.v_back_porch = simple_strtol(str_vbp, NULL, 10);
+	}
+
+	ret = strstr(src, STR_VFP);
+	if( ret != NULL ) {
+		ret += sizeof(STR_VFP) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_vfp[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.v_front_porch = simple_strtol(str_vfp, NULL, 10);
+	}
+
+	ret = strstr(src, STR_VPW);
+	if( ret != NULL ) {
+		ret += sizeof(STR_VPW) - 1;
+		for(i=0; i<3; i++) {
+			if(*ret>='0' && *ret<='9') {
+				str_vpw[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->lcdc.v_pulse_width = simple_strtol(str_vpw, NULL, 10);
+	}
+
+	ret = strstr(src, STR_TBL);
+	if( ret != NULL ) {
+		int j = 0;
+		int k = 0;
+		ret += sizeof(STR_TBL) - 1;
+		for(i=0; i<35; i++) {
+			if((*ret>='0' && *ret<='9')||(*ret>='a' && *ret<='f')||(*ret>='A' && *ret<='F')) {
+				str_tbl[j][k] = *ret;
+				k++;
+			} else if(*ret>=' '){
+				j++;
+				k=0;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		for(i=0; i<12; i++)
+			pinfo->mipi.dsi_phy_db.timing[i] = simple_strtol(str_tbl[i], NULL, 16);
+	}
+
+	ret = strstr(src, STR_POST);
+	if( ret != NULL ) {
+		ret += sizeof(STR_POST) - 1;
+		for(i=0; i<2; i++) {
+			if((*ret>='0' && *ret<='9')||(*ret>='a' && *ret<='f')||(*ret>='A' && *ret<='F')) {
+				str_post[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->mipi.t_clk_post = (char)simple_strtol(str_post, NULL, 16);
+	}
+
+	ret = strstr(src, STR_PRE);
+	if( ret != NULL ) {
+		ret += sizeof(STR_PRE) - 1;
+		for(i=0; i<2; i++) {
+			if((*ret>='0' && *ret<='9')||(*ret>='a' && *ret<='f')||(*ret>='A' && *ret<='F')) {
+				str_pre[i] = *ret;
+			} else {
+				break;
+			}
+			ret++;
+		}
+
+		pinfo->mipi.t_clk_pre = (char)simple_strtol(str_pre, NULL, 16);
+	}
+
+	pr_info("[LCD] **** after *****\n");
+
+	pr_info("[LCD] hfp=%d, hbp=%d, hpw=%d, vbp=%d, vfp=%d, vpw=%d\n",
+		pinfo->lcdc.h_front_porch,
+		pinfo->lcdc.h_back_porch,
+		pinfo->lcdc.h_pulse_width,
+		pinfo->lcdc.v_back_porch,
+		pinfo->lcdc.v_front_porch,
+		pinfo->lcdc.v_pulse_width);
+
+	pr_info("[LCD] dsi_phy_db.timing=[%02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X]\n",
+		pinfo->mipi.dsi_phy_db.timing[0],
+		pinfo->mipi.dsi_phy_db.timing[1],
+		pinfo->mipi.dsi_phy_db.timing[2],
+		pinfo->mipi.dsi_phy_db.timing[3],
+		pinfo->mipi.dsi_phy_db.timing[4],
+		pinfo->mipi.dsi_phy_db.timing[5],
+		pinfo->mipi.dsi_phy_db.timing[6],
+		pinfo->mipi.dsi_phy_db.timing[7],
+		pinfo->mipi.dsi_phy_db.timing[8],
+		pinfo->mipi.dsi_phy_db.timing[9],
+		pinfo->mipi.dsi_phy_db.timing[10],
+		pinfo->mipi.dsi_phy_db.timing[11]);
+
+	pr_info("[LCD] t_clk_post=0x%02X, t_clk_pre=0x%02X\n",
+		pinfo->mipi.t_clk_post,
+		pinfo->mipi.t_clk_pre);
+};
+
+void load_clk_tuning_file(void)
+{
+	struct file *filp;
+	char *dp;
+	long l;
+	loff_t pos;
+	int ret;
+	mm_segment_t fs;
+
+	if(clk_tuning_status == 0) {
+		pr_info("%s : Disable the clk_tuning\n", __func__);
+		return;
+	}
+
+	pr_info("%s called loading file name : [%s]\n", __func__,
+	       CLK_TUNING_FILE_NAME);
+
+	fs = get_fs();
+	set_fs(get_ds());
+
+	filp = filp_open(CLK_TUNING_FILE_NAME, O_RDONLY, 0);
+	if (IS_ERR(filp)) {
+		printk(KERN_ERR "%s File open failed : %ld\n", __func__, PTR_ERR(filp));
+		set_fs(fs);
+		return;
+	}
+
+	l = filp->f_path.dentry->d_inode->i_size;
+	pr_info("%s Loading File Size : %ld(bytes)", __func__, l);
+
+	dp = kmalloc(l + 10, GFP_KERNEL);
+	if (dp == NULL) {
+		pr_info("Can't not alloc memory for tuning file load\n");
+		filp_close(filp, current->files);
+		return;
+	}
+	pos = 0;
+	memset(dp, 0, l);
+
+	pr_info("%s before vfs_read()\n", __func__);
+	ret = vfs_read(filp, (char __user *)dp, l, &pos);
+	pr_info("%s after vfs_read()\n", __func__);
+
+	if (ret != l) {
+		pr_info("vfs_read() filed ret : %d\n", ret);
+		kfree(dp);
+		filp_close(filp, current->files);
+		return;
+	}
+
+	filp_close(filp, current->files);
+
+	set_fs(fs);
+
+	mdss_dsi_parse_clk_tuning(dp);
+
+	kfree(dp);
+}
+
+static ssize_t mdss_disp_clk_tuning_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	int rc = 0;
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+	rc = snprintf((char *)buf, sizeof(buf), "%d\n", clk_tuning_status);
+	pr_info("clk_tuning_status : %d\n", *buf);
+#endif
+	return rc;
+}
+
+static ssize_t mdss_disp_clk_tuning_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	if (sysfs_streq(buf, "1"))
+		clk_tuning_status = true;
+	else if (sysfs_streq(buf, "0"))
+		clk_tuning_status = false;
+	else
+		pr_info("%s: Invalid argument!!", __func__);
+
+	return size;
+}
+
+static DEVICE_ATTR(clk_tuning, S_IRUGO | S_IWUSR | S_IWGRP,
+			mdss_disp_clk_tuning_show,
+			mdss_disp_clk_tuning_store);
+#endif	/* CONFIG_CLK_TUNING */
+
+
+static struct lcd_ops mdss_disp_props = {
+
+	.get_power = NULL,
+	.set_power = NULL,
+
+};
+
+static struct attribute *panel_sysfs_attributes[] = {
+	&dev_attr_lcd_power.attr,
+	&dev_attr_lcd_type.attr,
+#if defined(CONFIG_CLK_TUNING)
+	&dev_attr_clk_tuning.attr,
+#endif
+	NULL
+};
+static const struct attribute_group panel_sysfs_group = {
+	.attrs = panel_sysfs_attributes,
+};
+#endif
+
+
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+#if defined(CONFIG_GET_LCD_ATTACHED)
+int get_samsung_lcd_attached(void)
+{
+	return msd.lcd_attached;
+}
+
+static int __init get_lcd_id_cmdline(char *mode)
+{
+	msd.manufacture_id = simple_strtol(mode, NULL, 16);
+	pr_info("[LCD] lcd_id=0x%06X", msd.manufacture_id);
+	if(msd.manufacture_id)
+		msd.lcd_attached = 1;
+	else
+		msd.lcd_attached = 0;
+
+	return 1;
+}
+__setup("lcd_id=0x", get_lcd_id_cmdline);
+#endif
+#endif	/* CONFIG_FB_MSM_MDSS_MDP3 */
+
 
 int mdss_dsi_panel_init(struct device_node *node,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata,
@@ -877,6 +1408,19 @@ int mdss_dsi_panel_init(struct device_node *node,
 	static const char *panel_name;
 	bool cont_splash_enabled;
 	bool partial_update_enabled;
+#if defined(CONFIG_LCD_CLASS_DEVICE)
+	struct lcd_device *lcd_device;
+	struct device_node *np = NULL;
+	struct platform_device *pdev = NULL;
+	np = of_parse_phandle(node,
+			"qcom,mdss-dsi-panel-controller", 0);
+	if (!np) {
+		pr_err("%s: Dsi controller node not initialized\n", __func__);
+		return -EPROBE_DEFER;
+	}
+
+	pdev = of_find_device_by_node(np);
+#endif
 
 	if (!node) {
 		pr_err("%s: no panel node\n", __func__);
@@ -890,6 +1434,13 @@ int mdss_dsi_panel_init(struct device_node *node,
 						__func__, __LINE__);
 	else
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
+
+#if defined(CONFIG_FB_MSM_MDSS_MDP3)
+#if defined(CONFIG_LCD_CLASS_DEVICE)
+	msd.panel_name = panel_name;
+#endif /* CONFIG_LCD_CLASS_DEVICE */
+	mutex_init(&msd.lock);
+#endif /* CONFIG_FB_MSM_MDSS_MDP3 */
 
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
@@ -929,5 +1480,35 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->off = mdss_dsi_panel_off;
 	ctrl_pdata->panel_data.set_backlight = mdss_dsi_panel_bl_ctrl;
 
+#if defined(CONFIG_MDSS_DSI_EVENT_HANDLER_PANEL)
+	ctrl_pdata->registered = mdss_dsi_panel_registered;
+	ctrl_pdata->event_handler = mdss_dsi_panel_event_handler;
+#endif
+
+#if defined(CONFIG_LCD_CLASS_DEVICE)
+	lcd_device = lcd_device_register("panel", &pdev->dev, NULL,
+					&mdss_disp_props);
+
+	if (IS_ERR(lcd_device)) {
+		rc = PTR_ERR(lcd_device);
+		printk(KERN_ERR "lcd : failed to register device\n");
+		return rc;
+	}
+
+	sysfs_remove_file(&lcd_device->dev.kobj,&dev_attr_lcd_power.attr);
+
+	rc = sysfs_create_group(&lcd_device->dev.kobj, &panel_sysfs_group);
+	if (rc) {
+		pr_err("Failed to create panel sysfs group..\n");
+		sysfs_remove_group(&lcd_device->dev.kobj, &panel_sysfs_group);
+		return rc;
+	}
+#endif
+
+#if defined(CONFIG_MDNIE_LITE_TUNING)
+	pr_info("[%s] CONFIG_MDNIE_LITE_TUNING ok ! init class called!\n",
+		__func__);
+	init_mdnie_class();
+#endif
 	return 0;
 }

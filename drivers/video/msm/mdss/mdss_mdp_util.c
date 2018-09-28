@@ -130,12 +130,16 @@ irqreturn_t mdss_mdp_isr(int irq, void *ptr)
 
 
 	isr = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_STATUS);
+	mask = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_EN);
+
+#if defined (CONFIG_FB_MSM_MDSS_DSI_DBG)
+	xlog(__func__, 0, isr, mask, 0, 0, 0);
+#endif
 
 	if (isr == 0)
 		goto mdp_isr_done;
 
 
-	mask = MDSS_MDP_REG_READ(MDSS_MDP_REG_INTR_EN);
 	MDSS_MDP_REG_WRITE(MDSS_MDP_REG_INTR_CLEAR, isr);
 
 	pr_debug("%s: isr=%x mask=%x\n", __func__, isr, mask);
@@ -200,14 +204,20 @@ irqreturn_t mdss_mdp_isr(int irq, void *ptr)
 		mdss_misr_crc_collect(mdata, DISPLAY_MISR_HDMI);
 	}
 
-	if (isr & MDSS_MDP_INTR_WB_0_DONE)
+	if (isr & MDSS_MDP_INTR_WB_0_DONE) {
 		mdss_mdp_intr_done(MDP_INTR_WB_0);
+		mdss_misr_crc_collect(mdata, DISPLAY_MISR_MDP);
+	}
 
-	if (isr & MDSS_MDP_INTR_WB_1_DONE)
+	if (isr & MDSS_MDP_INTR_WB_1_DONE) {
 		mdss_mdp_intr_done(MDP_INTR_WB_1);
+		mdss_misr_crc_collect(mdata, DISPLAY_MISR_MDP);
+	}
 
-	if (isr & MDSS_MDP_INTR_WB_2_DONE)
+	if (isr & MDSS_MDP_INTR_WB_2_DONE) {
 		mdss_mdp_intr_done(MDP_INTR_WB_2);
+		mdss_misr_crc_collect(mdata, DISPLAY_MISR_MDP);
+	}
 
 mdp_isr_done:
 	hist_isr = MDSS_MDP_REG_READ(MDSS_MDP_REG_HIST_INTR_STATUS);

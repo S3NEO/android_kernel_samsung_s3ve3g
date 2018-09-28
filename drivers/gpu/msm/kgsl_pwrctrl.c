@@ -132,6 +132,9 @@ void kgsl_pwrctrl_buslevel_update(struct kgsl_device *device,
 	int buslevel = 0;
 	if (!pwr->pcl)
 		return;
+	/* the bus should be ON to update the active frequency */
+	if (on && !(test_bit(KGSL_PWRFLAGS_AXI_ON, &pwr->power_flags)))
+		return;
 	/*
 	 * If the bus should remain on calculate our request and submit it,
 	 * otherwise request bus level 0, off.
@@ -175,11 +178,10 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 	pwr->bus_mod = 0;
 	pwrlevel = &pwr->pwrlevels[pwr->active_pwrlevel];
 
-	if (test_bit(KGSL_PWRFLAGS_AXI_ON, &pwr->power_flags)) {
-		kgsl_pwrctrl_buslevel_update(device, true);
+	kgsl_pwrctrl_buslevel_update(device, true);
+	if (test_bit(KGSL_PWRFLAGS_AXI_ON, &pwr->power_flags))
 		if (pwr->ebi1_clk)
 			clk_set_rate(pwr->ebi1_clk, pwrlevel->bus_freq);
-	}
 
 	if (test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->power_flags) ||
 		(device->state == KGSL_STATE_NAP)) {
@@ -1428,8 +1430,6 @@ _sleep(struct kgsl_device *device)
 		break;
 	}
 
-	kgsl_mmu_disable_clk_on_ts(&device->mmu, 0, false);
-
 	return 0;
 }
 
@@ -1569,7 +1569,10 @@ void kgsl_pwrctrl_enable(struct kgsl_device *device)
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	/* Order pwrrail/clk sequence based upon platform */
 	kgsl_pwrctrl_pwrrail(device, KGSL_PWRFLAGS_ON);
-	kgsl_pwrctrl_pwrlevel_change(device, pwr->active_pwrlevel);
+
+	if ((pwr->constraint.type == KGSL_CONSTRAINT_NONE))
+		kgsl_pwrctrl_pwrlevel_change(device, pwr->active_pwrlevel);
+
 	kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_ON, KGSL_STATE_ACTIVE);
 	kgsl_pwrctrl_axi(device, KGSL_PWRFLAGS_ON);
 }

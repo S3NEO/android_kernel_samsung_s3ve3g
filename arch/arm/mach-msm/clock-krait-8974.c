@@ -571,6 +571,10 @@ static void krait_update_uv(int *uv, int num, int boost_uv)
 {
 	int i;
 
+#if defined(CONFIG_MACH_VIENNAEUR) || defined(CONFIG_MACH_FLTESKT)
+	boost_uv=25000;
+	enable_boost=1;
+#endif
 	switch (read_cpuid_id()) {
 	case 0x511F04D0: /* KR28M2A20 */
 	case 0x511F04D1: /* KR28M2A21 */
@@ -732,8 +736,8 @@ static int clock_krait_8974_driver_probe(struct platform_device *pdev)
 	 * that the clocks have already been prepared and enabled by the time
 	 * they take over.
 	 */
-	clk_prepare_enable(&l2_clk.c);
 	for_each_online_cpu(cpu) {
+		clk_prepare_enable(&l2_clk.c);
 		WARN(clk_prepare_enable(cpu_clk[cpu]),
 			"Unable to turn on CPU%d clock", cpu);
 	}

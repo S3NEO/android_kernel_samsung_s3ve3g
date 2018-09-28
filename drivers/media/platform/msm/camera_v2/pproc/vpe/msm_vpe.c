@@ -25,8 +25,8 @@
 #include <media/v4l2-ioctl.h>
 #include <media/v4l2-subdev.h>
 #include <media/media-entity.h>
-#include <media/msmb_generic_buf_mgr.h>
 #include <media/msmb_pproc.h>
+#include <media/msmb_generic_buf_mgr.h>
 #include "msm_vpe.h"
 #include "msm_camera_io_util.h"
 
@@ -1282,15 +1282,6 @@ static long msm_vpe_subdev_ioctl(struct v4l2_subdev *sd,
 			return -EINVAL;
 		}
 
-		if ((u_stream_buff_info->num_buffs == 0) ||
-			(u_stream_buff_info->num_buffs >
-				MSM_CAMERA_MAX_STREAM_BUF)) {
-			pr_err("%s:%d: Invalid number of buffers\n", __func__,
-				__LINE__);
-			kfree(u_stream_buff_info);
-			mutex_unlock(&vpe_dev->mutex);
-			return -EINVAL;
-		}
 		k_stream_buff_info.num_buffs = u_stream_buff_info->num_buffs;
 		k_stream_buff_info.identity = u_stream_buff_info->identity;
 		k_stream_buff_info.buffer_info =
@@ -1332,11 +1323,6 @@ static long msm_vpe_subdev_ioctl(struct v4l2_subdev *sd,
 		struct msm_vpe_buff_queue_info_t *buff_queue_info;
 
 		VPE_DBG("VIDIOC_MSM_VPE_DEQUEUE_STREAM_BUFF_INFO\n");
-		if (ioctl_ptr->len != sizeof(uint32_t)) {
-			pr_err("%s:%d Invalid len\n", __func__, __LINE__);
-			mutex_unlock(&vpe_dev->mutex);
-			return -EINVAL;
-		}
 
 		rc = (copy_from_user(&identity,
 				(void __user *)ioctl_ptr->ioctl_ptr,
@@ -1434,7 +1420,6 @@ static long msm_vpe_subdev_do_ioctl(
 		struct vpe_device *vpe_dev = v4l2_get_subdevdata(sd);
 		struct msm_camera_v4l2_ioctl_t *ioctl_ptr = arg;
 		struct msm_vpe_frame_info_t inst_info;
-		memset(&inst_info, 0, sizeof(struct msm_vpe_frame_info_t));
 		for (i = 0; i < MAX_ACTIVE_VPE_INSTANCE; i++) {
 			if (vpe_dev->vpe_subscribe_list[i].vfh == vfh) {
 				inst_info.inst_id = i;

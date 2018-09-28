@@ -27,6 +27,7 @@ struct dsi_interface {
 	int (*on)(struct mdss_panel_data *pdata);
 	int (*off)(struct mdss_panel_data *pdata);
 	int (*cont_on)(struct mdss_panel_data *pdata);
+	int (*clk_ctrl)(struct mdss_panel_data *pdata, int enable);
 	void (*op_mode_config)(int mode, struct mdss_panel_data *pdata);
 	int (*tx)(struct mdss_panel_data *pdata,
 		struct dsi_buf *tp, struct dsi_cmd_desc *cmds, int cnt);
@@ -51,9 +52,7 @@ int dsi_cmds_tx_v2(struct mdss_panel_data *pdata,
 			int cnt);
 
 char *dsi_buf_init(struct dsi_buf *dp);
-
 int dsi_buf_alloc(struct dsi_buf *dp, int size);
-
 int dsi_cmd_dma_add(struct dsi_buf *dp, struct dsi_cmd_desc *cm);
 
 int dsi_short_read1_resp(struct dsi_buf *rp);

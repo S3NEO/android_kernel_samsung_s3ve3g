@@ -41,6 +41,20 @@
 /*
  * edp buffer operation
  */
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+static struct mdss_edp_drv_pdata *g_ep;
+
+void set_global_ep(struct mdss_edp_drv_pdata *ep)
+{
+	g_ep = ep;
+}
+
+struct mdss_edp_drv_pdata *get_global_ep(void)
+{
+	return g_ep;
+}
+#endif
+
 static char *edp_buf_init(struct edp_buf *eb, char *buf, int size)
 {
 	eb->start = buf;
@@ -129,6 +143,7 @@ static int edp_cmd_fifo_tx(struct edp_buf *tp, unsigned char *base)
 	u32 data;
 	char *dp;
 	int len, cnt;
+	u32 reg;
 
 	len = tp->len;	/* total byte to cmd fifo */
 	if (len == 0)
@@ -152,6 +167,10 @@ static int edp_cmd_fifo_tx(struct edp_buf *tp, unsigned char *base)
 	data = (tp->trans_num - 1);
 	if (tp->i2c)
 		data |= BIT(8); /* I2C */
+
+	/* To clear BIT(9) GO bit */
+	reg = edp_read(base + EDP_AUX_TRANS_CTRL);
+	edp_write(base + EDP_AUX_TRANS_CTRL, reg & (~(0x1 << 9)));
 
 	data |= BIT(9); /* GO */
 	pr_debug("%s: data=%x\n", __func__, data);
@@ -290,14 +309,21 @@ void edp_aux_native_handler(struct mdss_edp_drv_pdata *ep, u32 isr)
 
 	pr_debug("%s: isr=%x\n", __func__, isr);
 
-	if (isr & EDP_INTR_AUX_I2C_DONE)
+	if (isr & EDP_INTR_AUX_I2C_DONE) {
 		ep->aux_error_num = EDP_AUX_ERR_NONE;
-	else if (isr & EDP_INTR_WRONG_ADDR)
+	}
+	else if (isr & EDP_INTR_WRONG_ADDR) {
 		ep->aux_error_num = EDP_AUX_ERR_ADDR;
-	else if (isr & EDP_INTR_TIMEOUT)
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
+	else if (isr & EDP_INTR_TIMEOUT) {
 		ep->aux_error_num = EDP_AUX_ERR_TOUT;
-	if (isr & EDP_INTR_NACK_DEFER)
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
+	if (isr & EDP_INTR_NACK_DEFER) {
 		ep->aux_error_num = EDP_AUX_ERR_NACK;
+		pr_err("%s: isr=%x\n", __func__, isr);
+	}
 
 	complete(&ep->aux_comp);
 }
@@ -368,7 +394,6 @@ int edp_edid_buf_error(char *buf, int len)
 	char *bp;
 	int i;
 	char csum = 0;
-	int ret = 0;
 
 	bp = buf;
 	if (len < 128) {
@@ -389,7 +414,7 @@ int edp_edid_buf_error(char *buf, int len)
 		return -EINVAL;
 	}
 
-	return ret;
+	return 0;
 }
 
 
@@ -411,7 +436,7 @@ void edp_extract_edid_manufacturer(struct edp_edid *edid, char *buf)
 	edid->id_name[2] = 'A' + data - 1;
 	edid->id_name[3] = 0;
 
-	pr_debug("%s: edid manufacturer = %s", __func__, edid->id_name);
+	pr_info("%s: edid manufacturer = %s\n", __func__, edid->id_name);
 }
 
 void edp_extract_edid_product(struct edp_edid *edid, char *buf)
@@ -427,21 +452,21 @@ void edp_extract_edid_product(struct edp_edid *edid, char *buf)
 	data <<= 8;
 	edid->id_product |= data;
 
-	pr_debug("%s: edid product = 0x%x", __func__, edid->id_product);
+	pr_info("%s: edid product = 0x%x\n", __func__, edid->id_product);
 };
 
 void edp_extract_edid_version(struct edp_edid *edid, char *buf)
 {
 	edid->version = buf[0x12];
 	edid->revision = buf[0x13];
-	pr_debug("%s: edid version = %d.%d", __func__, edid->version,
+	pr_info("%s: edid version = %d.%d\n", __func__, edid->version,
 			edid->revision);
 };
 
 void edp_extract_edid_ext_block_cnt(struct edp_edid *edid, char *buf)
 {
 	edid->ext_block_cnt = buf[0x7e];
-	pr_debug("%s: edid extension = %d", __func__,
+	pr_debug("%s: edid extension = %d\n", __func__,
 			edid->ext_block_cnt);
 };
 
@@ -461,7 +486,7 @@ void edp_extract_edid_video_support(struct edp_edid *edid, char *buf)
 		pr_debug("%s: Digital Video intf=%d color_depth=%d\n",
 			 __func__, edid->video_intf, edid->color_depth);
 	} else {
-		pr_err("%s: Error, Analog video interface", __func__);
+		pr_err("%s: Error, Analog video interface\n", __func__);
 	}
 };
 
@@ -485,7 +510,7 @@ void edp_extract_edid_feature(struct edp_edid *edid, char *buf)
 		}
 	}
 
-	pr_debug("%s: edid dpm=%d color_format=%d", __func__,
+	pr_debug("%s: edid dpm=%d color_format=%d\n", __func__,
 			edid->dpm, edid->color_format);
 };
 
@@ -567,6 +592,7 @@ void edp_extract_edid_detailed_timing_description(struct edp_edid *edid,
 	dp->h_border = *bp++; /* byte 0x45 */
 	dp->v_border = *bp++; /* byte 0x46 */
 
+	/* progressive or interlaved */
 	dp->interlaced = *bp & 0x80; /* byte 0x47 */
 
 	dp->stereo = *bp & 0x60;
@@ -592,22 +618,22 @@ void edp_extract_edid_detailed_timing_description(struct edp_edid *edid,
 		}
 	}
 
-	pr_debug("%s: pixel_clock = %d\n", __func__, dp->pclk);
+	pr_info("%s: pixel_clock = %d\n", __func__, dp->pclk);
 
-	pr_debug("%s: horizontal=%d, blank=%d, porch=%d, sync=%d\n"
+	pr_info("%s: horizontal=%d, blank=%d, porch=%d, sync=%d\n"
 			, __func__, dp->h_addressable, dp->h_blank,
 			dp->h_fporch, dp->h_sync_pulse);
-	pr_debug("%s: vertical=%d, blank=%d, porch=%d, vsync=%d\n"
+	pr_info("%s: vertical=%d, blank=%d, porch=%d, vsync=%d\n"
 			, __func__, dp->v_addressable, dp->v_blank,
 			dp->v_fporch, dp->v_sync_pulse);
-	pr_debug("%s: panel size in mm, width=%d height=%d\n", __func__,
+	pr_info("%s: panel size in mm, width=%d height=%d\n", __func__,
 			dp->width_mm, dp->height_mm);
-	pr_debug("%s: panel border horizontal=%d vertical=%d\n", __func__,
+	pr_info("%s: panel border horizontal=%d vertical=%d\n", __func__,
 				dp->h_border, dp->v_border);
-	pr_debug("%s: flags: interlaced=%d stereo=%d sync_type=%d sync_sep=%d\n"
+	pr_info("%s: flags: interlaced=%d stereo=%d sync_type=%d sync_sep=%d\n"
 			, __func__, dp->interlaced, dp->stereo,
 			dp->sync_type, dp->sync_separate);
-	pr_debug("%s: polarity vsync=%d, hsync=%d", __func__,
+	pr_info("%s: polarity vsync=%d, hsync=%d", __func__,
 			dp->vsync_pol, dp->hsync_pol);
 }
 
@@ -634,6 +660,9 @@ void edp_extract_edid_detailed_timing_description(struct edp_edid *edid,
 
 static int edp_aux_chan_ready(struct mdss_edp_drv_pdata *ep)
 {
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+	return 1;
+#else
 	int cnt, ret;
 	char data = 0;
 
@@ -642,14 +671,16 @@ static int edp_aux_chan_ready(struct mdss_edp_drv_pdata *ep)
 		pr_debug("%s: ret=%d\n", __func__, ret);
 		if (ret >= 0)
 			break;
-		pr_debug("%s: failed in write\n", __func__);
 		msleep(100);
 	}
 
-	if (cnt == 0)
+	if (cnt <= 0) {
+		pr_err("%s: aux chan NOT ready\n", __func__);
 		return 0;
+	}
 
 	return 1;
+#endif
 }
 
 static int edp_sink_edid_read(struct mdss_edp_drv_pdata *ep, int block)
@@ -665,11 +696,11 @@ static int edp_sink_edid_read(struct mdss_edp_drv_pdata *ep, int block)
 	}
 
 	for (cnt = 5; cnt; cnt--) {
-		rlen = edp_aux_read_buf(ep, 0x50, 128, 1);
+	rlen = edp_aux_read_buf(ep, 0x50, 128, 1);
 		if (rlen > 0) {
 			pr_debug("%s: rlen=%d\n", __func__, rlen);
 
-			rp = &ep->rxp;
+	rp = &ep->rxp;
 			if (!edp_edid_buf_error(rp->data, rp->len))
 				break;
 		}
@@ -718,14 +749,15 @@ static void edp_sink_capability_read(struct mdss_edp_drv_pdata *ep,
 
 	data = *bp++; /* byte 1 */
 	/* 162, 270 and 540 MB, symbol rate, NOT bit rate */
-	cap->max_link_rate = data * 27;
+	cap->max_link_rate = data;
 	if (--rlen <= 0)
 		return;
-	pr_debug("%s: link_rate=%d\n", __func__, cap->max_link_rate);
+	pr_info("%s: link_rate=%d\n", __func__, cap->max_link_rate);
 
 	data = *bp++; /* byte 2 */
 	if (data & BIT(7))
-		cap->flags |=  DPCD_ENHANCED_FRAME;
+		cap->enhanced_frame++;
+
 	if (data & 0x40)
 		cap->flags |=  DPCD_TPS3;
 	data &= 0x0f;
@@ -789,7 +821,9 @@ static void edp_sink_capability_read(struct mdss_edp_drv_pdata *ep,
 	pr_debug("%s: scrambler_reset=%d\n", __func__,
 					cap->scrambler_reset);
 
-	cap->enhanced_frame = data & BIT(1);
+	if (data & BIT(1))
+		cap->enhanced_frame++;
+
 	pr_debug("%s: enhanced_framing=%d\n", __func__,
 					cap->enhanced_frame);
 	if (--rlen <= 0)
@@ -804,7 +838,7 @@ static void edp_sink_capability_read(struct mdss_edp_drv_pdata *ep,
 			 cap->training_read_interval);
 }
 
-static void edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
+static int edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
 {
 	char *bp;
 	char data;
@@ -815,9 +849,9 @@ static void edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
 	pr_debug("%s: len=%d", __func__, len);
 	/* skip byte 0x200 and 0x201 */
 	rlen = edp_aux_read_buf(ep, 0x202, len, 0);
-	if (rlen <= 0) {
+	if (rlen < len) {
 		pr_err("%s: edp aux read failed\n", __func__);
-		return;
+		return 0;
 	}
 	rp = &ep->rxp;
 	bp = rp->data;
@@ -825,26 +859,18 @@ static void edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
 
 	data = *bp++; /* byte 0x202 */
 	sp->lane_01_status = data; /* lane 0, 1 */
-	if (--rlen <= 0)
-		return;
 
 	data = *bp++; /* byte 0x203 */
 	sp->lane_23_status = data; /* lane 2, 3 */
-	if (--rlen <= 0)
-		return;
 
 	data = *bp++; /* byte 0x204 */
 	sp->interlane_align_done = (data & BIT(0));
 	sp->downstream_port_status_changed = (data & BIT(6));
 	sp->link_status_updated = (data & BIT(7));
-	if (--rlen <= 0)
-		return;
 
 	data = *bp++; /* byte 0x205 */
 	sp->port_0_in_sync = (data & BIT(0));
 	sp->port_1_in_sync = (data & BIT(1));
-	if (--rlen <= 0)
-		return;
 
 	data = *bp++; /* byte 0x206 */
 	sp->req_voltage_swing[0] = data & 0x03;
@@ -854,8 +880,6 @@ static void edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
 	sp->req_voltage_swing[1] = data & 0x03;
 	data >>= 2;
 	sp->req_pre_emphasis[1] = data & 0x03;
-	if (--rlen <= 0)
-		return;
 
 	data = *bp++; /* byte 0x207 */
 	sp->req_voltage_swing[2] = data & 0x03;
@@ -865,16 +889,23 @@ static void edp_link_status_read(struct mdss_edp_drv_pdata *ep, int len)
 	sp->req_voltage_swing[3] = data & 0x03;
 	data >>= 2;
 	sp->req_pre_emphasis[3] = data & 0x03;
+
+	return len;
 }
 
 static int edp_cap_lane_rate_set(struct mdss_edp_drv_pdata *ep)
 {
 	char buf[4];
 	int len = 0;
+	struct dpcd_cap *cap;
+
+	cap = &ep->dpcd;
 
 	pr_debug("%s: bw=%x lane=%d\n", __func__, ep->link_rate, ep->lane_cnt);
 	buf[0] = ep->link_rate;
 	buf[1] = ep->lane_cnt;
+	if (cap->enhanced_frame)
+		buf[1] |= 0x80;
 	len = edp_aux_write_buf(ep, 0x100, buf, 2, 0);
 
 	return len;
@@ -901,13 +932,6 @@ static int edp_lane_set_write(struct mdss_edp_drv_pdata *ep, int voltage_level,
 	return edp_aux_write_buf(ep, 0x103, buf, 4, 0);
 }
 
-static int edp_powerstate_write(struct mdss_edp_drv_pdata *ep,
-					char powerstate)
-{
-	pr_debug("%s: state=%d\n", __func__, powerstate);
-	return edp_aux_write_buf(ep, 0x600, &powerstate, 1, 0);
-}
-
 static int edp_train_pattern_set_write(struct mdss_edp_drv_pdata *ep,
 						int pattern)
 {
@@ -922,8 +946,6 @@ static int edp_sink_clock_recovery_done(struct mdss_edp_drv_pdata *ep)
 {
 	u32 mask;
 	u32 data;
-
-	pr_debug("%s:\n", __func__);
 
 	if (ep->lane_cnt == 1) {
 		mask = 0x01;	/* lane 0 */
@@ -953,8 +975,10 @@ static int edp_sink_channel_eq_done(struct mdss_edp_drv_pdata *ep)
 
 	pr_debug("%s:\n", __func__);
 
-	if (!ep->link_status.interlane_align_done) /* not align */
+	if (!ep->link_status.interlane_align_done) { /* not align */
+		pr_err("%s: interlane align failed\n", __func__);
 		return 0;
+	}
 
 	if (ep->lane_cnt == 1) {
 		mask = 0x7;
@@ -1084,6 +1108,11 @@ static int edp_start_link_train_1(struct mdss_edp_drv_pdata *ep)
 	while (1) {
 		usleep(ep->dpcd.training_read_interval);
 
+		if (edp_read(ep->base + EDP_MAINLINK_READY) & BIT(3))
+			pr_debug("%s: Training pattern 1 was sent properly\n", __func__);
+		else
+			pr_err("%s: Error in sending training pattern 1 value : 0x%x\n", __func__, edp_read(ep->base + EDP_MAINLINK_READY) );
+
 		edp_link_status_read(ep, 6);
 		if (edp_sink_clock_recovery_done(ep)) {
 			ret = 0;
@@ -1134,6 +1163,11 @@ static int edp_start_link_train_2(struct mdss_edp_drv_pdata *ep)
 	while (1) {
 		usleep(ep->dpcd.training_read_interval);
 
+		if (edp_read(ep->base + 0x84) & BIT(4))
+			pr_debug("%s: Training pattern 2 was sent properly\n", __func__);
+		else
+			pr_err("%s: Error in sending training pattern 2\n", __func__);
+
 		edp_link_status_read(ep, 6);
 
 		if (edp_sink_channel_eq_done(ep)) {
@@ -1154,8 +1188,53 @@ static int edp_start_link_train_2(struct mdss_edp_drv_pdata *ep)
 	return ret;
 }
 
-static int edp_link_rate_shift(struct mdss_edp_drv_pdata *ep)
+static int edp_link_rate_down_shift(struct mdss_edp_drv_pdata *ep)
 {
+	u32 prate, lrate;
+	int rate, lane, max_lane;
+	int changed = 0;
+
+	rate = ep->link_rate;
+	lane = ep->lane_cnt;
+	max_lane = ep->dpcd.max_lane_count;
+
+	prate = ep->pixel_rate;
+	prate /= 1000;	/* avoid using 64 biits */
+	prate *= ep->bpp;
+	prate /= 8; /* byte */
+
+#if !defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+	/* 
+		Link rate is fixed to 2.7G for eDP panel.
+	*/
+
+	if (rate > EDP_LINK_RATE_162 && rate <= EDP_LINK_RATE_MAX) {
+		rate -= 4;		/* reduce rate */
+		changed++;
+	}
+#endif	
+
+	if (changed) {
+		if (lane >= 1 && lane < max_lane)
+			lane <<= 1;	/* increase lane */
+
+		lrate = 270000000; /* 270M */
+		lrate /= 1000; /* avoid using 64 bits */
+		lrate *= rate;
+		lrate /= 10; /* byte, 10 bits --> 8 bits */
+		lrate *= lane;
+
+		pr_info("%s: new lrate=%u prate=%u rate=%d lane=%d p=%d b=%d\n",
+		__func__, lrate, prate, rate, lane, ep->pixel_rate, ep->bpp);
+
+		if (lrate > prate) {
+			ep->link_rate = rate;
+			ep->lane_cnt = lane;
+			pr_info("%s: new rate=%d %d\n", __func__, rate, lane);
+			return 0;
+		}
+	}
+
 	/* add calculation later */
 	return -EINVAL;
 }
@@ -1172,7 +1251,8 @@ static int edp_aux_link_train(struct mdss_edp_drv_pdata *ep)
 {
 	int ret = 0;
 
-	pr_debug("%s", __func__);
+	pr_info("%s", __func__);
+	ep->dpcd.training_read_interval = 1000;
 	ret = edp_aux_chan_ready(ep);
 	if (ret == 0) {
 		pr_err("%s: LINK Train failed: aux chan NOT ready\n", __func__);
@@ -1180,23 +1260,23 @@ static int edp_aux_link_train(struct mdss_edp_drv_pdata *ep)
 		return ret;
 	}
 
-	/* start with max rate and lane */
-	ep->lane_cnt = ep->dpcd.max_lane_count;
-	ep->link_rate = ep->dpcd.max_link_rate;
 	edp_write(ep->base + EDP_MAINLINK_CTRL, 0x1);
+
+	mdss_edp_sink_power_state(ep, SINK_POWER_ON);
 
 train_start:
 	ep->v_level = 0; /* start from default level */
 	ep->p_level = 0;
 	edp_cap_lane_rate_set(ep);
+	mdss_edp_config_ctrl(ep);
+	mdss_edp_lane_power_ctrl(ep, 1);
 
 	edp_clear_training_pattern(ep);
 	usleep(ep->dpcd.training_read_interval);
-	edp_powerstate_write(ep, 1);
 
 	ret = edp_start_link_train_1(ep);
 	if (ret < 0) {
-		if (edp_link_rate_shift(ep) == 0) {
+		if (edp_link_rate_down_shift(ep) == 0) {
 			goto train_start;
 		} else {
 			pr_err("%s: Training 1 failed", __func__);
@@ -1205,12 +1285,15 @@ train_start:
 		}
 	}
 
-	pr_debug("%s: Training 1 completed successfully", __func__);
-
+	/* recovery_done : 0x1111*/
+	pr_info("%s: Training 1 completed successfully recovery_done : 0x%x", __func__,
+		(ep->link_status.lane_23_status << 8) | ep->link_status.lane_01_status);
+#if !defined(CONFIG_FB_MSM_EDP_SAMSUNG)
 	edp_clear_training_pattern(ep);
+#endif
 	ret = edp_start_link_train_2(ep);
 	if (ret < 0) {
-		if (edp_link_rate_shift(ep) == 0) {
+		if (edp_link_rate_down_shift(ep) == 0) {
 			goto train_start;
 		} else {
 			pr_err("%s: Training 2 failed", __func__);
@@ -1219,8 +1302,11 @@ train_start:
 		}
 	}
 
-	pr_debug("%s: Training 2 completed successfully", __func__);
+	/* recovery_done : 0x7777*/
+	pr_info("%s: Training 2 completed successfully eq_done : 0x%x v_level : %d p_level : %d", __func__,
+		(ep->link_status.lane_23_status << 8) | ep->link_status.lane_01_status, ep->v_level, ep->p_level);
 
+	mdss_edp_state_ctrl(ep, ST_SEND_VIDEO);
 clear:
 	edp_clear_training_pattern(ep);
 
@@ -1233,9 +1319,33 @@ void mdss_edp_dpcd_cap_read(struct mdss_edp_drv_pdata *ep)
 	edp_sink_capability_read(ep, 16);
 }
 
-void mdss_edp_dpcd_status_read(struct mdss_edp_drv_pdata *ep)
+int mdss_edp_dpcd_status_read(struct mdss_edp_drv_pdata *ep)
 {
-	edp_link_status_read(ep, 6);
+	struct dpcd_link_status *sp;
+	int ret = 0; /* not sync */
+
+	ret = edp_link_status_read(ep, 6);
+
+	if (ret) {
+		sp = &ep->link_status;
+		ret = sp->port_0_in_sync; /* 1 == sync */
+	}
+
+	return ret;
+}
+
+void mdss_edp_fill_link_cfg(struct mdss_edp_drv_pdata *ep)
+{
+	struct display_timing_desc *dp;
+
+	dp = &ep->edid.timing[0];
+	ep->pixel_rate = dp->pclk;
+	ep->lane_cnt = ep->dpcd.max_lane_count;
+	ep->link_rate = ep->dpcd.max_link_rate;
+
+	pr_debug("%s: pclk=%d rate=%d lane=%d\n", __func__,
+		ep->pixel_rate, ep->link_rate, ep->lane_cnt);
+
 }
 
 void mdss_edp_edid_read(struct mdss_edp_drv_pdata *ep, int block)
@@ -1243,17 +1353,160 @@ void mdss_edp_edid_read(struct mdss_edp_drv_pdata *ep, int block)
 	edp_sink_edid_read(ep, block);
 }
 
+int mdss_edp_sink_power_state(struct mdss_edp_drv_pdata *ep, char state)
+{
+	int ret;
+
+	ret = edp_aux_write_buf(ep, 0x600, &state, 1, 0);
+	pr_info("%s: state=%d ret=%d\n", __func__, state, ret);
+	return ret;
+}
+
 int mdss_edp_link_train(struct mdss_edp_drv_pdata *ep)
 {
 	return edp_aux_link_train(ep);
 }
+
+void mdss_edp_aux_setup(struct mdss_edp_drv_pdata *ep)
+{
+	mutex_init(&ep->aux_mutex);
+	init_completion(&ep->aux_comp);
+
+	edp_buf_init(&ep->txp, ep->txbuf, sizeof(ep->txbuf));
+	edp_buf_init(&ep->rxp, ep->rxbuf, sizeof(ep->rxbuf));
+}
+
+#if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
+int aux_tx(int addr, char *data, int len)
+{
+	struct mdss_edp_drv_pdata *ep = get_global_ep();
+
+	if (!ep) {
+		pr_info("%s error", __func__);
+		return -1;
+	}
+
+	return edp_aux_write_buf(ep, addr, data, len, 0);
+}
+
+#if defined(CONFIG_MACH_VIENNAATT)
+void tcon_interanl_clock(void)
+{
+	/* ATT needs 577Mbps internal clock */
+	char data[3];
+
+	data[0] = 0x03; data[1] = 0xBB; data[2] = 0x27;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2A; data[2] = 0x34;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2B; data[2] = 0x6D;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x32; data[2] = 0x34;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x33; data[2] = 0x6D;
+	aux_tx(0x491, data, 3);
+}
+#elif defined(CONFIG_MACH_PICASSO_SPR)
+void tcon_interanl_clock(void)
+{
+	/* SPR needs 900Mbps internal clock */
+	char data[3];
+
+	//900Mbps
+	data[0] = 0x03; data[1] = 0xBB; data[2] = 0x26;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2A; data[2] = 0x28;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2B; data[2] = 0x43;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2E; data[2] = 0x28;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x2F; data[2] = 0x43;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x32; data[2] = 0x28;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x33; data[2] = 0x43;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x36; data[2] = 0x28;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x37; data[2] = 0x43;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x46; data[2] = 0x28;
+	aux_tx(0x491, data, 3);
+
+	data[0] = 0x05; data[1] = 0x47; data[2] = 0x43;
+	aux_tx(0x491, data, 3);
+
+}
+#else
+void tcon_interanl_clock(void)
+{
+	pr_debug("%s not change tcon internal clock", __func__);
+}
+#endif
+
+void read_firmware_version(char *string)
+{
+	struct mdss_edp_drv_pdata *ep = get_global_ep();
+	char *bp;
+	struct edp_buf *rp;
+	unsigned char data[4];
+	int read_size = 8;
+
+	if (!ep) {
+		pr_info("%s error", __func__);
+		return ;
+	}
+
+	rp = &ep->rxp;
+	bp = rp->data;
+
+	/* Indirect mode read eeprom*/
+	data[0] = 0x51;
+	data[1] = 0x0F; //MSB ADDR
+	data[2] = 0xEC; //LSB ADDR
+	data[3] = 0xC1;
+	edp_aux_write_buf(ep, 0x45C, data, 4, 0);
+	usleep(1000);
+	edp_aux_read_buf(ep, 0x454, read_size, 0);
+	memcpy(string, bp, read_size);
+
+	data[0] = 0x51;
+	data[1] = 0x0F; //MSB ADDR
+	data[2] = 0xF4; //LSB ADDR
+	data[3] = 0xC1;
+	edp_aux_write_buf(ep, 0x45C, data, 4, 0);
+
+	usleep(1000);
+	edp_aux_read_buf(ep, 0x454, read_size, 0);
+	memcpy(string + read_size, bp, read_size);
+
+	string[16] = '\0';
+}
+#endif
 
 void mdss_edp_aux_init(struct mdss_edp_drv_pdata *ep)
 {
 	mutex_init(&ep->aux_mutex);
 	init_completion(&ep->aux_comp);
 	init_completion(&ep->train_comp);
+	init_completion(&ep->idle_comp);
+	init_completion(&ep->video_comp);
 	complete(&ep->train_comp); /* make non block at first time */
+	complete(&ep->video_comp); /* make non block at first time */
 
 	edp_buf_init(&ep->txp, ep->txbuf, sizeof(ep->txbuf));
 	edp_buf_init(&ep->rxp, ep->rxbuf, sizeof(ep->rxbuf));

@@ -3029,8 +3029,8 @@ static int a3xx_rb_init(struct adreno_device *adreno_dev,
 	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000001);
 	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000000);
 	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000000);
-	/* Protected mode control - turned off for A3XX */
-	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000000);
+	/* Enable protected mode */
+	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x20000000);
 	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000000);
 	GSL_RB_WRITE(rb->device, cmds, cmds_gpu, 0x00000000);
 
@@ -3092,9 +3092,16 @@ static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
 	case A3XX_INT_CP_HW_FAULT:
 		err = "ringbuffer hardware fault";
 		break;
-	case A3XX_INT_CP_REG_PROTECT_FAULT:
-		err = "ringbuffer protected mode error interrupt";
-		break;
+	case A3XX_INT_CP_REG_PROTECT_FAULT: {
+		unsigned int reg;
+		kgsl_regread(device, A3XX_CP_PROTECT_STATUS, &reg);
+
+		KGSL_DRV_CRIT(device,
+			"CP | Protected mode error| %s | addr=%x\n",
+			reg & (1 << 24) ? "WRITE" : "READ",
+			(reg & 0x1FFFF) >> 2);
+		goto done;
+	}
 	case A3XX_INT_CP_AHB_ERROR_HALT:
 		err = "ringbuffer AHB error interrupt";
 		break;
@@ -3654,7 +3661,7 @@ void a3xx_busy_cycles(struct adreno_device *adreno_dev,
 					&busy->gpu_busy);
 	if (device->pwrctrl.bus_control) {
 		data->vbif_ram_cycles = counter_delta(adreno_dev,
-					A3XX_VBIF_PERF_CNT0_LO,
+					adreno_dev->ram_cycles_lo,
 					&busy->vbif_ram_cycles);
 		data->vbif_starved_ram = counter_delta(adreno_dev,
 					A3XX_VBIF_PERF_PWR_CNT0_LO,
@@ -3945,9 +3952,11 @@ static struct adreno_perfcount_group a3xx_perfcounter_groups[] = {
 	ADRENO_PERFCOUNTER_GROUP(a3xx, tp),
 	ADRENO_PERFCOUNTER_GROUP(a3xx, sp),
 	ADRENO_PERFCOUNTER_GROUP(a3xx, rb),
-	ADRENO_PERFCOUNTER_GROUP(a3xx, pwr),
+	ADRENO_PERFCOUNTER_GROUP_FLAGS(a3xx, pwr,
+		ADRENO_PERFCOUNTER_GROUP_FIXED),
 	ADRENO_PERFCOUNTER_GROUP(a3xx, vbif),
-	ADRENO_PERFCOUNTER_GROUP(a3xx, vbif_pwr),
+	ADRENO_PERFCOUNTER_GROUP_FLAGS(a3xx, vbif_pwr,
+		ADRENO_PERFCOUNTER_GROUP_FIXED),
 };
 
 static struct adreno_perfcounters a3xx_perfcounters = {
@@ -4075,6 +4084,7 @@ static void a3xx_perfcounter_close(struct adreno_device *adreno_dev)
 static int a3xx_perfcounter_init(struct adreno_device *adreno_dev)
 {
 	int ret;
+	struct kgsl_device *device = &adreno_dev->dev;
 	/* SP[3] counter is broken on a330 so disable it if a330 device */
 	if (adreno_is_a330(adreno_dev))
 		a3xx_perfcounters_sp[3].countable = KGSL_PERFCOUNTER_BROKEN;
@@ -4086,14 +4096,18 @@ static int a3xx_perfcounter_init(struct adreno_device *adreno_dev)
 	ret = adreno_perfcounter_get(adreno_dev, KGSL_PERFCOUNTER_GROUP_PWR, 1,
 			NULL, PERFCOUNTER_FLAG_KERNEL);
 
-	/* VBIF waiting for RAM */
-	ret |= adreno_perfcounter_get(adreno_dev,
+	if (device->pwrctrl.bus_control) {
+		/* VBIF waiting for RAM */
+		ret |= adreno_perfcounter_get(adreno_dev,
 				KGSL_PERFCOUNTER_GROUP_VBIF_PWR, 0,
 				NULL, PERFCOUNTER_FLAG_KERNEL);
-	/* VBIF DDR cycles */
-	ret |= adreno_perfcounter_get(adreno_dev, KGSL_PERFCOUNTER_GROUP_VBIF,
-				VBIF_AXI_TOTAL_BEATS, NULL,
+		/* VBIF DDR cycles */
+		ret |= adreno_perfcounter_get(adreno_dev,
+				KGSL_PERFCOUNTER_GROUP_VBIF,
+				VBIF_AXI_TOTAL_BEATS,
+				&adreno_dev->ram_cycles_lo,
 				PERFCOUNTER_FLAG_KERNEL);
+	}
 
 	/* Default performance counter profiling to false */
 	adreno_dev->profile.enabled = false;
@@ -4108,29 +4122,36 @@ static int a3xx_perfcounter_init(struct adreno_device *adreno_dev)
  */
 static void a3xx_protect_init(struct kgsl_device *device)
 {
+	int index = 0;
+
 	/* enable access protection to privileged registers */
 	kgsl_regwrite(device, A3XX_CP_PROTECT_CTRL, 0x00000007);
 
 	/* RBBM registers */
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_0, 0x63000040);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_1, 0x62000080);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_2, 0x600000CC);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_3, 0x60000108);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_4, 0x64000140);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_5, 0x66000400);
+	adreno_set_protected_registers(device, &index, 0x18, 0);
+	adreno_set_protected_registers(device, &index, 0x20, 2);
+	adreno_set_protected_registers(device, &index, 0x33, 0);
+	adreno_set_protected_registers(device, &index, 0x42, 0);
+	adreno_set_protected_registers(device, &index, 0x50, 4);
+	adreno_set_protected_registers(device, &index, 0x63, 0);
+	adreno_set_protected_registers(device, &index, 0x100, 4);
 
 	/* CP registers */
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_6, 0x65000700);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_7, 0x610007D8);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_8, 0x620007E0);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_9, 0x61001178);
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_A, 0x64001180);
+	adreno_set_protected_registers(device, &index, 0x1C0, 5);
+	adreno_set_protected_registers(device, &index, 0x1EC, 1);
+	adreno_set_protected_registers(device, &index, 0x1F6, 1);
+	adreno_set_protected_registers(device, &index, 0x1F8, 2);
+	adreno_set_protected_registers(device, &index, 0x45E, 2);
+	adreno_set_protected_registers(device, &index, 0x460, 4);
 
 	/* RB registers */
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_B, 0x60003300);
+	adreno_set_protected_registers(device, &index, 0xCC0, 0);
 
 	/* VBIF registers */
-	kgsl_regwrite(device, A3XX_CP_PROTECT_REG_C, 0x6B00C000);
+	adreno_set_protected_registers(device, &index, 0x3000, 6);
+
+	/* SMMU registers */
+	adreno_set_protected_registers(device, &index, 0x4000, 14);
 }
 
 static void a3xx_start(struct adreno_device *adreno_dev)
@@ -4201,10 +4222,7 @@ static void a3xx_start(struct adreno_device *adreno_dev)
 	a3xx_protect_init(device);
 
 	/* Turn on performance counters */
-	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_CTL, RBBM_PERF_ENABLE_MASK);
-	kgsl_regwrite(device, A3XX_VBIF_PERF_CNT_SEL,
-			_SET(VBIF_PERF_CNT_0_SEL, VBIF_AXI_TOTAL_BEATS));
-	kgsl_regwrite(device, A3XX_VBIF_PERF_CNT_EN, VBIF_PERF_MASK);
+	kgsl_regwrite(device, A3XX_RBBM_PERFCTR_CTL, 0x01);
 
 	/* the CP_DEBUG register offset and value are same as A2XX */
 	kgsl_regwrite(device, REG_CP_DEBUG, A2XX_CP_DEBUG_DEFAULT);

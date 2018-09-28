@@ -26,11 +26,57 @@
 #define CDBG(fmt, args...) do { } while (0)
 #endif
 
-extern int32_t msm_led_torch_create_classdev(
-				struct platform_device *pdev, void *data);
-
-static enum flash_type flashtype;
 static struct msm_led_flash_ctrl_t fctrl;
+
+extern struct class *camera_class; /*sys/class/camera*/
+struct device *flash_dev;
+
+static ssize_t qpnp_led_flash(struct device *dev,
+	 struct device_attribute *attr, const char *buf, size_t size)
+{
+	int tmp;
+	uint32_t i;
+	sscanf(buf, "%i", &tmp);
+	CDBG("sysfs node: %d\n", tmp);
+	switch (tmp) {
+	case MSM_CAMERA_LED_OFF:
+		fctrl.rear_flash_status=MSM_CAMERA_LED_OFF;
+		for (i = 0; i < fctrl.num_sources; i++)
+			if (fctrl.flash_trigger[i])
+				led_trigger_event(fctrl.flash_trigger[i], 0);
+		if (fctrl.torch_trigger)
+			led_trigger_event(fctrl.torch_trigger, 0);
+		break;
+
+	case MSM_CAMERA_LED_LOW:
+		fctrl.rear_flash_status=MSM_CAMERA_LED_LOW;
+		if (fctrl.torch_trigger)
+			led_trigger_event(fctrl.torch_trigger, fctrl.torch_op_current);
+		break;
+
+	case MSM_CAMERA_LED_HIGH:
+		fctrl.rear_flash_status=MSM_CAMERA_LED_HIGH;
+		for (i = 0; i < fctrl.num_sources; i++)
+			if (fctrl.flash_trigger[i])
+				led_trigger_event(fctrl.flash_trigger[i], 0);
+		if (fctrl.torch_trigger)
+			led_trigger_event(fctrl.torch_trigger, 0);
+		break;
+
+	default:
+		fctrl.rear_flash_status=MSM_CAMERA_LED_OFF;
+		for (i = 0; i < fctrl.num_sources; i++)
+			if (fctrl.flash_trigger[i])
+				led_trigger_event(fctrl.flash_trigger[i], 0);
+		if (fctrl.torch_trigger)
+			led_trigger_event(fctrl.torch_trigger, 0);
+		break;
+	}
+    return strnlen(buf, size);
+}
+
+static DEVICE_ATTR(rear_flash, S_IWUSR|S_IWGRP|S_IROTH,
+	NULL, qpnp_led_flash);
 
 static int32_t msm_led_trigger_get_subdev_id(struct msm_led_flash_ctrl_t *fctrl,
 	void *arg)
@@ -44,7 +90,46 @@ static int32_t msm_led_trigger_get_subdev_id(struct msm_led_flash_ctrl_t *fctrl,
 	CDBG("%s:%d subdev_id %d\n", __func__, __LINE__, *subdev_id);
 	return 0;
 }
+#if defined(CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_VICTORLTE_CTC)
+int32_t s5k4ecgx_set_flash(int mode)
+{
+	uint32_t i;
+	switch (mode) {
+	case MSM_CAMERA_LED_OFF:
+	fctrl.rear_flash_status=MSM_CAMERA_LED_OFF;
+	for (i = 0; i < fctrl.num_sources; i++)
+	if (fctrl.flash_trigger[i])
+		led_trigger_event(fctrl.flash_trigger[i], 0);
+	if (fctrl.torch_trigger)
+		led_trigger_event(fctrl.torch_trigger, 0);
+	break;
 
+	case MSM_CAMERA_LED_LOW:
+	fctrl.rear_flash_status=MSM_CAMERA_LED_LOW;
+	if (fctrl.torch_trigger)
+		led_trigger_event(fctrl.torch_trigger, fctrl.torch_op_current);
+	break;
+	case MSM_CAMERA_LED_HIGH:
+	fctrl.rear_flash_status=MSM_CAMERA_LED_HIGH;
+	if (fctrl.torch_trigger)
+		led_trigger_event(fctrl.torch_trigger, 0);
+	for (i = 0; i < fctrl.num_sources; i++)
+	if (fctrl.flash_trigger[i])
+		led_trigger_event(fctrl.flash_trigger[i], fctrl.flash_op_current[i]);
+	break;
+	default:
+	fctrl.rear_flash_status=MSM_CAMERA_LED_OFF;
+	for (i = 0; i < fctrl.num_sources; i++)
+	if (fctrl.flash_trigger[i])
+		led_trigger_event(fctrl.flash_trigger[i], 0);
+	if (fctrl.torch_trigger)
+		led_trigger_event(fctrl.torch_trigger, 0);
+	break;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(s5k4ecgx_set_flash);
+#endif
 static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 	void *data)
 {
@@ -56,6 +141,11 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 	if (!fctrl) {
 		pr_err("failed\n");
 		return -EINVAL;
+	}
+	if(fctrl->rear_flash_status == MSM_CAMERA_LED_LOW || fctrl->rear_flash_status == MSM_CAMERA_LED_HIGH)
+	{
+		printk("Dont handle flash..rear_flash is set\n");
+		return rc;
 	}
 
 	switch (cfg->cfgtype) {
@@ -120,7 +210,6 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 	struct device_node *of_node = pdev->dev.of_node;
 	struct device_node *flash_src_node = NULL;
 	uint32_t count = 0;
-	struct led_trigger *temp = NULL;
 
 	CDBG("called\n");
 
@@ -139,18 +228,11 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 	}
 	CDBG("pdev id %d\n", pdev->id);
 
-	rc = of_property_read_u32(of_node,
-			"qcom,flash-type", &flashtype);
-	if (rc < 0) {
-		pr_err("flash-type: read failed\n");
-		return -EINVAL;
-	}
-
 	if (of_get_property(of_node, "qcom,flash-source", &count)) {
 		count /= sizeof(uint32_t);
 		CDBG("count %d\n", count);
 		if (count > MAX_LED_TRIGGERS) {
-			pr_err("invalid count\n");
+			pr_err("failed\n");
 			return -EINVAL;
 		}
 		fctrl.num_sources = count;
@@ -166,7 +248,7 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 				"linux,default-trigger",
 				&fctrl.flash_trigger_name[i]);
 			if (rc < 0) {
-				pr_err("default-trigger: read failed\n");
+				pr_err("failed\n");
 				of_node_put(flash_src_node);
 				continue;
 			}
@@ -174,18 +256,12 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 			CDBG("default trigger %s\n",
 				fctrl.flash_trigger_name[i]);
 
-			if (flashtype == GPIO_FLASH) {
-				/* use fake current */
-				fctrl.flash_op_current[i] = LED_FULL;
-			} else {
-				rc = of_property_read_u32(flash_src_node,
-					"qcom,current",
-					&fctrl.flash_op_current[i]);
-				if (rc < 0) {
-					pr_err("current: read failed\n");
-					of_node_put(flash_src_node);
-					continue;
-				}
+			rc = of_property_read_u32(flash_src_node,
+				"qcom,current", &fctrl.flash_op_current[i]);
+			if (rc < 0) {
+				pr_err("failed rc %d\n", rc);
+				of_node_put(flash_src_node);
+				continue;
 			}
 
 			of_node_put(flash_src_node);
@@ -195,10 +271,6 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 
 			led_trigger_register_simple(fctrl.flash_trigger_name[i],
 				&fctrl.flash_trigger[i]);
-
-			if (flashtype == GPIO_FLASH)
-				if (fctrl.flash_trigger[i])
-					temp = fctrl.flash_trigger[i];
 		}
 
 		/* Torch source */
@@ -209,47 +281,42 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 				"linux,default-trigger",
 				&fctrl.torch_trigger_name);
 			if (rc < 0) {
-				pr_err("default-trigger: read failed\n");
-				goto torch_failed;
-			}
-
-			CDBG("default trigger %s\n",
-				fctrl.torch_trigger_name);
-
-			if (flashtype == GPIO_FLASH) {
-				/* use fake current */
-				fctrl.torch_op_current = LED_FULL;
-				if (temp)
-					fctrl.torch_trigger = temp;
-				else
-					led_trigger_register_simple(
-						fctrl.torch_trigger_name,
-						&fctrl.torch_trigger);
+				pr_err("failed\n");
 			} else {
+				CDBG("default trigger %s\n",
+					fctrl.torch_trigger_name);
+
 				rc = of_property_read_u32(flash_src_node,
 					"qcom,current",
 					&fctrl.torch_op_current);
 				if (rc < 0) {
-					pr_err("current: read failed\n");
-					goto torch_failed;
+					pr_err("failed rc %d\n", rc);
+				} else {
+					CDBG("torch max_current %d\n",
+						fctrl.torch_op_current);
+
+					led_trigger_register_simple(
+						fctrl.torch_trigger_name,
+						&fctrl.torch_trigger);
 				}
-
-				CDBG("torch max_current %d\n",
-					fctrl.torch_op_current);
-
-				led_trigger_register_simple(
-					fctrl.torch_trigger_name,
-					&fctrl.torch_trigger);
 			}
-torch_failed:
 			of_node_put(flash_src_node);
 		}
 	}
-
 	rc = msm_led_flash_create_v4lsubdev(pdev, &fctrl);
-	if (!rc)
-		msm_led_torch_create_classdev(pdev, &fctrl);
 
+	if (!IS_ERR(camera_class)) {
+		flash_dev = device_create(camera_class, NULL, 0, NULL, "flash");
+		if (flash_dev < 0)
+			pr_err("Failed to create device(flash)!\n");
+
+		if (device_create_file(flash_dev, &dev_attr_rear_flash) < 0) {
+			pr_err("failed to create device file, %s\n",
+			   dev_attr_rear_flash.attr.name);
+		}
+
+	} else
+		pr_err("Failed to create device(flash) because of nothing camera class!\n");
 	return rc;
 }
 

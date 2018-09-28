@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,7 @@
 
 #include "msm-pcm-routing-v2.h"
 #include "audio_ocmem.h"
+#include "msm-audio-effects-q6-v2.h"
 
 #define DSP_PP_BUFFERING_IN_MSEC	25
 #define PARTIAL_DRAIN_ACK_EARLY_BY_MSEC	150
@@ -65,12 +66,16 @@ struct msm_compr_gapless_state {
 	int32_t stream_opened[2];
 	uint32_t initial_samples_drop;
 	uint32_t trailing_samples_drop;
+	uint32_t gapless_transition;
+	bool use_dsp_gapless_mode;
 };
 
 struct msm_compr_pdata {
 	atomic_t audio_ocmem_req;
 	struct snd_compr_stream *cstream[MSM_FRONTEND_DAI_MAX];
 	uint32_t volume[MSM_FRONTEND_DAI_MAX][2]; /* For both L & R */
+	struct msm_compr_audio_effects *audio_effects[MSM_FRONTEND_DAI_MAX];
+	bool use_dsp_gapless_mode;
 };
 
 struct msm_compr_audio {
@@ -109,6 +114,7 @@ struct msm_compr_audio {
 	atomic_t xrun;
 	atomic_t close;
 	atomic_t wait_on_close;
+	atomic_t error;
 
 	wait_queue_head_t eos_wait;
 	wait_queue_head_t drain_wait;
@@ -116,6 +122,13 @@ struct msm_compr_audio {
 	wait_queue_head_t close_wait;
 
 	spinlock_t lock;
+};
+
+struct msm_compr_audio_effects {
+	struct bass_boost_params bass_boost;
+	struct virtualizer_params virtualizer;
+	struct reverb_params reverb;
+	struct eq_params equalizer;
 };
 
 static int msm_compr_set_volume(struct snd_compr_stream *cstream,
@@ -164,17 +177,11 @@ static int msm_compr_send_buffer(struct msm_compr_audio *prtd)
 
 	pr_debug("%s: bytes_received = %d copied_total = %d\n",
 		__func__, prtd->bytes_received, prtd->copied_total);
-	/*
-	 * FIXME: Initial and trailing silence removal API call to DSP results
-	 *	to a glitch during the stream transition for gapless playback.
-	 *	Add this when the issue is fixed from DSP.
-	 */
-/*
-	if (prtd->first_buffer)
+	if (prtd->first_buffer &&  prtd->gapless_state.use_dsp_gapless_mode)
 		q6asm_send_meta_data(prtd->audio_client,
 				prtd->gapless_state.initial_samples_drop,
 				prtd->gapless_state.trailing_samples_drop);
-*/
+
 	buffer_length = prtd->codec_param.buffer.fragment_size;
 	bytes_available = prtd->bytes_received - prtd->copied_total;
 	if (bytes_available < prtd->codec_param.buffer.fragment_size)
@@ -354,6 +361,14 @@ static void compr_event_handler(uint32_t opcode,
 	case ASM_SESSION_CMDRSP_GET_SESSIONTIME_V3:
 		pr_debug("ASM_SESSION_CMDRSP_GET_SESSIONTIME_V3\n");
 		break;
+	case RESET_EVENTS:
+		pr_err("Received reset events CB, move to error state");
+		spin_lock(&prtd->lock);
+		snd_compr_fragment_elapsed(cstream);
+		prtd->copied_total = prtd->bytes_received;
+		atomic_set(&prtd->error, 1);
+		spin_unlock(&prtd->lock);
+		break;
 	default:
 		pr_debug("Not Supported Event opcode[0x%x]\n", opcode);
 		break;
@@ -436,7 +451,8 @@ static int msm_compr_configure_dsp(struct snd_compr_stream *cstream)
 	pr_debug("%s\n", __func__);
 	ret = q6asm_stream_open_write_v2(ac,
 				prtd->codec, bits_per_sample,
-				ac->stream_id, true/*gapless*/);
+				ac->stream_id,
+				prtd->gapless_state.use_dsp_gapless_mode);
 	if (ret < 0) {
 		pr_err("%s: Session out open failed\n", __func__);
 		 return -ENOMEM;
@@ -514,10 +530,18 @@ static int msm_compr_open(struct snd_compr_stream *cstream)
 
 	prtd->cstream = cstream;
 	pdata->cstream[rtd->dai_link->be_id] = cstream;
+	pdata->audio_effects[rtd->dai_link->be_id] =
+		 kzalloc(sizeof(struct msm_compr_audio_effects), GFP_KERNEL);
+	if (!pdata->audio_effects[rtd->dai_link->be_id]) {
+		pr_err("%s: Could not allocate memory for effects\n", __func__);
+		kfree(prtd);
+		return -ENOMEM;
+	}
 	prtd->audio_client = q6asm_audio_client_alloc(
 				(app_cb)compr_event_handler, prtd);
 	if (!prtd->audio_client) {
-		pr_err("%s: Could not allocate memory\n", __func__);
+		pr_err("%s: Could not allocate memory for client\n", __func__);
+		kfree(pdata->audio_effects[rtd->dai_link->be_id]);
 		kfree(prtd);
 		return -ENOMEM;
 	}
@@ -536,6 +560,13 @@ static int msm_compr_open(struct snd_compr_stream *cstream)
 	prtd->first_buffer = 1;
 	prtd->partial_drain_delay = 0;
 	memset(&prtd->gapless_state, 0, sizeof(struct msm_compr_gapless_state));
+	/*
+	 * Update the use_dsp_gapless_mode from gapless struture with the value
+	 * part of platform data.
+	 */
+	prtd->gapless_state.use_dsp_gapless_mode = pdata->use_dsp_gapless_mode;
+
+	pr_debug("%s: gapless mode %d", __func__, pdata->use_dsp_gapless_mode);
 
 	spin_lock_init(&prtd->lock);
 
@@ -545,6 +576,7 @@ static int msm_compr_open(struct snd_compr_stream *cstream)
 	atomic_set(&prtd->xrun, 0);
 	atomic_set(&prtd->close, 0);
 	atomic_set(&prtd->wait_on_close, 0);
+	atomic_set(&prtd->error, 0);
 
 	init_waitqueue_head(&prtd->eos_wait);
 	init_waitqueue_head(&prtd->drain_wait);
@@ -629,6 +661,7 @@ static int msm_compr_free(struct snd_compr_stream *cstream)
 
 	q6asm_audio_client_free(ac);
 
+	kfree(pdata->audio_effects[soc_prtd->dai_link->be_id]);
 	kfree(prtd);
 
 	return 0;
@@ -759,6 +792,14 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		return -EINVAL;
 	}
 
+	spin_lock_irqsave(&prtd->lock, flags);
+	if (atomic_read(&prtd->error)) {
+		pr_err("%s Got RESET EVENTS notification, return immediately", __func__);
+		spin_unlock_irqrestore(&prtd->lock, flags);
+		return 0;
+	}
+	spin_unlock_irqrestore(&prtd->lock, flags);
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		pr_debug("%s: SNDRV_PCM_TRIGGER_START\n", __func__);
@@ -771,21 +812,10 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 				__func__, rc);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pr_debug("%s: SNDRV_PCM_TRIGGER_STOP\n", __func__);
 		spin_lock_irqsave(&prtd->lock, flags);
-
+		pr_debug("%s: SNDRV_PCM_TRIGGER_STOP transition %d\n", __func__,
+					prtd->gapless_state.gapless_transition);
 		stream_id = ac->stream_id;
-		if (prtd->gapless_state.set_next_stream_id &&
-		    prtd->first_buffer) {
-			/*
-			 * Stream just switched for gapless, no buffers sent.
-			 * So seek needs to be applied to previous stream
-			 */
-			pr_debug("Seek previous stream as next stream hasn't started\n");
-			stream_id = stream_id^1;
-			ac->stream_id = stream_id;
-			prtd->first_buffer = 0;
-		}
 		atomic_set(&prtd->start, 0);
 		if (atomic_read(&prtd->eos)) {
 			pr_debug("%s: interrupt eos wait queues", __func__);
@@ -803,22 +833,27 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		prtd->last_buffer = 0;
 		pr_debug("issue CMD_FLUSH\n");
 		prtd->cmd_ack = 0;
-		spin_unlock_irqrestore(&prtd->lock, flags);
-		rc = q6asm_stream_cmd(prtd->audio_client, CMD_FLUSH, stream_id);
-		if (rc < 0) {
-			pr_err("%s: flush cmd failed rc=%d\n",
-			       __func__, rc);
-			return rc;
-		}
-		rc = wait_event_timeout(prtd->flush_wait,
+		if (!prtd->gapless_state.gapless_transition) {
+			spin_unlock_irqrestore(&prtd->lock, flags);
+			rc = q6asm_stream_cmd(
+				prtd->audio_client, CMD_FLUSH, stream_id);
+			if (rc < 0) {
+				pr_err("%s: flush cmd failed rc=%d\n",
+							__func__, rc);
+				return rc;
+			}
+			rc = wait_event_timeout(prtd->flush_wait,
 					prtd->cmd_ack, 1 * HZ);
-		if (!rc) {
-			rc = -ETIMEDOUT;
-			pr_err("Flush cmd timeout\n");
-		} else
-			rc = 0; /* prtd->cmd_status == OK? 0 : -EPERM */
-
-		spin_lock_irqsave(&prtd->lock, flags);
+			if (!rc) {
+				rc = -ETIMEDOUT;
+				pr_err("Flush cmd timeout\n");
+			} else {
+				rc = 0; /* prtd->cmd_status == OK? 0 : -EPERM*/
+			}
+			spin_lock_irqsave(&prtd->lock, flags);
+		} else {
+			prtd->first_buffer = 0;
+		}
 		/* FIXME. only reset if flush was successful */
 		prtd->byte_offset  = 0;
 		prtd->copied_total = 0;
@@ -828,17 +863,27 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		spin_unlock_irqrestore(&prtd->lock, flags);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_PUSH\n");
-		q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
-		atomic_set(&prtd->start, 0);
+		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_PUSH transition %d\n",
+				prtd->gapless_state.gapless_transition);
+		if (!prtd->gapless_state.gapless_transition) {
+			q6asm_cmd_nowait(prtd->audio_client, CMD_PAUSE);
+			atomic_set(&prtd->start, 0);
+		}
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_RELEASE\n");
-		atomic_set(&prtd->start, 1);
-		q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
+		pr_debug("SNDRV_PCM_TRIGGER_PAUSE_RELEASE transition %d\n",
+				   prtd->gapless_state.gapless_transition);
+		if (!prtd->gapless_state.gapless_transition) {
+			atomic_set(&prtd->start, 1);
+			q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
+		}
 		break;
 	case SND_COMPR_TRIGGER_PARTIAL_DRAIN:
 		pr_debug("%s: SND_COMPR_TRIGGER_PARTIAL_DRAIN\n", __func__);
+		if (!prtd->gapless_state.use_dsp_gapless_mode) {
+			pr_debug("%s: set partial drain as drain\n", __func__);
+			cmd = SND_COMPR_TRIGGER_DRAIN;
+		}
 	case SND_COMPR_TRIGGER_DRAIN:
 		pr_debug("%s: SNDRV_COMPRESS_DRAIN\n", __func__);
 		/* Make sure all the data is sent to DSP before sending EOS */
@@ -885,6 +930,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		if ((cmd == SND_COMPR_TRIGGER_PARTIAL_DRAIN) &&
 		    (prtd->gapless_state.set_next_stream_id)) {
 			/* wait for the last buffer to be returned */
+
 			if (prtd->last_buffer) {
 				pr_debug("%s: last buffer drain\n", __func__);
 				rc = msm_compr_drain_buffer(prtd, &flags);
@@ -896,7 +942,6 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 
 			/* send EOS */
 			prtd->cmd_ack = 0;
-			atomic_set(&prtd->eos, 1);
 			q6asm_cmd_nowait(prtd->audio_client, CMD_EOS);
 			pr_info("PARTIAL DRAIN, do not wait for EOS ack\n");
 
@@ -940,6 +985,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			prtd->app_pointer  = 0;
 			prtd->first_buffer = 1;
 			prtd->last_buffer = 0;
+			prtd->gapless_state.gapless_transition = 1;
 			/*
 			Don't reset these as these vars map to
 			total_bytes_transferred and total_bytes_available
@@ -983,7 +1029,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			rc = -EINTR;
 
 		/*FIXME : what if a flush comes while PC is here */
-		if (rc == 0 && (cmd == SND_COMPR_TRIGGER_PARTIAL_DRAIN)) {
+		if (rc == 0) {
 			/*
 			 * Failed to open second stream in DSP for gapless
 			 * so prepare the current stream in session for gapless playback
@@ -1019,6 +1065,11 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		prtd->cmd_interrupt = 0;
 		break;
 	case SND_COMPR_TRIGGER_NEXT_TRACK:
+		if (!prtd->gapless_state.use_dsp_gapless_mode) {
+			pr_debug("%s: ignore trigger next track\n", __func__);
+			rc = 0;
+			break;
+		}
 		pr_debug("%s: SND_COMPR_TRIGGER_NEXT_TRACK\n", __func__);
 		spin_lock_irqsave(&prtd->lock, flags);
 		rc = 0;
@@ -1030,9 +1081,9 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 		}
 		spin_unlock_irqrestore(&prtd->lock, flags);
 		rc = q6asm_stream_open_write_v2(prtd->audio_client,
-						prtd->codec, 16,
-						stream_id,
-						true /*gapless*/);
+				prtd->codec, 16,
+				stream_id,
+				prtd->gapless_state.use_dsp_gapless_mode);
 		if (rc < 0) {
 			pr_err("%s: Session out open failed for gapless\n",
 				 __func__);
@@ -1072,6 +1123,15 @@ static int msm_compr_pointer(struct snd_compr_stream *cstream,
 	tstamp.byte_offset = prtd->byte_offset;
 	tstamp.copied_total = prtd->copied_total;
 	first_buffer = prtd->first_buffer;
+
+	if (atomic_read(&prtd->error)) {
+		pr_err("%s Got RESET EVENTS notification, return error", __func__);
+		tstamp.pcm_io_frames = 0;
+		memcpy(arg, &tstamp, sizeof(struct snd_compr_tstamp));
+		spin_unlock_irqrestore(&prtd->lock, flags);
+		return -EINVAL;
+	}
+
 	spin_unlock_irqrestore(&prtd->lock, flags);
 
 	/*
@@ -1160,6 +1220,14 @@ static int msm_compr_copy(struct snd_compr_stream *cstream,
 		return 0;
 	}
 
+	spin_lock_irqsave(&prtd->lock, flags);
+	if (atomic_read(&prtd->error)) {
+		pr_err("%s Got RESET EVENTS notification", __func__);
+		spin_unlock_irqrestore(&prtd->lock, flags);
+		return -EINVAL;
+	}
+	spin_unlock_irqrestore(&prtd->lock, flags);
+
 	dstn = prtd->buffer + prtd->app_pointer;
 	if (count < prtd->buffer_size - prtd->app_pointer) {
 		if (copy_from_user(dstn, buf, count))
@@ -1179,7 +1247,8 @@ static int msm_compr_copy(struct snd_compr_stream *cstream,
 	 * since the available bytes fits fragment_size, copy the data right away
 	 */
 	spin_lock_irqsave(&prtd->lock, flags);
-
+	if (prtd->gapless_state.gapless_transition)
+		prtd->gapless_state.gapless_transition = 0;
 	prtd->bytes_received += count;
 	if (atomic_read(&prtd->start)) {
 		if (atomic_read(&prtd->xrun)) {
@@ -1268,7 +1337,6 @@ static int msm_compr_set_metadata(struct snd_compr_stream *cstream,
 	prtd = cstream->runtime->private_data;
 	if (!prtd && !prtd->audio_client)
 		return -EINVAL;
-
 	ac = prtd->audio_client;
 	if (metadata->key == SNDRV_COMPRESS_ENCODER_PADDING) {
 		pr_debug("%s, got encoder padding %u", __func__, metadata->value[0]);
@@ -1282,50 +1350,125 @@ static int msm_compr_set_metadata(struct snd_compr_stream *cstream,
 }
 
 static int msm_compr_volume_put(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
+				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
-	struct soc_mixer_control *mc =
-		(struct soc_mixer_control *)kcontrol->private_value;
+	unsigned long fe_id = kcontrol->private_value;
 	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
 			snd_soc_platform_get_drvdata(platform);
-	struct snd_compr_stream *cstream = pdata->cstream[mc->reg];
-	uint32_t *volume = pdata->volume[mc->reg];
+	struct snd_compr_stream *cstream = NULL;
+	uint32_t *volume = NULL;
+
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bounds fe_id %lu\n",
+			__func__, fe_id);
+		return -EINVAL;
+	}
+
+	cstream = pdata->cstream[fe_id];
+	volume = pdata->volume[fe_id];
 
 	volume[0] = ucontrol->value.integer.value[0];
 	volume[1] = ucontrol->value.integer.value[1];
-	pr_debug("%s: mc->reg %d left_vol %d right_vol %d\n",
-		__func__, mc->reg, volume[0], volume[1]);
+	pr_debug("%s: fe_id %lu left_vol %d right_vol %d\n",
+		 __func__, fe_id, volume[0], volume[1]);
 	if (cstream)
 		msm_compr_set_volume(cstream, volume[0], volume[1]);
 	return 0;
 }
 
 static int msm_compr_volume_get(struct snd_kcontrol *kcontrol,
-				 struct snd_ctl_elem_value *ucontrol)
+				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
-	struct soc_mixer_control *mc =
-		(struct soc_mixer_control *)kcontrol->private_value;
+	unsigned long fe_id = kcontrol->private_value;
+
 	struct msm_compr_pdata *pdata =
 		snd_soc_platform_get_drvdata(platform);
-	uint32_t *volume = pdata->volume[mc->reg];
-	pr_debug("%s: mc->reg %d\n", __func__, mc->reg);
+	uint32_t *volume = NULL;
+
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bound fe_id %lu\n", __func__, fe_id);
+		return -EINVAL;
+	}
+
+	volume = pdata->volume[fe_id];
+	pr_debug("%s: fe_id %lu\n", __func__, fe_id);
 	ucontrol->value.integer.value[0] = volume[0];
 	ucontrol->value.integer.value[1] = volume[1];
 
 	return 0;
 }
 
-/* System Pin has no volume control */
-static const struct snd_kcontrol_new msm_compr_volume_controls[] = {
-	SOC_DOUBLE_EXT_TLV("Compress Playback Volume",
-			MSM_FRONTEND_DAI_MULTIMEDIA4,
-			0, 8, COMPRESSED_LR_VOL_MAX_STEPS, 0,
-			msm_compr_volume_get,
-			msm_compr_volume_put,
-			msm_compr_vol_gain),
-};
+static int msm_compr_audio_effects_config_put(struct snd_kcontrol *kcontrol,
+					   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
+	unsigned long fe_id = kcontrol->private_value;
+	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
+			snd_soc_platform_get_drvdata(platform);
+	struct msm_compr_audio_effects *audio_effects = NULL;
+	struct snd_compr_stream *cstream = NULL;
+	struct msm_compr_audio *prtd = NULL;
+	long *values = &(ucontrol->value.integer.value[0]);
+	int effects_module;
+
+	pr_debug("%s\n", __func__);
+	if (fe_id >= MSM_FRONTEND_DAI_MAX) {
+		pr_err("%s Received out of bounds fe_id %lu\n",
+			__func__, fe_id);
+		return -EINVAL;
+	}
+	cstream = pdata->cstream[fe_id];
+	audio_effects = pdata->audio_effects[fe_id];
+	if (!cstream || !audio_effects) {
+		pr_err("%s: stream or effects inactive\n", __func__);
+		return -EINVAL;
+	}
+	prtd = cstream->runtime->private_data;
+	if (!prtd) {
+		pr_err("%s: cannot set audio effects\n", __func__);
+		return -EINVAL;
+	}
+	effects_module = *values++;
+	switch (effects_module) {
+	case VIRTUALIZER_MODULE:
+		pr_debug("%s: VIRTUALIZER_MODULE\n", __func__);
+		msm_audio_effects_virtualizer_handler(prtd->audio_client,
+						&(audio_effects->virtualizer),
+						values);
+		break;
+	case REVERB_MODULE:
+		pr_debug("%s: REVERB_MODULE\n", __func__);
+		msm_audio_effects_reverb_handler(prtd->audio_client,
+						 &(audio_effects->reverb),
+						 values);
+		break;
+	case BASS_BOOST_MODULE:
+		pr_debug("%s: BASS_BOOST_MODULE\n", __func__);
+		msm_audio_effects_bass_boost_handler(prtd->audio_client,
+						   &(audio_effects->bass_boost),
+						     values);
+		break;
+	case EQ_MODULE:
+		pr_debug("%s: EQ_MODULE\n", __func__);
+		msm_audio_effects_popless_eq_handler(prtd->audio_client,
+						    &(audio_effects->equalizer),
+						     values);
+		break;
+	default:
+		pr_err("%s Invalid effects config module\n", __func__);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int msm_compr_audio_effects_config_get(struct snd_kcontrol *kcontrol,
+					   struct snd_ctl_elem_value *ucontrol)
+{
+	/* dummy function */
+	return 0;
+}
 
 static int msm_compr_probe(struct snd_soc_platform *platform)
 {
@@ -1345,9 +1488,177 @@ static int msm_compr_probe(struct snd_soc_platform *platform)
 	for (i = 0; i < MSM_FRONTEND_DAI_MAX; i++) {
 		pdata->volume[i][0] = COMPRESSED_LR_VOL_MAX_STEPS;
 		pdata->volume[i][1] = COMPRESSED_LR_VOL_MAX_STEPS;
+		pdata->audio_effects[i] = NULL;
 		pdata->cstream[i] = NULL;
 	}
 
+	/*
+	 * use_dsp_gapless_mode part of platform data(pdata) is updated from HAL
+	 * through a mixer control before compress driver is opened. The mixer
+	 * control is used to decide if dsp gapless mode needs to be enabled.
+	 * Gapless is disabled by default.
+	 */
+	pdata->use_dsp_gapless_mode = false;
+	return 0;
+}
+
+static int msm_compr_volume_info(struct snd_kcontrol *kcontrol,
+				 struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = COMPRESSED_LR_VOL_MAX_STEPS;
+	return 0;
+}
+
+static int msm_compr_audio_effects_config_info(struct snd_kcontrol *kcontrol,
+					       struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 128;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0xFFFFFFFF;
+	return 0;
+}
+
+static int msm_compr_add_volume_control(struct snd_soc_pcm_runtime *rtd)
+{
+	const char *mixer_ctl_name = "Compress Playback";
+	const char *deviceNo       = "NN";
+	const char *suffix         = "Volume";
+	char *mixer_str = NULL;
+	int ctl_len;
+	struct snd_kcontrol_new fe_volume_control[1] = {
+		{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "?",
+		.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |
+			  SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = msm_compr_volume_info,
+		.tlv.p = msm_compr_vol_gain,
+		.get = msm_compr_volume_get,
+		.put = msm_compr_volume_put,
+		.private_value = 0,
+		}
+	};
+
+	if (!rtd) {
+		pr_err("%s NULL rtd\n", __func__);
+		return 0;
+	}
+	pr_debug("%s: added new compr FE with name %s, id %d, cpu dai %s, device no %d\n",
+		 __func__, rtd->dai_link->name, rtd->dai_link->be_id,
+		 rtd->dai_link->cpu_dai_name, rtd->pcm->device);
+	ctl_len = strlen(mixer_ctl_name) + 1 + strlen(deviceNo) + 1 +
+		  strlen(suffix) + 1;
+	mixer_str = kzalloc(ctl_len, GFP_KERNEL);
+	if (!mixer_str) {
+		pr_err("failed to allocate mixer ctrl str of len %d", ctl_len);
+		return 0;
+	}
+	snprintf(mixer_str, ctl_len, "%s %d %s", mixer_ctl_name,
+		 rtd->pcm->device, suffix);
+	fe_volume_control[0].name = mixer_str;
+	fe_volume_control[0].private_value = rtd->dai_link->be_id;
+	pr_debug("Registering new mixer ctl %s\n", mixer_str);
+	snd_soc_add_platform_controls(rtd->platform, fe_volume_control,
+				      ARRAY_SIZE(fe_volume_control));
+	kfree(mixer_str);
+	return 0;
+}
+
+static int msm_compr_add_audio_effects_control(struct snd_soc_pcm_runtime *rtd)
+{
+	const char *mixer_ctl_name = "Audio Effects Config";
+	const char *deviceNo       = "NN";
+	char *mixer_str = NULL;
+	int ctl_len;
+	struct snd_kcontrol_new fe_audio_effects_config_control[1] = {
+		{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "?",
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = msm_compr_audio_effects_config_info,
+		.get = msm_compr_audio_effects_config_get,
+		.put = msm_compr_audio_effects_config_put,
+		.private_value = 0,
+		}
+	};
+
+
+	if (!rtd) {
+		pr_err("%s NULL rtd\n", __func__);
+		return 0;
+	}
+
+	pr_debug("%s: added new compr FE with name %s, id %d, cpu dai %s, device no %d\n",
+		 __func__, rtd->dai_link->name, rtd->dai_link->be_id,
+		 rtd->dai_link->cpu_dai_name, rtd->pcm->device);
+
+	ctl_len = strlen(mixer_ctl_name) + 1 + strlen(deviceNo) + 1;
+	mixer_str = kzalloc(ctl_len, GFP_KERNEL);
+
+	if (!mixer_str) {
+		pr_err("failed to allocate mixer ctrl str of len %d", ctl_len);
+		return 0;
+	}
+
+	snprintf(mixer_str, ctl_len, "%s %d", mixer_ctl_name, rtd->pcm->device);
+
+	fe_audio_effects_config_control[0].name = mixer_str;
+	fe_audio_effects_config_control[0].private_value = rtd->dai_link->be_id;
+	pr_debug("Registering new mixer ctl %s\n", mixer_str);
+	snd_soc_add_platform_controls(rtd->platform,
+				fe_audio_effects_config_control,
+				ARRAY_SIZE(fe_audio_effects_config_control));
+	kfree(mixer_str);
+	return 0;
+}
+
+static int msm_compr_gapless_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
+	struct msm_compr_pdata *pdata = (struct msm_compr_pdata *)
+		snd_soc_platform_get_drvdata(platform);
+	pdata->use_dsp_gapless_mode =  ucontrol->value.integer.value[0];
+	pr_debug("%s: value: %ld\n", __func__,
+		ucontrol->value.integer.value[0]);
+
+	return 0;
+}
+
+static int msm_compr_gapless_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
+	struct msm_compr_pdata *pdata =
+		snd_soc_platform_get_drvdata(platform);
+	pr_debug("%s:gapless mode %d\n", __func__, pdata->use_dsp_gapless_mode);
+	ucontrol->value.integer.value[0] = pdata->use_dsp_gapless_mode;
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new msm_compr_gapless_controls[] = {
+	SOC_SINGLE_EXT("Compress Gapless Playback",
+			0, 0, 1, 0,
+			msm_compr_gapless_get,
+			msm_compr_gapless_put),
+};
+
+static int msm_compr_new(struct snd_soc_pcm_runtime *rtd)
+{
+	int rc;
+
+	rc = msm_compr_add_volume_control(rtd);
+	if (rc)
+		pr_err("%s: Could not add Compr Volume Control\n", __func__);
+	rc = msm_compr_add_audio_effects_control(rtd);
+	if (rc)
+		pr_err("%s: Could not add Compr Audio Effects Control\n",
+			__func__);
 	return 0;
 }
 
@@ -1367,8 +1678,9 @@ static struct snd_compr_ops msm_compr_ops = {
 static struct snd_soc_platform_driver msm_soc_platform = {
 	.probe		= msm_compr_probe,
 	.compr_ops	= &msm_compr_ops,
-	.controls	= msm_compr_volume_controls,
-	.num_controls	= ARRAY_SIZE(msm_compr_volume_controls),
+	.pcm_new	= msm_compr_new,
+	.controls       = msm_compr_gapless_controls,
+	.num_controls   = ARRAY_SIZE(msm_compr_gapless_controls),
 };
 
 static __devinit int msm_compr_dev_probe(struct platform_device *pdev)

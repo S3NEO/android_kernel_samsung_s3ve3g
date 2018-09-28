@@ -43,6 +43,8 @@ static DEFINE_IDR(ctrl_idr);
 static struct device_type slim_dev_type;
 static struct device_type slim_ctrl_type;
 
+extern unsigned int system_rev;
+
 static const struct slim_device_id *slim_match(const struct slim_device_id *id,
 					const struct slim_device *slim_dev)
 {
@@ -316,6 +318,19 @@ static void slim_report(struct work_struct *work)
 	if (sbdev->notified)
 		return;
 	ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &laddr);
+
+#if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_MTR)
+	if (system_rev == 0xd) {
+		pr_info("%s : system rev = %d\n", __func__, system_rev);
+		if ((ret == -ENXIO) &&
+			((sbdev->e_addr[4] == 0xbe) && (sbdev->e_addr[2] == 0x83))) {
+			pr_info("%s : es704 fail to assign retry to assign the es705\n", __func__);
+			sbdev->e_addr[2] = 0x03;
+			ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &laddr);		
+		}
+	}
+#endif
+
 	if (!ret) {
 		if (sbdrv)
 			sbdev->notified = true;

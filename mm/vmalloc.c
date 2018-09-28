@@ -37,11 +37,38 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 {
 	pte_t *pte;
 
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	unsigned long do_lazy_mmu = 0;
+#endif
+
 	pte = pte_offset_kernel(pmd, addr);
+	
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (tima_is_pg_protected((unsigned long)pte) == 1)
+		do_lazy_mmu = 1;
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
+
+
 	do {
 		pte_t ptent = ptep_get_and_clear(&init_mm, addr, pte);
 		WARN_ON(!pte_none(ptent) && !pte_present(ptent));
 	} while (pte++, addr += PAGE_SIZE, addr != end);
+
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_STOP, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
+
 }
 
 static void vunmap_pmd_range(pud_t *pud, unsigned long addr, unsigned long end)
@@ -91,6 +118,9 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		unsigned long end, pgprot_t prot, struct page **pages, int *nr)
 {
 	pte_t *pte;
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	unsigned long do_lazy_mmu = 0;
+#endif
 
 	/*
 	 * nr is a running index into the array which helps higher level
@@ -100,6 +130,18 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 	pte = pte_alloc_kernel(pmd, addr);
 	if (!pte)
 		return -ENOMEM;
+
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (tima_is_pg_protected((unsigned long)pte) == 1)
+		do_lazy_mmu = 1;
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
+
 	do {
 		struct page *page = pages[*nr];
 
@@ -110,6 +152,16 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		set_pte_at(&init_mm, addr, pte, mk_pte(page, prot));
 		(*nr)++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
+
+#ifdef CONFIG_TIMA_RKP_LAZY_MMU
+	if (do_lazy_mmu) {
+		spin_lock(&init_mm.page_table_lock);
+		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_STOP, TIMA_LAZY_MMU_CMDID);
+		flush_tlb_l2_page(pmd);
+		spin_unlock(&init_mm.page_table_lock);
+	}
+#endif
+
 	return 0;
 }
 
@@ -183,36 +235,6 @@ static int vmap_page_range(unsigned long start, unsigned long end,
 	flush_cache_vmap(start, end);
 	return ret;
 }
-
-#ifdef ENABLE_VMALLOC_SAVING
-int is_vmalloc_addr(const void *x)
-{
-	struct rb_node *n;
-	struct vmap_area *va;
-	int ret = 0;
-
-	spin_lock(&vmap_area_lock);
-
-	for (n = rb_first(vmap_area_root); n; rb_next(n)) {
-		va = rb_entry(n, struct vmap_area, rb_node);
-		if (x >= va->va_start && x < va->va_end) {
-			ret = 1;
-			break;
-		}
-	}
-
-	spin_unlock(&vmap_area_lock);
-	return ret;
-}
-#else
-int is_vmalloc_addr(const void *x)
-{
-	unsigned long addr = (unsigned long)x;
-
-	return addr >= VMALLOC_START && addr < VMALLOC_END;
-}
-#endif
-EXPORT_SYMBOL(is_vmalloc_addr);
 
 int is_vmalloc_or_module_addr(const void *x)
 {
@@ -301,6 +323,47 @@ static unsigned long cached_vstart;
 static unsigned long cached_align;
 
 static unsigned long vmap_area_pcpu_hole;
+
+#ifdef CONFIG_ENABLE_VMALLOC_SAVING
+#define POSSIBLE_VMALLOC_START	PAGE_OFFSET
+
+#define VMALLOC_BITMAP_SIZE	((VMALLOC_END - PAGE_OFFSET) >> \
+					PAGE_SHIFT)
+#define VMALLOC_TO_BIT(addr)	((addr - PAGE_OFFSET) >> PAGE_SHIFT)
+#define BIT_TO_VMALLOC(i)	(PAGE_OFFSET + i * PAGE_SIZE)
+
+DECLARE_BITMAP(possible_areas, VMALLOC_BITMAP_SIZE);
+
+void mark_vmalloc_reserved_area(void *x, unsigned long size)
+{
+	unsigned long addr = (unsigned long)x;
+
+	bitmap_set(possible_areas, VMALLOC_TO_BIT(addr), size >> PAGE_SHIFT);
+}
+
+int is_vmalloc_addr(const void *x)
+{
+	unsigned long addr = (unsigned long)x;
+
+	if (addr < POSSIBLE_VMALLOC_START || addr >= VMALLOC_END)
+		return 0;
+
+	if (test_bit(VMALLOC_TO_BIT(addr), possible_areas))
+		return 0;
+
+	return 1;
+}
+#else
+int is_vmalloc_addr(const void *x)
+{
+	unsigned long addr = (unsigned long)x;
+
+	return addr >= VMALLOC_START && addr < VMALLOC_END;
+}
+#endif
+EXPORT_SYMBOL(is_vmalloc_addr);
+
+
 
 static struct vmap_area *__find_vmap_area(unsigned long addr)
 {

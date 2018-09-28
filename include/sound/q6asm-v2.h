@@ -67,6 +67,8 @@
 /* Enable Sample_Rate/Channel_Mode notification event from Decoder */
 #define SR_CM_NOTIFY_ENABLE	0x0004
 
+#define TUN_WRITE_IO_MODE 0x0008 /* tunnel read write mode */
+#define TUN_READ_IO_MODE  0x0004 /* tunnel read write mode */
 #define SYNC_IO_MODE	0x0001
 #define ASYNC_IO_MODE	0x0002
 #define COMPRESSED_IO	0x0040
@@ -173,7 +175,7 @@ struct audio_client {
 	struct audio_port_data port[2];
 	wait_queue_head_t      cmd_wait;
 	wait_queue_head_t      time_wait;
-	bool                   perf_mode;
+	int                    perf_mode;
 	int					   stream_id;
 	/* audio cache operations fptr*/
 	int (*fptr_cache_ops)(struct audio_buffer *abuff, int cache_op);
@@ -217,6 +219,9 @@ int q6asm_stream_open_write_v2(struct audio_client *ac, uint32_t format,
 int q6asm_open_read_write(struct audio_client *ac,
 			uint32_t rd_format,
 			uint32_t wr_format);
+
+int q6asm_open_loopback_v2(struct audio_client *ac,
+			   uint16_t bits_per_sample);
 
 int q6asm_write(struct audio_client *ac, uint32_t len, uint32_t msw_ts,
 				uint32_t lsw_ts, uint32_t flags);
@@ -377,6 +382,9 @@ int q6asm_set_mute(struct audio_client *ac, int muteflag);
 
 int q6asm_get_session_time(struct audio_client *ac, uint64_t *tstamp);
 
+int q6asm_send_audio_effects_params(struct audio_client *ac, char *params,
+				    uint32_t params_length);
+
 /* Client can set the IO mode to either AIO/SIO mode */
 int q6asm_set_io_mode(struct audio_client *ac, uint32_t mode);
 
@@ -390,5 +398,11 @@ int q6asm_media_format_block(struct audio_client *ac, uint32_t format);
 /* Send the meta data to remove initial and trailing silence */
 int q6asm_send_meta_data(struct audio_client *ac, uint32_t initial_samples,
 		uint32_t trailing_samples);
+int q6asm_set_sa(struct audio_client *ac,int *param);
+int q6asm_set_vsp(struct audio_client *ac,int *param);
+int q6asm_set_dha(struct audio_client *ac,int *param);
+int q6asm_set_lrsm(struct audio_client *ac,int *param);
+int q6asm_set_sa_ep(struct audio_client *ac,int *param);
+int q6asm_get_sa_ep(struct audio_client *ac);
 
 #endif /* __Q6_ASM_H__ */

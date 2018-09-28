@@ -64,9 +64,13 @@ static int of_batterydata_read_lut(const struct device_node *np,
 	}
 
 	prop = of_find_property(np, "qcom,lut-data", NULL);
+	if (!prop) {
+		pr_err("%s: No lut data found\n", np->name);
+		return -EINVAL;
+	}
 	data = prop->value;
 	size = prop->length/sizeof(int);
-	if (!prop || size != cols * rows) {
+	if (size != cols * rows) {
 		pr_err("%s: data size mismatch, %dx%d != %d\n",
 				np->name, cols, rows, size);
 		return -EINVAL;
@@ -228,7 +232,7 @@ static int of_batterydata_load_battery_data(struct device_node *node,
 	OF_PROP_READ(batt_data->rbatt_capacitive_mohm,
 			"rbatt-capacitive-mohm", node, rc, false);
 	OF_PROP_READ(batt_data->flat_ocv_threshold_uv,
-			"flat-ocv-threshold", node, rc, true);
+			"flat-ocv-threshold-uv", node, rc, true);
 	OF_PROP_READ(batt_data->max_voltage_uv,
 			"max-voltage-uv", node, rc, true);
 	OF_PROP_READ(batt_data->cutoff_uv, "v-cutoff-uv", node, rc, true);

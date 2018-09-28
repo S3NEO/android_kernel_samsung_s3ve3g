@@ -307,7 +307,11 @@ static struct mem_type mem_types[] = {
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MEMORY_DMA_READY] = {
+#ifndef CONFIG_TIMA_RKP
 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
+#else
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY | L_PTE_XN,
+#endif
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_KERNEL,
 	},
@@ -1500,7 +1504,9 @@ static void __init map_lowmem(void)
 		vm->flags = VM_LOWMEM | VM_ARM_STATIC_MAPPING;
 		vm->flags |= VM_ARM_MTYPE(type);
 		vm->caller = map_lowmem;
-		vm_area_add_early(vm++);
+		vm_area_add_early(vm);
+		mark_vmalloc_reserved_area(vm->addr, vm->size);
+		vm++;
 	}
 }
 
