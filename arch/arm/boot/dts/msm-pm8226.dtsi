@@ -484,7 +484,6 @@
 			qcom,adc-bit-resolution = <16>;
 			qcom,adc-vdd-reference = <1800>;
 			qcom,iadc-vadc = <&pm8226_vadc>;
-			qcom,iadc-poll-eoc;
 			qcom,use-default-rds-trim = <0>;
 			qcom,iadc-poll-eoc;
 			qcom,rsense = <10000000>;
