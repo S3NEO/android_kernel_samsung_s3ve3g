@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export ARCH=arm
-export CROSS_COMPILE=~/bin/arm-eabi-4.9/arm-linux-androideabi/bin/
+export CROSS_COMPILE=~/bin/arm-eabi-4.8/arm-eabi/bin/
 mkdir output
 
 make -C $(pwd) O=output lineageos_s3ve3g_defconfig
