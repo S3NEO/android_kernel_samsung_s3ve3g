@@ -3378,6 +3378,9 @@ static void tapan_shutdown(struct snd_pcm_substream *substream,
 
 	if (dai->id < NUM_CODEC_DAIS) {
 		if (tapan->dai[dai->id].ch_mask) {
+#ifdef CONFIG_SND_SOC_ES325_ATLANTIC
+			es325_wrapper_sleep(dai->id);
+#endif
 			active = 1;
 			dev_dbg(dai->codec->dev, "%s(): Codec DAI: chmask[%d] = 0x%lx\n",
 				 __func__, dai->id,
@@ -3388,9 +3391,6 @@ static void tapan_shutdown(struct snd_pcm_substream *substream,
 	    (tapan_core->dev != NULL) &&
 	    (tapan_core->dev->parent != NULL) &&
 	    (active == 0)) {
-#ifdef CONFIG_SND_SOC_ES325_ATLANTIC
-		es325_wrapper_sleep(dai->id);
-#endif
 		pm_runtime_mark_last_busy(tapan_core->dev->parent);
 		pm_runtime_put(tapan_core->dev->parent);
 		dev_dbg(dai->codec->dev, "%s: unvote requested", __func__);
@@ -5473,6 +5473,7 @@ static void tapan_init_slim_slave_cfg(struct snd_soc_codec *codec)
 	pr_debug("%s: slimbus logical address 0x%llx\n", __func__, eaddr);
 }
 
+extern int system_rev;
 static void tapan_codec_init_reg(struct snd_soc_codec *codec)
 {
 	u32 i;
