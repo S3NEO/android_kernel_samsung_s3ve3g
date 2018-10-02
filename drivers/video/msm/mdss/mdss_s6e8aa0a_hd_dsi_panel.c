@@ -1649,8 +1649,10 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 #if defined(CONFIG_MACH_S3VE3G_EUR)	
-	if(bl_first_update== 0)
+	if(bl_first_update== 0){
+		bl_first_update = 1;
 		pr_err("to maintain ddefault brightness \n");
+	}
 	else
 		mdss_dsi_panel_bl_ctrl(pdata,msd.mfd->bl_previous);
 #endif
