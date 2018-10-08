@@ -1722,13 +1722,10 @@ static int __q6asm_open_read(struct audio_client *ac,
 	open.bits_per_sample = bits_per_sample;
 	open.mode_flags = 0x0;
 
-	if (ac->perf_mode == LOW_LATENCY_PCM_MODE) {
-		open.mode_flags |= ASM_LOW_LATENCY_STREAM_SESSION <<
-				ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ;
-	} else {
-		open.mode_flags |= ASM_LEGACY_STREAM_SESSION <<
-				ASM_SHIFT_STREAM_PERF_MODE_FLAG_IN_OPEN_READ;
-	}
+	if (ac->perf_mode)
+		open.mode_flags |= ASM_LOW_LATENCY_STREAM_SESSION;
+	else
+		open.mode_flags |= ASM_LEGACY_STREAM_SESSION;
 
 	switch (format) {
 	case FORMAT_LINEAR_PCM:
