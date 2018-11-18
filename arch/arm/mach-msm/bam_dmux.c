@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -234,7 +234,7 @@ static struct srcu_struct bam_dmux_srcu;
 #define UL_TIMEOUT_DELAY 1000	/* in ms */
 #define ENABLE_DISCONNECT_ACK	0x1
 #define SHUTDOWN_TIMEOUT_MS	3000
-#define UL_WAKEUP_TIMEOUT_MS	4000
+#define UL_WAKEUP_TIMEOUT_MS	2000
 static void toggle_apps_ack(void);
 static void reconnect_to_bam(void);
 static void disconnect_to_bam(void);
@@ -2092,7 +2092,7 @@ static int bam_init(void)
 	a2_props.virt_addr = a2_virt_addr;
 	a2_props.virt_size = a2_phys_size;
 	a2_props.irq = a2_bam_irq;
-	a2_props.options = SPS_BAM_OPT_IRQ_WAKEUP;
+	a2_props.options = SPS_BAM_OPT_IRQ_WAKEUP | SPS_BAM_HOLD_MEM;
 	a2_props.num_pipes = A2_NUM_PIPES;
 	a2_props.summing_threshold = A2_SUMMING_THRESHOLD;
 	a2_props.constrained_logging = true;
@@ -2386,6 +2386,54 @@ static void bam_dmux_smsm_ack_cb(void *priv, uint32_t old_state,
 	complete_all(&ul_wakeup_ack_completion);
 	srcu_read_unlock(&bam_dmux_srcu, rcu_id);
 }
+
+/**
+ * msm_bam_dmux_set_bam_ops() - sets the bam_ops
+ * @ops: bam_ops_if to set
+ *
+ * Sets bam_ops to allow switching of runtime behavior. Preconditon, bam dmux
+ * must be in an idle state. If input ops is NULL, then bam_ops will be
+ * restored to their default state.
+ */
+void msm_bam_dmux_set_bam_ops(struct bam_ops_if *ops)
+{
+	if (ops != NULL)
+		bam_ops = ops;
+	else
+		bam_ops = &bam_default_ops;
+}
+EXPORT_SYMBOL(msm_bam_dmux_set_bam_ops);
+
+/**
+ * msm_bam_dmux_deinit() - puts bam dmux into a deinited state
+ *
+ * Puts bam dmux into a deinitialized state by simulating an ssr.
+ */
+void msm_bam_dmux_deinit(void)
+{
+	restart_notifier_cb(NULL, SUBSYS_BEFORE_SHUTDOWN, NULL);
+	restart_notifier_cb(NULL, SUBSYS_AFTER_SHUTDOWN, NULL);
+	restart_notifier_cb(NULL, SUBSYS_BEFORE_POWERUP, NULL);
+	restart_notifier_cb(NULL, SUBSYS_AFTER_POWERUP, NULL);
+	in_global_reset = 0;
+}
+EXPORT_SYMBOL(msm_bam_dmux_deinit);
+
+/**
+ * msm_bam_dmux_reinit() - reinitializes bam dmux
+ */
+void msm_bam_dmux_reinit(void)
+{
+	bam_ops->smsm_state_cb_register_ptr(SMSM_MODEM_STATE,
+			SMSM_A2_POWER_CONTROL,
+			bam_dmux_smsm_cb, NULL);
+	bam_ops->smsm_state_cb_register_ptr(SMSM_MODEM_STATE,
+			SMSM_A2_POWER_CONTROL_ACK,
+			bam_dmux_smsm_ack_cb, NULL);
+	bam_mux_initialized = 0;
+	bam_init();
+}
+EXPORT_SYMBOL(msm_bam_dmux_reinit);
 
 /**
  * msm_bam_dmux_set_bam_ops() - sets the bam_ops
