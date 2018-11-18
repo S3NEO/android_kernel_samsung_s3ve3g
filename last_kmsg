@@ -1,0 +1,573 @@
+[    0.000000] sec_dbg_setup: str=@0x3ff00008
+[    0.000000] sec_dbg_setup: secdbg_paddr = 0x3ff00008
+[    0.000000] sec_dbg_setup: secdbg_size = 0x80000
+[    0.004085] set_dload_mode <1> ( c110dd40 )
+[    0.048077] sec_debug_init: restart_reason_ddr_address : 0x0 
+[    0.048088] sec_debug_init: enable=0
+[    0.048097] sec_debug_init:__raw_readl restart_reason=0
+[    0.048107] sec_debug_init: restart_reason : 0xfa00a65c
+[    0.452796] qup_i2c f9924000.i2c: Missing 'qcom,master-id' DT entry
+[    0.453466] qup_i2c f9926000.i2c: Missing 'qcom,i2c-src-freq' DT entry
+[    0.459600] AXI: msm_bus_fabric_init_driver(): msm_bus_fabric_init_driver
+[    0.491467] ION-heap mm: Cannot specify alignment for this type of heap
+[    0.491738] ION-heap adsp: Cannot specify alignment for this type of heap
+[    0.729148] sec_therm_probe:ret=-517
+[    0.729636] sec_therm_probe:ret=-19
+[    0.729754] vadc property missing
+[    0.748867] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xc2 incorrect owner 2
+[    0.748992] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xc3 incorrect owner 2
+[    0.749333] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xc7 incorrect owner 2
+[    0.749809] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xa0 incorrect owner 4
+[    0.750151] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xa4 incorrect owner 2
+[    0.750432] spmi_pmic_arb fc4cf000.qcom,spmi: PPID 0xa7 incorrect owner 2
+[    0.751463] mdss_mdp_parse_dt_prop_len: Error from prop qcom,mdss-ad-off : spec error in device tree
+[    0.753183] [ on state : 0, off state : 1
+[    0.753790] dsi_panel_device_register:1677, Disp_en_gpio (73)
+[    0.753900] dsi_panel_device_register:1843, Disp_te gpio not specified
+[    0.754019] dsi_panel_device_register:1849, Disp_rst_gpio (25)
+[    0.786066] mdss_dsi_event_handler: unhandled event=1
+[    0.975822] sps: BAM device 0xf9904000 is not registered yet.
+[    1.004708] cypress_request_gpio: unable to request touchkey_scl [66]
+[    1.094722] cypress_touchkey 21-0020: Touchkey FW Version: 0x06
+[    1.157624] mms_ts_probe: [TSP] probe START!!
+[    1.265529] qup_i2c f9927000.i2c: QUP: I2C status flags :0xc1300c8, irq:131
+[    1.271943] qup_i2c f9927000.i2c: I2C slave addr:0x48 not connected
+[    1.278263] qup_i2c f9927000.i2c: QUP: I2C status flags :0xc1300c8, irq:131
+[    1.285009] qup_i2c f9927000.i2c: I2C slave addr:0x48 not connected
+[    1.291474] qup_i2c f9927000.i2c: QUP: I2C status flags :0x81343c8, irq:131
+[    1.297925] qup_i2c f9927000.i2c: I2C slave addr:0x48 not connected
+[    1.725335] mms144_ts 5-0048: [TSP] ISC Ver [0xc7] [0x23] [0x23]
+[    1.730348] mms144_ts 5-0048: [TSP] fw is latest. Do not update.
+[    1.736661] mms_ts_probe: tsp : gpio_to_irq : 339
+[    1.742101] mms_ts_probe: [TSP] probe END!!
+[    1.757864] cam_dummy_init_module:182
+[    1.760561] cam_dummy_platform_probe:87
+[    1.766274] csiphy_probe: device id = 0
+[    1.769286] csiphy_probe: device id = 1
+[    1.773343] csid_probe device id 0
+[    1.776363] csid_probe:526 reading mipi_csi_vdd is 1200000
+[    1.781945] csid_probe device id 1
+[    1.785195] csid_probe:526 reading mipi_csi_vdd is 1200000
+[    1.791576] msm_eeprom_init_module E
+[    1.794549] msm_eeprom_init_module:1396 platform rc -19
+[    1.799435] msm_eeprom_spi_probe
+[    1.803824] msm_eeprom_spi_probe: irq[0] cs[0] CPHA[0] CPOL[0] CS_HIGH[0]
+[    1.809640] msm_eeprom_spi_probe: max_speed[50000000]
+[    1.814724] cell-index 0, rc 0
+[    1.817694] msm_eeprom_spi_setup qcom,eeprom-name fidelix, rc 0
+[    1.823647] msm_camera_get_dt_vreg_data qcom,cam-vreg-name count 2
+[    1.829777] msm_camera_get_dt_vreg_data reg_name[0] = cam_vdig
+[    1.835639] msm_camera_get_dt_vreg_data reg_name[1] = cam_vio
+[    1.841308] msm_camera_get_dt_vreg_data cam_vreg[0].type = 0
+[    1.847007] msm_camera_get_dt_vreg_data cam_vreg[1].type = 0
+[    1.852590] msm_camera_get_dt_vreg_data cam_vreg[0].min_voltage = 1225000
+[    1.859419] msm_camera_get_dt_vreg_data cam_vreg[1].min_voltage = 1800000
+[    1.866148] msm_camera_get_dt_vreg_data cam_vreg[0].max_voltage = 1225000
+[    1.872950] msm_camera_get_dt_vreg_data cam_vreg[1].max_voltage = 1800000
+[    1.879738] msm_camera_get_dt_vreg_data cam_vreg[0].op_mode = 200000
+[    1.886023] msm_camera_get_dt_vreg_data cam_vreg[1].op_mode = 1800000
+[    1.892486] msm_camera_get_dt_power_setting_data qcom,cam-power-seq-type count 2
+[    1.899830] msm_camera_get_dt_power_setting_data seq_name[0] = sensor_vreg
+[    1.906731] msm_camera_get_dt_power_setting_data:385 seq_type[0] 2
+[    1.912883] msm_camera_get_dt_power_setting_data seq_name[1] = sensor_vreg
+[    1.919704] msm_camera_get_dt_power_setting_data:385 seq_type[1] 2
+[    1.925915] msm_camera_get_dt_power_setting_data seq_name[0] = cam_vdig
+[    1.932451] msm_camera_get_dt_power_setting_data power_setting[0].seq_val = 0
+[    1.939633] msm_camera_get_dt_power_setting_data seq_name[1] = cam_vio
+[    1.946091] msm_camera_get_dt_power_setting_data power_setting[1].seq_val = 1
+[    1.953249] msm_camera_get_dt_power_setting_data power_setting[0].config_val = 1
+[    1.960637] msm_camera_get_dt_power_setting_data power_setting[1].config_val = 1
+[    1.967972] msm_camera_get_dt_power_setting_data power_setting[0].delay = 2
+[    1.974959] msm_camera_get_dt_power_setting_data power_setting[1].delay = 2
+[    1.981892] msm_eeprom_get_dt_data gpio count 0
+[    1.986393] msm_eeprom_parse_memory_map: qcom,cal-num-blocks 8
+[    1.992267] msm_eeprom_parse_memory_map num_bytes 4304
+[    1.997312] msm_camera_power_up:1168
+[    2.000855] msm_camera_request_gpio_table:526 invalid gpio_tbl   (null) / size 0
+[    2.008298] msm_camera_power_up index 0
+[    2.012050] msm_camera_power_up type 2
+[    2.019282] msm_camera_power_up index 1
+[    2.022124] msm_camera_power_up type 2
+[    2.029733] ====GPIO STATUS CHECK====
+[    2.032450] CAM_A_en: 0
+[    2.034855] MCLK: 0
+[    2.036917] VT_MCLK: 0
+[    2.039259] I2C_SCL: 1
+[    2.041603] I2C_SDA: 1
+[    2.043996] RESET: 0
+[    2.046130] VT_RESET: 0
+[    2.048547] msm_camera_power_up exit
+[    2.052112] msm_camera_spi_tx_helper: tx(6): 90 00 00 00
+[    2.057665] msm_camera_spi_tx_helper: tx(132): 03 00 00 00
+[    2.062980] msm_camera_spi_tx_helper: tx(8): 03 00 0f fc
+[    2.068312] msm_camera_spi_tx_helper: tx(2308): 03 00 10 00
+[    2.074304] msm_camera_spi_tx_helper: tx(8): 03 00 1f fc
+[    2.079127] msm_camera_spi_tx_helper: tx(68): 03 00 20 00
+[    2.084498] msm_camera_spi_tx_helper: tx(8): 03 00 2f fc
+[    2.089807] msm_camera_spi_tx_helper: tx(1796): 03 00 30 00
+[    2.095729] msm_camera_spi_tx_helper: tx(8): 03 00 3f fc
+[    2.100701] msm_camera_power_down:1488
+[    2.104295] msm_camera_power_down index 1
+[    2.108269] msm_camera_power_down type 2
+[    2.115918] msm_camera_power_down index 0
+[    2.118934] msm_camera_power_down type 2
+[    2.126303] msm_camera_request_gpio_table:526 invalid gpio_tbl   (null) / size 0
+[    2.132754] msm_camera_power_down exit
+[    2.137172] MSM-SENSOR-DRIVER msm_sensor_driver_parse:659 Enter
+[    2.142429] msm_sensor_get_sub_module_index qcom,actuator cell index 1, rc 0
+[    2.149415] msm_sensor_get_sub_module_index qcom,eeprom cell index 0, rc 0
+[    2.156317] msm_sensor_get_sub_module_index qcom,led flash cell index 0, rc 0
+[    2.163401] msm_sensor_get_sub_module_index csiphy_core[0] = 0
+[    2.169187] msm_sensor_get_sub_module_index csid_core[0] = 0
+[    2.174872] msm_camera_get_dt_vreg_data qcom,cam-vreg-name count 3
+[    2.180972] msm_camera_get_dt_vreg_data reg_name[0] = cam_vdig
+[    2.186848] msm_camera_get_dt_vreg_data reg_name[1] = cam_vio
+[    2.192516] msm_camera_get_dt_vreg_data reg_name[2] = cam_vaf
+[    2.198306] msm_camera_get_dt_vreg_data cam_vreg[0].type = 0
+[    2.203887] msm_camera_get_dt_vreg_data cam_vreg[1].type = 0
+[    2.209592] msm_camera_get_dt_vreg_data cam_vreg[2].type = 0
+[    2.215189] msm_camera_get_dt_vreg_data cam_vreg[0].op_mode = 1225000
+[    2.221643] msm_camera_get_dt_vreg_data cam_vreg[1].op_mode = 1800000
+[    2.228032] msm_camera_get_dt_vreg_data cam_vreg[2].op_mode = 2800000
+[    2.234539] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:512 gpio count 3
+[    2.241704] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[0] = 26
+[    2.249401] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[1] = 37
+[    2.257174] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[2] = 112
+[    2.264980] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].gpio = 26
+[    2.271595] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].gpio = 37
+[    2.278341] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].gpio = 112
+[    2.285116] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].flags = 1
+[    2.291735] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].flags = 0
+[    2.298481] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].flags = 0
+[    2.305118] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].label = CAMIF_MCLK
+[    2.312616] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].label = CAM_RESET1
+[    2.320095] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].label = CAM_VANA_GPIO
+[    2.327777] msm_camera_init_gpio_pin_tbl qcom,gpio-reset 37
+[    2.333363] msm_camera_init_gpio_pin_tbl qcom,gpio-ext-vana-power 112
+[    2.339763] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:617 qcom,cci-master 0, rc 0
+[    2.347788] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:628 msm_sensor_driver_get_dt_data qcom,mount-angle 0, rc -22
+[    2.347793] 
+[    2.360066] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:641 qcom,misc_regulator (null)
+[    2.368383] MSM-SENSOR-DRIVER msm_sensor_driver_parse:659 Enter
+[    2.374218] msm_sensor_get_sub_module_index:143 src_node NULL
+[    2.379976] msm_sensor_get_sub_module_index:158 eeprom src_node NULL
+[    2.386331] msm_sensor_get_sub_module_index:184 src_node NULL
+[    2.391997] msm_sensor_get_sub_module_index csiphy_core[0] = 1
+[    2.397887] msm_sensor_get_sub_module_index csid_core[0] = 1
+[    2.403453] msm_camera_get_dt_vreg_data qcom,cam-vreg-name count 3
+[    2.409679] msm_camera_get_dt_vreg_data reg_name[0] = cam_vdig
+[    2.415448] msm_camera_get_dt_vreg_data reg_name[1] = cam_vana
+[    2.421296] msm_camera_get_dt_vreg_data reg_name[2] = cam_vio
+[    2.426992] msm_camera_get_dt_vreg_data cam_vreg[0].type = 1
+[    2.432667] msm_camera_get_dt_vreg_data cam_vreg[1].type = 1
+[    2.438277] msm_camera_get_dt_vreg_data cam_vreg[2].type = 0
+[    2.443955] msm_camera_get_dt_vreg_data cam_vreg[0].op_mode = 0
+[    2.449821] msm_camera_get_dt_vreg_data cam_vreg[1].op_mode = 0
+[    2.455770] msm_camera_get_dt_vreg_data cam_vreg[2].op_mode = 1800000
+[    2.462165] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:512 gpio count 3
+[    2.469408] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[0] = 26
+[    2.477136] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[1] = 28
+[    2.484817] MSM-SENSOR-DRIVER msm_sensor_driver_get_gpio_data:523 gpio_array[2] = 112
+[    2.492654] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].gpio = 26
+[    2.499348] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].gpio = 28
+[    2.505984] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].gpio = 112
+[    2.512788] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].flags = 1
+[    2.519439] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].flags = 0
+[    2.526171] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].flags = 0
+[    2.532841] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[0].label = CAMIF_MCLK
+[    2.540273] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[1].label = CAM_RESET1
+[    2.547787] msm_camera_get_dt_gpio_req_tbl cam_gpio_req_tbl[2].label = CAM_VANA_GPIO
+[    2.555514] msm_camera_init_gpio_pin_tbl qcom,gpio-reset 28
+[    2.561008] msm_camera_init_gpio_pin_tbl qcom,gpio-ext-vana-power 112
+[    2.567498] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:617 qcom,cci-master 0, rc 0
+[    2.575432] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:628 msm_sensor_driver_get_dt_data qcom,mount-angle 0, rc -22
+[    2.575437] 
+[    2.587756] MSM-SENSOR-DRIVER msm_sensor_driver_get_dt_data:641 qcom,misc_regulator (null)
+[    2.596088] msm_led_trigger_add_driver:320 called
+[    2.600936] msm_led_trigger_probe:209 called
+[    2.604947] msm_led_trigger_probe:224 pdev id 0
+[    2.609442] msm_led_trigger_probe:228 count 2
+[    2.613846] msm_led_trigger_probe:252 default trigger flash0_trigger
+[    2.620139] msm_led_trigger_probe:265 max_current[0] 1000
+[    2.625580] msm_led_trigger_probe:252 default trigger flash1_trigger
+[    2.631840] msm_led_trigger_probe:265 max_current[1] 1000
+[    2.637296] msm_led_trigger_probe:282 default trigger torch_trigger
+[    2.643471] msm_led_trigger_probe:291 torch max_current 145
+[    2.649092] msm_led_flash_create_v4lsubdev:60 Enter
+[    2.653964] msm_led_flash_create_v4lsubdev:82 probe success
+[    2.660642] __msm_jpeg_init:895] Jpeg Device id 0
+[    2.665845] MSM-CPP cpp_init_hardware:758 stream_cnt:0
+[    2.670212] MSM-CPP cpp_init_hardware:781 cpp_dbg: end of cpp_init_hardware
+[    2.677653] MSM-CPP msm_queue_init:93 E
+[    2.680976] MSM-CPP msm_queue_init:93 E
+[    2.685859] iris_radio: Cannot open the command channel
+[    2.690268] qpnp_charger_read_dt_props: read EXT_OVP gpio (438) 
+[    2.751414] qcom,leds-qpnp qpnp-charger-e8a10600: Unable to get LED base address
+[    2.758308] qcom,leds-qpnp leds-qpnp-e8a3aa00: Regulator get failed(-517)
+[    2.764618] qcom,leds-qpnp leds-qpnp-e8a3aa00: Unable to read flash config data
+[    2.772000] i2c i2c-23: an30259a_probe
+[    2.783891] sps:BAM 0xfd404000 pipe 3 sharing violation
+[    2.788187] sps:Failed to connect BAM 0xe754d600 pipe 3
+[    2.793161] QCE50: qce_sps_init_ep_conn: sps_connect() fail pipe_handle=0xe754d800, rc = -1
+[    2.801747] sps:De-init client in connected state: 0x1535053
+[    2.809192] QCE50: __qce_init_clk: Unable to get CE core clk
+[    2.813908] QCE50: __qce_init_clk: Unable to init CE clks, rc = -2
+[    2.823427] usb_bam_ipa_create_resources: Failed to create USB_PROD resource
+[    2.830275] cm36651_parse_dt complete, vdd_en:110 p_out:65 /efs/prox_cal
+[    2.934526] cm36651_setup_reg: initial proximity value = 6
+[    2.941905] mpu6500_parse_dt complete, SCL:7 SDA:6 IRQ:64
+[    2.946718] mpu6500_vdd_on: error vreg_2p8 setting voltage ret=-22
+[    3.140922] msm8226-asoc-tapan sound-9302.46: Property 'qcom,audio-routing' does not exist or its length is not even
+[    3.162939] **** secdbg_log or secdbg_paddr is not initialized ****
+[    3.170449] qcom,leds-qpnp leds-qpnp-e8a3aa00: Regulator get failed(-517)
+[    3.176287] qcom,leds-qpnp leds-qpnp-e8a3aa00: Unable to read flash config data
+[    3.183680] qpnp_charger_read_dt_props: read EXT_OVP gpio (438) 
+[    3.189809] qpnp_chg_ibatterm_set: bad mA=70 asked to set, setting 100mA instead
+[    3.196996] qpnp_chg_ibatterm_set: REG IBAT_TERM_CHGR(105b) : 8 
+[    3.225932] get_prop_batt_temp: get_bat_temp: adc_code(32101) physical (323)
+[    3.232446] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    3.248480] sec_bat_read_dt_props: sec_bat_read_dt_props:parsing device tree for SEC dt parameters 
+[    3.256800] qpnp_charger_probe: SEC battery device tree read SUCCESS : rc(0) 
+[    3.259269] get_prop_batt_temp: get_bat_temp: adc_code(32100) physical (323)
+[    3.271059] qpnp_charger_probe: qpnp_charger_probe: initialize battery status(2) & health(1)
+[    3.279570] qpnp_batt_power_set_property: qpnp_batt_power_set_property: same cable, no change in cable type (0) 
+[    3.289538] qpnp_charger_probe: normal boot with cable_type(0)
+[    3.314602] get_prop_batt_temp: get_bat_temp: adc_code(32100) physical (323)
+[    3.331757] qpnp_chg_usb_usbin_valid_irq_handler: USB-IN triggered : usbin-valid voltage 
+[    3.339190] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    3.346713] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    3.354602] BMS: set_battery_data: battery capacity: 2100 mA
+[    3.474632] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    3.622652] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[    3.630331] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    3.660641] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[    3.667057] sec_jack_probe - defer as codec_probe_done is false
+[    3.670564] gpio-keys gpio_keys.82: [Keys] no regulator: ignoring
+[    3.673474] sec_debug_check_crash_key code 172 value 0 state 0 enable 0
+[    3.673536] sec_debug_check_crash_key code 114 value 0 state 0 enable 0
+[    3.673593] sec_debug_check_crash_key code 115 value 0 state 0 enable 0
+[    3.677244] sec_jack_probe - defer as codec_probe_done is false
+[    3.706366] sec_jack_probe - defer as codec_probe_done is false
+[    3.832460] sec_jack_probe - defer as codec_probe_done is false
+[    3.862692] msm_hsl_power: Unknown PM state 1
+[    4.010457] selinux: SELinux:  Could not stat /dev/block: No such file or directory.
+[    4.010462] 
+[    4.018930] init: waitid failed: No child processes
+[    4.038895] init: Unable to read config file '/vendor/etc/init/hw/init.qcom.rc': open() failed: No such file or directory
+[    4.048997] init: /init.rc: 10: Could not import file '/vendor/etc/init/hw/init.qcom.rc': No such file or directory
+[    4.060597] init: Unable to read config file '/system/etc/init': open() failed: No such file or directory
+[    4.069326] init: Unable to read config file '/product/etc/init': open() failed: No such file or directory
+[    4.078971] init: Unable to read config file '/odm/etc/init': open() failed: No such file or directory
+[    4.088239] init: Unable to read config file '/vendor/etc/init': open() failed: No such file or directory
+[    4.118079] ueventd: Unable to read config file '/vendor/ueventd.rc': open() failed: No such file or directory
+[    4.127276] ueventd: Unable to read config file '/odm/ueventd.rc': open() failed: No such file or directory
+[    4.138012] ueventd: /ueventd.qcom.rc: 146: invalid uid 'fm_radio'
+[    4.168941] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[    4.329616] get_prop_batt_temp: get_bat_temp: adc_code(32090) physical (324)
+[    4.387210] get_prop_batt_temp: get_bat_temp: adc_code(32089) physical (324)
+[    4.587102] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    4.611286] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[    5.294156] sec_chg_time_management: discharging state! timer inactive
+[    5.317315] get_prop_batt_temp: get_bat_temp: adc_code(32084) physical (324)
+[    5.332141] get_prop_batt_temp: get_bat_temp: adc_code(32083) physical (324)
+[    5.338283] sec_bat_monitor: status(2), health(1), batt_present(1), cable(0), siop(100)
+[    5.346250] sec_bat_monitor: soc(100), vcell(4345), current(-68), temperature(324), chg_en(0)
+[    5.354712] sec_bat_monitor: ovp_uvlo(0), second_phase_chg(0), polling_time(60), event(0x0), HT(600), LT(-50)
+[    5.412930] get_prop_batt_temp: get_bat_temp: adc_code(32082) physical (324)
+[    6.376417] sm5502 15-0025: dev1: 0x4,dev2: 0x0,dev3: 0x0,Carkit: 0x0,ADC: 0x1f,Jig: OFF
+[    6.383946] sm5502 15-0025: sm5502_attach_dev: vbus val2
+[    6.388849] sm5502_callback USB Cable status attached (1) 
+[    6.394369] qpnp_batt_power_set_property: qpnp_batt_power_set_property: cable type changed (0) -> (1) 
+[    6.403574] sec_handle_cable_insertion_removal: USB is inserted, chg_current 500, batt_present(1)
+[    6.412526] sec_handle_cable_insertion_removal: USB : SIOP change in current ibatmax_ma(500)
+[    6.420939] sec_pm8226_start_charging: enable charging for cable type (1) 
+[    6.427765] sec_pm8226_start_charging: battery status changed to (1)
+[    6.434039] qpnp_chg_charge_en:  qpnp_chg_charge_en called with enable=1
+[    6.440830] sec_handle_cable_insertion_removal: battery status changed from (2)->(1)
+[    6.448635] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[    6.456376] sec_chg_time_management: Charging Time: 0 secs (rechg:0)
+[    6.555263] get_prop_batt_temp: get_bat_temp: adc_code(32075) physical (325)
+[    6.583157] get_prop_batt_temp: get_bat_temp: adc_code(32075) physical (325)
+[    6.593676] get_prop_batt_temp: get_bat_temp: adc_code(32076) physical (325)
+[    6.599780] sec_bat_monitor: first phase charging: ui_full_cnt(1)
+[    6.605704] sec_bat_monitor: status(1), health(1), batt_present(1), cable(1), siop(100)
+[    6.613846] sec_bat_monitor: soc(100), vcell(4345), current(-62), temperature(325), chg_en(1)
+[    6.622325] sec_bat_monitor: ovp_uvlo(0), second_phase_chg(0), polling_time(60), event(0x0), HT(600), LT(-50)
+[    6.676066] get_prop_batt_temp: get_bat_temp: adc_code(32075) physical (325)
+[   14.183627] msm_thermal: Hotplug task is not initialized
+[   19.363462] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 1th superblock
+[   19.370512] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 2th superblock
+[   19.378046] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 1th superblock
+[   19.385743] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 2th superblock
+[   20.100158] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 1th superblock
+[   20.107223] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 2th superblock
+[   20.114727] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 1th superblock
+[   20.122373] F2FS-fs (mmcblk0p26): Can't find valid F2FS filesystem in 2th superblock
+[   20.840815] init: [libfs_mgr]mount_with_alternatives(): Mounted /dev/block/platform/msm_sdcc.1/by-name/userdata on /data with fs_type=ext4 instead of f2fs
+[   20.875254] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 1th superblock
+[   20.882321] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 2th superblock
+[   20.889837] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 1th superblock
+[   20.897491] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 2th superblock
+[   21.039894] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 1th superblock
+[   21.047016] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 2th superblock
+[   21.054417] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 1th superblock
+[   21.062155] F2FS-fs (mmcblk0p24): Can't find valid F2FS filesystem in 2th superblock
+[   21.126560] init: [libfs_mgr]mount_with_alternatives(): Mounted /dev/block/platform/msm_sdcc.1/by-name/cache on /cache with fs_type=ext4 instead of f2fs
+[   21.285764] init: Unable to read config file '/product/etc/init': open() failed: No such file or directory
+[   21.294637] init: Unable to read config file '/odm/etc/init': open() failed: No such file or directory
+[   21.317708] selinux: SELinux:  Could not read /sys/devices/fe200000.qcom,lpass/firmware/fe200000.qcom,lpass/power: No such file or directory.
+[   21.317715] 
+[   21.505178] selinux: SELinux:  Could not read /sys/devices/fe200000.qcom,lpass/firmware/fe200000.qcom,lpass: No such file or directory.
+[   21.505186] 
+[   21.567632] selinux: SELinux:  Could not read /sys/devices/fe200000.qcom,lpass/firmware/fe200000.qcom,lpass: No such file or directory.
+[   21.567638] 
+[   21.924532] sec_jack_probe - defer as codec_probe_done is false
+[   21.927334] diag: In diag_send_msg_mask_update, invalid status 0
+[   21.927341] diag: In diag_send_log_mask_update, invalid status 0
+[   21.942681] tapan-slim tapan-slim-pgd: Looking up qcom,cdc-micbias4-cfilt-sel property in node /soc/slim@fe12f000/tapan_codec failed
+[   21.953614] tapan-slim tapan-slim-pgd: Looking up qcom,cdc-dmic-sample-rate property in node /soc/slim@fe12f000/tapan_codec failed
+[   22.082971] selinux: SELinux:  Could not read /sys/devices/fb21b000.qcom,pronto/firmware/fb21b000.qcom,pronto/power: No such file or directory.
+[   22.082978] 
+[   22.118255] msm8226-asoc-tapan sound.45: Looking up qcom, cdc-lineout-spkr-gpios property in node /soc/sound failed -22
+[   22.128145] msm8226_asoc_machine_probe Ear jack LDO node not available
+[   22.135309] sec_jack_populate_dt_pdata : can not find the earjack-micbias-gpio in the dt
+[   23.000620] selinux: SELinux:  Could not read /sys/devices/fb21b000.qcom,pronto/firmware/fb21b000.qcom,pronto: No such file or directory.
+[   23.000626] 
+[   24.047135] diag: In diag_send_msg_mask_update, invalid status 0
+[   24.052263] diag: In diag_send_log_mask_update, invalid status 0
+[   24.078793] init: Unable to set property 'ro.telephony.call_ring.multiple' to '0' in property file '/system/build.prop': Read-only property was already set
+[   24.096779] init: Found bootloader id I9301IXCSAQE1 setting build properties for s3ve3g device
+[   24.104503] init: 
+[   24.202648] audit: rate limit exceeded
+[   24.310332] wcnss: wcnss_nvbin_dnld 
+[   24.313001] wcnss: request_firmware 
+[   24.325862] wcnss: NV bin size: 29812, total_fragments: 10
+[   24.327174] selinux: SELinux:  Could not read /sys/devices/fb000000.qcom,wcnss-wlan/firmware/fb000000.qcom,wcnss-wlan/power: No such file or directory.
+[   24.327182] 
+[   24.345607] wcnss: no space available for smd frame
+[   24.347392] selinux: SELinux:  Could not stat /metadata: No such file or directory.
+[   24.347397] 
+[   24.384228] wcnss: no space available for smd frame
+[   24.414395] wcnss: no space available for smd frame
+[   24.444288] wcnss: no space available for smd frame
+[   26.425937] audit: rate limit exceeded
+[   26.554877] init: Could not load single persistent property file, trying legacy directory: Unable to read persistent property file: open() failed: No such file or directory
+[   26.645369] init: property 'persist.sys.ssr.enable_debug' doesn't exist while expanding '${persist.sys.ssr.enable_debug}'
+[   26.832698] get_prop_batt_temp: get_bat_temp: adc_code(32069) physical (325)
+[   27.057347] init: File /vendor/bin/hw/android.hardware.sensors@1.0-service.samsung8226(labeled "u:object_r:vendor_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   27.355006] init: Could not find service hosting interface android.hardware.health@1.0::IHealth/default
+[   27.364086] init: File /system/bin/qseecomd(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   27.404909] init: File /system/bin/rfs_access(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   27.436809] audit: rate limit exceeded
+[   27.527339] init: Failed to bind socket 'pdx/system/vr/display/client': No such file or directory
+[   27.536503] init: Failed to bind socket 'pdx/system/vr/display/manager': No such file or directory
+[   27.545931] init: Failed to bind socket 'pdx/system/vr/display/vsync': No such file or directory
+[   27.554718] selinux: SELinux:  Could not read /sys/devices/fc880000.qcom,mss/firmware/fc880000.qcom,mss/power: No such file or directory.
+[   27.554725] 
+[   27.635560] init: Init cannot set 'ro.nfc.port' to 'I2C': Read-only property was already set
+[   27.657819] selinux: SELinux: Could not get canonical path for /sys/block/sda/queue/scheduler restorecon: No such file or directory.
+[   27.657827] 
+[   27.670743] selinux: SELinux: Could not get canonical path for /sys/block/sde/queue/scheduler restorecon: No such file or directory.
+[   27.670751] 
+[   27.684414] selinux: SELinux: Could not get canonical path for /sys/block/dm-0/queue/scheduler restorecon: No such file or directory.
+[   27.684422] 
+[   27.706378] init: setpgid failed for console: Operation not permitted
+[   27.806876] init: Could not find service hosting interface android.hardware.thermal@1.1::IThermal/default
+[   27.875294] init: File /system/bin/rmt_storage(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   27.995050] init: File /system/bin/adsprpcd(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   28.085111] init: File /system/bin/irsc_util(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   28.144919] init: File /system/bin/mpdecision(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   28.194874] init: File /system/bin/qmuxd(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   28.454780] audit: rate limit exceeded
+[   28.491030] q6asm_get_audio_client: invalid session: -1
+[   28.504596] APR: Wrong parameters
+[   28.507914] adm_get_params: Failed to Get Params on port 16385
+[   28.512796] msm_routing_get_rms_value_control: get parameters failed
+[   28.752916] Notify: smsm init
+[   28.875775] init: Could not find service hosting interface android.hardware.audio@4.0::IDevicesFactory/default
+[   28.891244] init: Could not start service 'audiod' as part of class 'late_start': Cannot find '/system/bin/audiod': No such file or directory
+[   28.904005] init: Could not start service 'qcamerasvr' as part of class 'late_start': Cannot find '/system/bin/mm-qcamera-daemon': No such file or directory
+[   28.931849] init: File /system/bin/time_daemon(labeled "u:object_r:system_file:s0") has incorrect label or no domain transition from u:r:init:s0 to another SELinux domain defined. Have you configured your service correctly? https://source.android.com/security/selinux/device-policy#label_new_services_and_address_denials
+[   29.338655] init: Could not find service hosting interface android.hardware.audio@2.0::IDevicesFactory/msd
+[   29.348399] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[   29.394617] init: Could not find service hosting interface android.hardware.keymaster@4.0::IKeymasterDevice/default
+[   29.402953] msm_audio_ion_import: DMA Buf name=audio_acdb_client, fd=11 handle=e8280040
+[   29.404284] diag: In diag_send_msg_mask_update, invalid status 0
+[   29.404291] diag: In diag_send_log_mask_update, invalid status 0
+[   29.459720] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   29.472050] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   29.510497] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   29.559579] audit: rate limit exceeded
+[   29.585095] init: Could not find service hosting interface android.hardware.usb.gadget@1.0::IUsbGadget/default
+[   29.594349] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   29.626231] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[   29.745490] init: Could not find service hosting interface android.hardware.gatekeeper@1.0::IGatekeeper/default
+[   30.331384] smd_pkt_open: DATA17_CNTL open failed -19
+[   30.633291] msm_open_cam_dummy: E
+[   31.097416] audit: rate limit exceeded
+[   31.418543] mdss_mdp_pipe_init: no 2 type pipes available
+[   31.423082] mdss_mdp_overlay_pipe_setup: error allocating pipe
+[   31.467679] mdss_dsi_event_handler: unhandled event=1
+[   31.881058] to maintain ddefault brightness 
+[   32.127978] sec_debug_check_crash_key code 115 value 1 state 0 enable 0
+[   32.158108] audit: rate limit exceeded
+[   32.181062] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.214383] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.247714] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.281057] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.314381] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.348489] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.381054] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.415195] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.448481] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.481052] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.514378] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.547721] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.581053] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.614382] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.647752] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.681330] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.715113] init: setpgid failed for console: Operation not permitted
+[   32.731076] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.764406] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.797826] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.831040] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.864624] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.897823] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.931054] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.964399] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   32.997731] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.031053] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.064383] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.097721] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.131041] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.164383] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.200168] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.231049] mdss_dsi_cmdlist_rx: No rx buffer provided
+[   33.558835] audit: rate limit exceeded
+[   35.134191] sec_debug_check_crash_key code 115 value 0 state 0 enable 0
+[   35.451008] audit: rate limit exceeded
+[   37.726359] init: setpgid failed for console: Operation not permitted
+[   40.088133] audit: rate limit exceeded
+[   40.449086] init: Could not find service hosting interface android.hardware.soundtrigger@2.0::ISoundTriggerHw/default
+[   40.582387] init: Could not find service hosting interface android.hardware.health@2.0::IHealth/default
+[   40.616178] get_prop_batt_temp: get_bat_temp: adc_code(31878) physical (335)
+[   40.674262] get_prop_batt_temp: get_bat_temp: adc_code(31877) physical (335)
+[   42.729095] init: setpgid failed for console: Operation not permitted
+[   42.746286] audit: rate limit exceeded
+[   44.144950] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[   44.189936] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[   46.154457] audit: rate limit exceeded
+[   47.732780] init: setpgid failed for console: Operation not permitted
+[   52.736278] init: setpgid failed for console: Operation not permitted
+[   57.742129] init: setpgid failed for console: Operation not permitted
+[   62.224621] audit: rate limit exceeded
+[   62.745354] init: setpgid failed for console: Operation not permitted
+[   66.644221] sec_chg_time_management: Charging Time: 60 secs (rechg:0)
+[   66.691795] get_prop_batt_temp: get_bat_temp: adc_code(31813) physical (338)
+[   66.736100] get_prop_batt_temp: get_bat_temp: adc_code(31813) physical (338)
+[   66.742359] sec_bat_monitor: first phase charging: ui_full_cnt(2)
+[   66.748385] sec_bat_monitor: status(1), health(1), batt_present(1), cable(1), siop(100)
+[   66.756904] sec_bat_monitor: soc(100), vcell(4345), current(-47), temperature(338), chg_en(1)
+[   66.764991] sec_bat_monitor: ovp_uvlo(0), second_phase_chg(0), polling_time(60), event(0x0), HT(600), LT(-50)
+[   66.893542] get_prop_batt_temp: get_bat_temp: adc_code(31812) physical (338)
+[   66.935603] get_prop_batt_temp: get_bat_temp: adc_code(31812) physical (338)
+[   67.751551] init: setpgid failed for console: Operation not permitted
+[   72.755862] init: setpgid failed for console: Operation not permitted
+[   77.757512] init: setpgid failed for console: Operation not permitted
+[   82.775461] init: setpgid failed for console: Operation not permitted
+[   84.140196] qpnp_batt_external_power_changed: skip qpnp_batt_external_power_changed
+[   84.193525] power_supply bms: driver failed to report `current_avg' property: 4294967274
+[   85.014026] 
+[   85.014028] kfree_hook: Use after free detected on the node 0xe8ac0e00 which was freed by __rcu_process_callbacks+0x1d0/0x418.
+[   85.025990] 
+[   86.843635] get_prop_batt_temp: get_bat_temp: adc_code(31769) physical (340)
+[   87.772153] init: setpgid failed for console: Operation not permitted
+[   89.236648] audit: rate limit exceeded
+[   92.783915] init: setpgid failed for console: Operation not permitted
+[   95.234219] init: Could not find service hosting interface android.hardware.oemlock@1.0::IOemLock/default
+[   96.280686] init: Could not find service hosting interface android.hardware.usb.gadget@1.0::IUsbGadget/default
+[   96.356931] init: Could not find service hosting interface android.hardware.thermal@1.0::IThermal/default
+[   96.832043] libprocessgroup: Failed to kill process cgroup uid 1013 pid 559 in 247ms, 1 processes remain
+[   97.188828] audit: rate limit exceeded
+[   97.785072] init: setpgid failed for console: Operation not permitted
+[   97.997377] init: Could not find service hosting interface android.hardware.audio@4.0::IDevicesFactory/default
+[   98.045790] init: Could not find service hosting interface android.hardware.audio@2.0::IDevicesFactory/msd
+[   98.072088] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[   98.145154] q6asm_get_audio_client: invalid session: -1
+[   98.150067] APR: Wrong parameters
+[   98.152725] adm_get_params: Failed to Get Params on port 16385
+[   98.159110] msm_routing_get_rms_value_control: get parameters failed
+[   98.506639] msm_audio_ion_import: DMA Buf name=audio_acdb_client, fd=11 handle=e4c73000
+[   98.561953] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   98.595372] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   98.637025] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   98.649276] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[   98.687918] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[   99.273418] audit: rate limit exceeded
+[  100.333346] audit: rate limit exceeded
+[  101.491581] audit: rate limit exceeded
+[  102.781981] init: setpgid failed for console: Operation not permitted
+[  102.789213] audit: rate limit exceeded
+[  106.134041] init: Could not find service hosting interface android.hardware.soundtrigger@2.0::ISoundTriggerHw/default
+[  106.203666] init: Could not find service hosting interface android.hardware.health@2.0::IHealth/default
+[  106.210454] audit: rate limit exceeded
+[  106.245511] get_prop_batt_temp: get_bat_temp: adc_code(31702) physical (344)
+[  106.308812] get_prop_batt_temp: get_bat_temp: adc_code(31703) physical (344)
+[  106.756409] init: Could not find service hosting interface android.hardware.oemlock@1.0::IOemLock/default
+[  107.565264] init: Could not find service hosting interface android.hardware.usb.gadget@1.0::IUsbGadget/default
+[  107.664580] init: Could not find service hosting interface android.hardware.thermal@1.0::IThermal/default
+[  107.792739] init: setpgid failed for console: Operation not permitted
+[  108.316239] libprocessgroup: Failed to kill process cgroup uid 1013 pid 559 in 241ms, 1 processes remain
+[  108.714744] audit: rate limit exceeded
+[  109.313785] init: Could not find service hosting interface android.hardware.audio@4.0::IDevicesFactory/default
+[  109.335505] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[  109.354905] init: Could not find service hosting interface android.hardware.audio@2.0::IDevicesFactory/msd
+[  109.401413] q6asm_get_audio_client: invalid session: -1
+[  109.407472] APR: Wrong parameters
+[  109.409805] adm_get_params: Failed to Get Params on port 16385
+[  109.417654] msm_routing_get_rms_value_control: get parameters failed
+[  109.693588] msm_audio_ion_import: DMA Buf name=audio_acdb_client, fd=11 handle=e6d0e340
+[  109.747353] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  109.762797] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  109.796275] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  109.812760] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  109.844326] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[  110.742318] audit: rate limit exceeded
+[  111.839959] audit: rate limit exceeded
+[  112.604238] sec_debug_check_crash_key code 114 value 1 state 0 enable 0
+[  112.793162] init: setpgid failed for console: Operation not permitted
+[  112.945573] sec_debug_check_crash_key code 116 value 1 state 0 enable 0
+[  112.951206] (sec_debug_set_upload_cause) 85
+[  114.355949] audit: rate limit exceeded
+[  114.422866] sec_debug_check_crash_key code 116 value 0 state 0 enable 0
+[  114.428543] (sec_debug_set_upload_cause) cafebabe
+[  114.705110] sec_debug_check_crash_key code 116 value 1 state 0 enable 0
+[  114.710792] (sec_debug_set_upload_cause) 85
+[  117.399422] init: Could not find service hosting interface android.hardware.soundtrigger@2.0::ISoundTriggerHw/default
+[  117.425125] init: Could not find service hosting interface android.hardware.health@2.0::IHealth/default
+[  117.455100] audit: rate limit exceeded
+[  117.495820] get_prop_batt_temp: get_bat_temp: adc_code(31653) physical (346)
+[  117.552222] get_prop_batt_temp: get_bat_temp: adc_code(31653) physical (346)
+[  117.792722] init: setpgid failed for console: Operation not permitted
+[  118.013939] init: Could not find service hosting interface android.hardware.oemlock@1.0::IOemLock/default
+[  118.853203] init: Could not find service hosting interface android.hardware.usb.gadget@1.0::IUsbGadget/default
+[  118.948201] init: Could not find service hosting interface android.hardware.thermal@1.0::IThermal/default
+[  119.549951] libprocessgroup: Failed to kill process cgroup uid 1013 pid 559 in 235ms, 1 processes remain
+[  119.855672] audit: rate limit exceeded
+[  120.507306] init: Could not find service hosting interface android.hardware.audio@4.0::IDevicesFactory/default
+[  120.541889] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[  120.552923] init: Could not find service hosting interface android.hardware.audio@2.0::IDevicesFactory/msd
+[  120.612263] q6asm_get_audio_client: invalid session: -1
+[  120.618169] APR: Wrong parameters
+[  120.620602] adm_get_params: Failed to Get Params on port 16385
+[  120.627880] msm_routing_get_rms_value_control: get parameters failed
+[  120.883899] msm_audio_ion_import: DMA Buf name=audio_acdb_client, fd=11 handle=e816f400
+[  120.942511] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  120.954980] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  120.974511] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  120.996733] q6asm_callback: cmd = 0x10bcd returned error = 0x5
+[  121.012742] init: Could not find service hosting interface android.hardware.audio.effect@4.0::IEffectsFactory/default
+[  121.879873] audit: rate limit exceeded
+
+No errors detected

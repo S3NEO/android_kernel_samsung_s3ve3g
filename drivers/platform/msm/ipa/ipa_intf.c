@@ -60,6 +60,18 @@ int ipa_register_intf(const char *name, const struct ipa_tx_intf *tx,
 		return -EINVAL;
 	}
 
+	if (tx && tx->num_props > IPA_NUM_PROPS_MAX) {
+		IPAERR("invalid tx num_props=%d max=%d\n", tx->num_props,
+				IPA_NUM_PROPS_MAX);
+		return -EINVAL;
+	}
+
+	if (rx && rx->num_props > IPA_NUM_PROPS_MAX) {
+		IPAERR("invalid rx num_props=%d max=%d\n", rx->num_props,
+				IPA_NUM_PROPS_MAX);
+		return -EINVAL;
+	}
+
 	len = sizeof(struct ipa_intf);
 	intf = kzalloc(len, GFP_KERNEL);
 	if (intf == NULL) {
@@ -198,6 +210,14 @@ int ipa_query_intf_tx_props(struct ipa_ioc_query_intf_tx_props *tx)
 	mutex_lock(&ipa_ctx->lock);
 	list_for_each_entry(entry, &ipa_ctx->intf_list, link) {
 		if (!strncmp(entry->name, tx->name, IPA_RESOURCE_NAME_MAX)) {
+			/* add the entry check */
+			if (entry->num_tx_props != tx->num_tx_props) {
+				IPAERR("invalid entry number(%u %u)\n",
+					entry->num_tx_props,
+						tx->num_tx_props);
+				mutex_unlock(&ipa_ctx->lock);
+				return result;
+			}
 			memcpy(tx->tx, entry->tx, entry->num_tx_props *
 			       sizeof(struct ipa_ioc_tx_intf_prop));
 			result = 0;
@@ -231,6 +251,14 @@ int ipa_query_intf_rx_props(struct ipa_ioc_query_intf_rx_props *rx)
 	mutex_lock(&ipa_ctx->lock);
 	list_for_each_entry(entry, &ipa_ctx->intf_list, link) {
 		if (!strncmp(entry->name, rx->name, IPA_RESOURCE_NAME_MAX)) {
+			/* add the entry check */
+			if (entry->num_rx_props != rx->num_rx_props) {
+				IPAERR("invalid entry number(%u %u)\n",
+					entry->num_rx_props,
+						rx->num_rx_props);
+				mutex_unlock(&ipa_ctx->lock);
+				return result;
+			}
 			memcpy(rx->rx, entry->rx, entry->num_rx_props *
 					sizeof(struct ipa_ioc_rx_intf_prop));
 			result = 0;

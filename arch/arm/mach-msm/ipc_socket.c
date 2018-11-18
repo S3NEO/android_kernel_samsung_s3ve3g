@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -567,11 +567,19 @@ static unsigned int msm_ipc_router_poll(struct file *file,
 static int msm_ipc_router_close(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
-	struct msm_ipc_port *port_ptr = msm_ipc_sk_port(sk);
+	struct msm_ipc_port *port_ptr;
 	void *pil = msm_ipc_sk(sk)->default_pil;
 	int ret;
 
+	if (!sk)
+		return -EINVAL;
+
 	lock_sock(sk);
+	port_ptr = msm_ipc_sk_port(sk);
+	if (!port_ptr) {
+		release_sock(sk);
+		return -EINVAL;
+	}
 	ret = msm_ipc_router_close_port(port_ptr);
 	if (pil)
 		msm_ipc_unload_default_node(pil);
@@ -626,13 +634,13 @@ void msm_ipc_router_ipc_log_init(void)
 {
 	ipc_req_resp_log_txt =
 		ipc_log_context_create(REQ_RESP_IPC_LOG_PAGES,
-			"ipc_rtr_req_resp");
+			"ipc_rtr_req_resp", 0);
 	if (!ipc_req_resp_log_txt) {
 		pr_err("%s: Unable to create IPC logging for Req/Resp",
 			__func__);
 	}
 	ipc_ind_log_txt =
-		ipc_log_context_create(IND_IPC_LOG_PAGES, "ipc_rtr_ind");
+		ipc_log_context_create(IND_IPC_LOG_PAGES, "ipc_rtr_ind", 0);
 	if (!ipc_ind_log_txt) {
 		pr_err("%s: Unable to create IPC logging for Indications",
 			__func__);
