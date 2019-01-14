@@ -901,23 +901,21 @@ static int __ref update_offline_cores(int val)
 	msm_thermal_info.cpus_offlined = msm_thermal_info.core_control_mask & val;
 
 	for_each_possible_cpu(cpu) {
-			if (msm_thermal_info.cpus_offlined & BIT(cpu)) {
+		if (msm_thermal_info.cpus_offlined & BIT(cpu)) {
 #ifdef CONFIG_STATE_HELPER
 			thermal_notify(cpu, 0);
 #endif
+			if (!cpu_online(cpu)) {
 				continue;
-				}
-			if (!cpu_online(cpu))
-				continue;
+			}
 			ret = cpu_down(cpu);
-			if (ret)
+			if (ret) {
 				pr_err("Unable to offline CPU%d. err:%d\n",
 					cpu, ret);
-			else
+			} else {
 				pr_debug("Offlined CPU%d\n", cpu);
-			trace_thermal_post_core_offline(cpu,
-				cpumask_test_cpu(cpu, cpu_online_mask));
-		} else if (online_core && (previous_cpus_offlined & BIT(cpu))) {
+			}
+		  } else if (online_core && (previous_cpus_offlined & BIT(cpu))) {
 #ifdef CONFIG_STATE_HELPER
 			thermal_notify(cpu, 1);
 #endif
@@ -938,8 +936,6 @@ static int __ref update_offline_cores(int val)
 	if (previous_cpus_offlined != msm_thermal_info.cpus_offlined)
 		reschedule_helper();
 #endif
-
->>>>>>> 12d604fb25c... mach-msm: Add state_helper driver
 	return ret;
 }
 
