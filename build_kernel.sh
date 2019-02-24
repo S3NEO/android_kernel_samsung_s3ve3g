@@ -36,11 +36,11 @@ CLEAN()
 	echo "================================="
 	echo ""
 
-    make clean
+	make clean
 	make mrproper
 
 	if [ $2 == 0 ]; then
-	    if [ -d $OUTPUT_DIR ]; then
+		if [ -d $OUTPUT_DIR ]; then
 		    rm -rf $OUTPUT_DIR
 		    echo "output directory removed"
 		else
@@ -125,8 +125,6 @@ BUILD_ZIMAGE()
 	APPEND_DTB
 	BUILD_DTIMAGE_TARGET
 
-	cp $OUTPUT_DIR/arch/arm/boot/Image $BUILD_KERNEL_DIR/arch/arm/boot/zImage
-
 	echo ""
 	echo "=============================================="
 	echo "BUILDING KERNEL FINISHED"
@@ -135,31 +133,31 @@ BUILD_ZIMAGE()
 }
 
 # MAIN FUNCTION
-rm -rf ./build.log
+rm -rf ../build.log
 (
 	echo "=============================================="
 	echo "Do you wish to clean up kernel source first?"
 	echo "=============================================="
 	select options in "Yes, remove output too" "Yes" "No" "Cancel"; do
-        case $options in
-            "Yes, remove output too")
+	case $options in
+		"Yes, remove output too")
 			CLEAN "Cleaning up and removing output..." 0
 			break
 			;;
-			"Yes") 
+		"Yes")
 			CLEAN "Cleaning up..." 1
 			break
 			;;
-            "No") 
+		"No")
 			echo "proceeding without cleaning up..."
 			break
 			;;
-			"Cancel") 
+		"Cancel")
 			echo "Script aborted..."
 			exit
 			;;
-        esac
-    done
+		esac
+	done
 
 	START_TIME=`date +%s`
 
@@ -169,4 +167,4 @@ rm -rf ./build.log
 
 	let "ELAPSED_TIME=$END_TIME-$START_TIME"
 	echo "Total compile time is $ELAPSED_TIME seconds"
-) 2>&1	 | tee -a ./build.log
+) 2>&1	 | tee -a ../build.log
