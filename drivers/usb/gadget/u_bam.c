@@ -54,28 +54,31 @@ static const char *bam_ch_names[] = { "bam_dmux_ch_8" };
 
 #define DL_INTR_THRESHOLD			20
 
-unsigned int bam_mux_tx_pkt_drop_thld = BAM_MUX_TX_PKT_DROP_THRESHOLD;
+static unsigned int bam_pending_limit = BAM_PENDING_LIMIT;
+module_param(bam_pending_limit, uint, S_IRUGO | S_IWUSR);
+
+static unsigned int bam_mux_tx_pkt_drop_thld = BAM_MUX_TX_PKT_DROP_THRESHOLD;
 module_param(bam_mux_tx_pkt_drop_thld, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_rx_fctrl_en_thld = BAM_MUX_RX_PKT_FCTRL_EN_TSHOLD;
+static unsigned int bam_mux_rx_fctrl_en_thld = BAM_MUX_RX_PKT_FCTRL_EN_TSHOLD;
 module_param(bam_mux_rx_fctrl_en_thld, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_rx_fctrl_support = BAM_MUX_RX_PKT_FLOW_CTRL_SUPPORT;
+static unsigned int bam_mux_rx_fctrl_support = BAM_MUX_RX_PKT_FLOW_CTRL_SUPPORT;
 module_param(bam_mux_rx_fctrl_support, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_rx_fctrl_dis_thld = BAM_MUX_RX_PKT_FCTRL_DIS_TSHOLD;
+static unsigned int bam_mux_rx_fctrl_dis_thld = BAM_MUX_RX_PKT_FCTRL_DIS_TSHOLD;
 module_param(bam_mux_rx_fctrl_dis_thld, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_tx_q_size = BAM_MUX_TX_Q_SIZE;
+static unsigned int bam_mux_tx_q_size = BAM_MUX_TX_Q_SIZE;
 module_param(bam_mux_tx_q_size, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_rx_q_size = BAM_MUX_RX_Q_SIZE;
+static unsigned int bam_mux_rx_q_size = BAM_MUX_RX_Q_SIZE;
 module_param(bam_mux_rx_q_size, uint, S_IRUGO | S_IWUSR);
 
-unsigned int bam_mux_rx_req_size = BAM_MUX_RX_REQ_SIZE;
+static unsigned int bam_mux_rx_req_size = BAM_MUX_RX_REQ_SIZE;
 module_param(bam_mux_rx_req_size, uint, S_IRUGO | S_IWUSR);
 
-unsigned int dl_intr_threshold = DL_INTR_THRESHOLD;
+static unsigned int dl_intr_threshold = DL_INTR_THRESHOLD;
 module_param(dl_intr_threshold, uint, S_IRUGO | S_IWUSR);
 
 #define BAM_CH_OPENED	BIT(0)
@@ -113,6 +116,10 @@ struct bam_ch_info {
 	unsigned int		rx_len;
 	unsigned long		to_modem;
 	unsigned long		to_host;
+	unsigned int		rx_flow_control_disable;
+	unsigned int		rx_flow_control_enable;
+	unsigned int		rx_flow_control_triggered;
+	unsigned int		max_num_pkts_pending_with_bam;
 };
 
 struct gbam_port {
@@ -162,7 +169,7 @@ static int gbam_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	int i;
 	struct usb_request *req;
 
-	pr_debug("%s: ep:%p head:%p num:%d cb:%p", __func__,
+	pr_debug("%s: ep:%pK head:%pK num:%d cb:%pK", __func__,
 			ep, head, num, cb);
 
 	for (i = 0; i < num; i++) {
@@ -256,7 +263,7 @@ void gbam_data_recv_cb(void *p, struct sk_buff *skb)
 	if (!skb)
 		return;
 
-	pr_debug("%s: p:%p#%d d:%p skb_len:%d\n", __func__,
+	pr_debug("%s: p:%pK#%d d:%pK skb_len:%d\n", __func__,
 			port, port->port_num, d, skb->len);
 
 	spin_lock_irqsave(&port->port_lock_dl, flags);
@@ -297,7 +304,7 @@ void gbam_data_write_done(void *p, struct sk_buff *skb)
 
 	d->pending_with_bam--;
 
-	pr_debug("%s: port:%p d:%p tom:%lu pbam:%u, pno:%d\n", __func__,
+	pr_debug("%s: port:%pK d:%pK tom:%lu pbam:%u, pno:%d\n", __func__,
 			port, d, d->to_modem,
 			d->pending_with_bam, port->port_num);
 
@@ -324,7 +331,7 @@ static void gbam_data_write_tobam(struct work_struct *w)
 		return;
 	}
 
-	while (d->pending_with_bam < BAM_PENDING_LIMIT) {
+	while (d->pending_with_bam < bam_pending_limit) {
 		skb =  __skb_dequeue(&d->rx_skb_q);
 		if (!skb)
 			break;
@@ -332,7 +339,7 @@ static void gbam_data_write_tobam(struct work_struct *w)
 		d->pending_with_bam++;
 		d->to_modem++;
 
-		pr_debug("%s: port:%p d:%p tom:%lu pbam:%u pno:%d\n", __func__,
+		pr_debug("%s: port:%pK d:%pK tom:%lu pbam:%u pno:%d\n", __func__,
 				port, d, d->to_modem, d->pending_with_bam,
 				port->port_num);
 
@@ -347,14 +354,21 @@ static void gbam_data_write_tobam(struct work_struct *w)
 			dev_kfree_skb_any(skb);
 			break;
 		}
+		if (d->pending_with_bam > d->max_num_pkts_pending_with_bam)
+			d->max_num_pkts_pending_with_bam = d->pending_with_bam;
 	}
 
 	qlen = d->rx_skb_q.qlen;
 
 	spin_unlock_irqrestore(&port->port_lock_ul, flags);
 
-	if (qlen < BAM_MUX_RX_PKT_FCTRL_DIS_TSHOLD)
+	if (qlen < bam_mux_rx_fctrl_dis_thld) {
+		if (d->rx_flow_control_triggered) {
+			d->rx_flow_control_disable++;
+			d->rx_flow_control_triggered = 0;
+		}
 		gbam_start_rx(port);
+	}
 }
 /*-------------------------------------------------------------*/
 
@@ -435,7 +449,10 @@ gbam_epout_complete(struct usb_ep *ep, struct usb_request *req)
 	 */
 	if (bam_mux_rx_fctrl_support &&
 		d->rx_skb_q.qlen >= bam_mux_rx_fctrl_en_thld) {
-
+		if (!d->rx_flow_control_triggered) {
+			d->rx_flow_control_triggered = 1;
+			d->rx_flow_control_enable++;
+		}
 		list_add_tail(&req->list, &d->rx_idle);
 		spin_unlock(&port->port_lock_ul);
 		return;
@@ -643,7 +660,7 @@ static void gbam_start_io(struct gbam_port *port)
 	int			ret;
 	struct bam_ch_info	*d;
 
-	pr_debug("%s: port:%p\n", __func__, port);
+	pr_debug("%s: port:%pK\n", __func__, port);
 
 	spin_lock_irqsave(&port->port_lock_ul, flags);
 	if (!port->port_usb) {
@@ -993,7 +1010,7 @@ reenable_eps:
 	if (reenable_eps) {
 		ret = usb_ep_enable(port->port_usb->in);
 		if (ret) {
-			pr_err("%s: usb_ep_enable failed eptype:IN ep:%p",
+			pr_err("%s: usb_ep_enable failed eptype:IN ep:%pK",
 				__func__, port->port_usb->in);
 			return ret;
 		}
@@ -1001,7 +1018,7 @@ reenable_eps:
 
 		ret = usb_ep_enable(port->port_usb->out);
 		if (ret) {
-			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
+			pr_err("%s: usb_ep_enable failed eptype:OUT ep:%pK",
 				__func__, port->port_usb->out);
 			port->port_usb->in->driver_data = 0;
 			return ret;
@@ -1155,7 +1172,7 @@ static int gbam_port_alloc(int portno)
 	pdrv->driver.owner = THIS_MODULE;
 
 	platform_driver_register(pdrv);
-	pr_debug("%s: port:%p portno:%d\n", __func__, port, portno);
+	pr_debug("%s: port:%pK portno:%d\n", __func__, port, portno);
 
 	return 0;
 }
@@ -1185,7 +1202,7 @@ static int gbam2bam_port_alloc(int portno)
 	d->port = port;
 	bam2bam_ports[portno] = port;
 
-	pr_debug("%s: port:%p portno:%d\n", __func__, port, portno);
+	pr_debug("%s: port:%pK portno:%d\n", __func__, port, portno);
 
 	return 0;
 }
@@ -1217,12 +1234,16 @@ static ssize_t gbam_read_stats(struct file *file, char __user *ubuf,
 		d = &port->data_ch;
 
 		temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-				"#PORT:%d port:%p data_ch:%p#\n"
+				"#PORT:%d port:%pK data_ch:%pK#\n"
 				"dpkts_to_usbhost: %lu\n"
 				"dpkts_to_modem:  %lu\n"
 				"dpkts_pwith_bam: %u\n"
 				"to_usbhost_dcnt:  %u\n"
 				"tomodem__dcnt:  %u\n"
+				"rx_flow_control_disable_count: %u\n"
+				"rx_flow_control_enable_count: %u\n"
+				"rx_flow_control_triggered: %u\n"
+				"max_num_pkts_pending_with_bam: %u\n"
 				"tx_buf_len:	 %u\n"
 				"rx_buf_len:	 %u\n"
 				"data_ch_open:   %d\n"
@@ -1231,6 +1252,10 @@ static ssize_t gbam_read_stats(struct file *file, char __user *ubuf,
 				d->to_host, d->to_modem,
 				d->pending_with_bam,
 				d->tohost_drp_cnt, d->tomodem_drp_cnt,
+				d->rx_flow_control_disable,
+				d->rx_flow_control_enable,
+				d->rx_flow_control_triggered,
+				d->max_num_pkts_pending_with_bam,
 				d->tx_skb_q.qlen, d->rx_skb_q.qlen,
 				test_bit(BAM_CH_OPENED, &d->flags),
 				test_bit(BAM_CH_READY, &d->flags));
@@ -1269,6 +1294,10 @@ static ssize_t gbam_reset_stats(struct file *file, const char __user *buf,
 		d->pending_with_bam = 0;
 		d->tohost_drp_cnt = 0;
 		d->tomodem_drp_cnt = 0;
+		d->rx_flow_control_disable = 0;
+		d->rx_flow_control_enable = 0;
+		d->rx_flow_control_triggered = 0;
+		d->max_num_pkts_pending_with_bam = 0;
 
 		spin_unlock(&port->port_lock_dl);
 		spin_unlock_irqrestore(&port->port_lock_ul, flags);
@@ -1313,7 +1342,7 @@ void gbam_disconnect(struct grmnet *gr, u8 port_num, enum transport_type trans)
 	unsigned long		flags;
 	struct bam_ch_info	*d;
 
-	pr_debug("%s: grmnet:%p port#%d\n", __func__, gr, port_num);
+	pr_debug("%s: grmnet:%pK port#%d\n", __func__, gr, port_num);
 
 	if (trans == USB_GADGET_XPORT_BAM &&
 		port_num >= n_bam_ports) {
@@ -1381,7 +1410,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 	int			ret;
 	unsigned long		flags;
 
-	pr_debug("%s: grmnet:%p port#%d\n", __func__, gr, port_num);
+	pr_debug("%s: grmnet:%pK port#%d\n", __func__, gr, port_num);
 
 	if (trans == USB_GADGET_XPORT_BAM && port_num >= n_bam_ports) {
 		pr_err("%s: invalid portno#%d\n", __func__, port_num);
@@ -1409,7 +1438,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 
 	ret = usb_ep_enable(gr->in);
 	if (ret) {
-		pr_err("%s: usb_ep_enable failed eptype:IN ep:%p",
+		pr_err("%s: usb_ep_enable failed eptype:IN ep:%pK",
 			__func__, gr->in);
 		return ret;
 	}
@@ -1417,7 +1446,7 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 
 	ret = usb_ep_enable(gr->out);
 	if (ret) {
-		pr_err("%s: usb_ep_enable failed eptype:OUT ep:%p",
+		pr_err("%s: usb_ep_enable failed eptype:OUT ep:%pK",
 			__func__, gr->out);
 		gr->in->driver_data = 0;
 		return ret;
@@ -1434,6 +1463,10 @@ int gbam_connect(struct grmnet *gr, u8 port_num,
 		d->pending_with_bam = 0;
 		d->tohost_drp_cnt = 0;
 		d->tomodem_drp_cnt = 0;
+		d->rx_flow_control_disable = 0;
+		d->rx_flow_control_enable = 0;
+		d->rx_flow_control_triggered = 0;
+		d->max_num_pkts_pending_with_bam = 0;
 	}
 
 	spin_unlock(&port->port_lock_dl);

@@ -305,8 +305,10 @@ static void acc_complete_in(struct usb_ep *ep, struct usb_request *req)
 {
 	struct acc_dev *dev = _acc_dev;
 
-	if (req->status != 0)
+	if (req->status == -ESHUTDOWN) {
+		pr_debug("acc_complete_in set disconnected");
 		acc_set_disconnected(dev);
+	}
 
 	req_put(dev, &dev->tx_idle, req);
 
@@ -318,8 +320,10 @@ static void acc_complete_out(struct usb_ep *ep, struct usb_request *req)
 	struct acc_dev *dev = _acc_dev;
 
 	dev->rx_done = 1;
-	if (req->status != 0)
+	if (req->status == -ESHUTDOWN) {
+		pr_debug("acc_complete_out set disconnected");
 		acc_set_disconnected(dev);
+	}
 
 	wake_up(&dev->read_wq);
 }
@@ -535,7 +539,7 @@ static int create_bulk_endpoints(struct acc_dev *dev,
 	struct usb_ep *ep;
 	int i;
 
-	DBG(cdev, "create_bulk_endpoints dev: %p\n", dev);
+	DBG(cdev, "create_bulk_endpoints dev: %pK\n", dev);
 
 	ep = usb_ep_autoconfig(cdev->gadget, in_desc);
 	if (!ep) {
@@ -601,8 +605,10 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 
 	pr_debug("acc_read(%d)\n", count);
 
-	if (dev->disconnected)
+	if (dev->disconnected) {
+		pr_debug("acc_read disconnected");
 		return -ENODEV;
+	}
 
 	if (count > BULK_BUFFER_SIZE)
 		count = BULK_BUFFER_SIZE;
@@ -615,6 +621,12 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 		goto done;
 	}
 
+	if (dev->rx_done) {
+		// last req cancelled. try to get it.
+		req = dev->rx_req[0];
+		goto copy_data;
+	}
+
 requeue_req:
 	/* queue a request */
 	req = dev->rx_req[0];
@@ -625,22 +637,30 @@ requeue_req:
 		r = -EIO;
 		goto done;
 	} else {
-		pr_debug("rx %p queue\n", req);
+		pr_debug("rx %pK queue\n", req);
 	}
 
 	/* wait for a request to complete */
 	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
 	if (ret < 0) {
 		r = ret;
-		usb_ep_dequeue(dev->ep_out, req);
+		ret = usb_ep_dequeue(dev->ep_out, req);
+		if (ret != 0) {
+			// cancel failed. There can be a data already received.
+			// it will be retrieved in the next read.
+			pr_debug("acc_read: cancelling failed %d", ret);
+		}
 		goto done;
 	}
+
+copy_data:
+	dev->rx_done = 0;
 	if (dev->online) {
 		/* If we got a 0-len packet, throw it back and try again. */
 		if (req->actual == 0)
 			goto requeue_req;
 
-		pr_debug("rx %p %d\n", req, req->actual);
+		pr_debug("rx %pK %d\n", req, req->actual);
 		xfer = (req->actual < count) ? req->actual : count;
 		r = xfer;
 		if (copy_to_user(buf, req->buf, xfer))
@@ -663,8 +683,10 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 
 	pr_debug("acc_write(%d)\n", count);
 
-	if (!dev->online || dev->disconnected)
+	if (!dev->online || dev->disconnected) {
+		pr_debug("acc_write disconnected or not online");
 		return -ENODEV;
+	}
 
 	while (count > 0) {
 		if (!dev->online) {
@@ -682,10 +704,17 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 			break;
 		}
 
-		if (count > BULK_BUFFER_SIZE)
+		if (count > BULK_BUFFER_SIZE) {
 			xfer = BULK_BUFFER_SIZE;
-		else
+			/* ZLP, They will be more TX requests so not yet. */
+			req->zero = 0;
+		} else {
 			xfer = count;
+			/* If the data length is a multple of the
+			 * maxpacket size then send a zero length packet(ZLP).
+			*/
+			req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
+		}
 		if (copy_from_user(req->buf, buf, xfer)) {
 			r = -EFAULT;
 			break;
@@ -835,7 +864,7 @@ static int acc_ctrlrequest(struct usb_composite_dev *cdev,
 		if (b_request == ACCESSORY_START) {
 			dev->start_requested = 1;
 			schedule_delayed_work(
-				&dev->start_work, msecs_to_jiffies(10));
+				&dev->start_work, msecs_to_jiffies(200));
 			value = 0;
 		} else if (b_request == ACCESSORY_SEND_STRING) {
 			dev->string_index = w_index;
@@ -923,7 +952,7 @@ acc_function_bind(struct usb_configuration *c, struct usb_function *f)
 	int			id;
 	int			ret;
 
-	DBG(cdev, "acc_function_bind dev: %p\n", dev);
+	DBG(cdev, "acc_function_bind dev: %pK\n", dev);
 
 	ret = hid_register_driver(&acc_hid_driver);
 	if (ret)
@@ -1085,7 +1114,7 @@ static void acc_hid_work(struct work_struct *data)
 	list_for_each_safe(entry, temp, &new_list) {
 		hid = list_entry(entry, struct acc_hid_dev, list);
 		if (acc_hid_init(hid)) {
-			pr_err("can't add HID device %p\n", hid);
+			pr_err("can't add HID device %pK\n", hid);
 			acc_hid_delete(hid);
 		} else {
 			spin_lock_irqsave(&dev->lock, flags);
@@ -1185,7 +1214,7 @@ static int acc_bind_config(struct usb_configuration *c)
 	dev->cdev = c->cdev;
 	dev->function.name = "accessory";
 	dev->function.strings = acc_strings,
-	dev->function.descriptors = fs_acc_descs;
+	dev->function.fs_descriptors = fs_acc_descs;
 	dev->function.hs_descriptors = hs_acc_descs;
 	if (gadget_is_superspeed(c->cdev->gadget))
 		dev->function.ss_descriptors = ss_acc_descs;

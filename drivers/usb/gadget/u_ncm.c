@@ -19,11 +19,28 @@
  */
 
 #include "f_ncm.c"
+#include <linux/miscdevice.h>
+#include <linux/module.h>
 
 /* Support dynamic tethering mode.
  * if ncm_connect is true, device is received vendor specific request
  * from head unit.
  */
+
+struct ncm_dev {
+	struct work_struct work;
+};
+
+
+static const char mirrorlink_shortname[] = "usb_ncm";
+/* Create misc driver for Mirror Link cmd */
+static struct miscdevice mirrorlink_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = mirrorlink_shortname,
+	//.fops = &mirrorlink_fops,
+};
+
+
 static bool ncm_connect;
 
 /* terminal version using vendor specific request */
@@ -34,17 +51,58 @@ struct ncm_function_config {
 	u8      ethaddr[ETH_ALEN];
 };
 
+static struct ncm_dev *_ncm_dev;
+
+static void ncm_work(struct work_struct *data)
+{
+	char *ncm_start[2] = { "NCM_DEVICE=START", NULL };
+	char *ncm_release[2] = { "NCM_DEVICE=RELEASE", NULL };
+	char **uevent_envp = NULL;
+
+	printk(KERN_DEBUG "usb: %s ncm_connect=%d\n", __func__, ncm_connect);
+
+	if ( ncm_connect==true )
+		uevent_envp = ncm_start;
+	else
+		uevent_envp = ncm_release;
+
+	kobject_uevent_env(&mirrorlink_device.this_device->kobj, KOBJ_CHANGE, uevent_envp);
+}
+
 static int ncm_function_init(struct android_usb_function *f,
 		struct usb_composite_dev *cdev)
 {
+	struct ncm_dev *dev;
+	int ret=0;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+
 	f->config = kzalloc(sizeof(struct ncm_function_config), GFP_KERNEL);
+
+	if (!f->config)
+	{
+		kfree(dev);
+		return -ENOMEM;
+	}
+	INIT_WORK(&dev->work, ncm_work);
+
+	_ncm_dev = dev;
+
+	ret = misc_register(&mirrorlink_device);
+	if (ret)
+		printk("usb: %s - usb_ncm misc driver fail \n",__func__);
 	return 0;
 }
 
 static void ncm_function_cleanup(struct android_usb_function *f)
 {
+	misc_deregister(&mirrorlink_device);
+	kfree(_ncm_dev);
 	kfree(f->config);
 	f->config = NULL;
+	_ncm_dev = NULL;
 }
 
 static int ncm_function_bind_config(struct android_usb_function *f,
@@ -89,7 +147,9 @@ static int ncm_function_bind_config(struct android_usb_function *f,
 	/* we have to use trick.
 	 * rndis name will be used for ethernet interface name.
 	 */
-	ret = gether_setup_name(c->cdev->gadget, ncm->ethaddr, "rndis");
+
+	ret = gether_setup_name(c->cdev->gadget, ncm->ethaddr, "ncm");
+
 	printk(KERN_DEBUG "usb: %s after MAC:%02X:%02X:%02X:%02X:%02X:%02X\n",
 			__func__, ncm->ethaddr[0], ncm->ethaddr[1],
 			ncm->ethaddr[2], ncm->ethaddr[3], ncm->ethaddr[4],
@@ -141,14 +201,21 @@ void set_ncm_device_descriptor(struct usb_device_descriptor *desc)
 void set_ncm_ready(bool ready)
 {
 	if (ready != ncm_connect)
+	{
 		printk(KERN_DEBUG "usb: %s old status=%d, new status=%d\n",
 				__func__, ncm_connect, ready);
-	ncm_connect = ready;
+		ncm_connect = ready;
+		schedule_work(&_ncm_dev->work);
+	}
+	else
+		ncm_connect = ready;
+
 	if (ready == false) {
 		terminal_mode_version = 0;
 		terminal_mode_vendor_id = 0;
 	}
 }
+EXPORT_SYMBOL(set_ncm_ready);
 
 static ssize_t terminal_version_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -158,7 +225,9 @@ static ssize_t terminal_version_show(struct device *dev,
 			terminal_mode_version & 0xff,
 			(terminal_mode_version >> 8 & 0xff),
 			terminal_mode_vendor_id);
-	printk(KERN_DEBUG "usb: %s terminal_mode %s\n", __func__, buf);
+	if(terminal_mode_version)
+		printk(KERN_DEBUG "usb: %s terminal_mode %s\n", __func__, buf);
+
 	return ret;
 }
 
@@ -172,6 +241,8 @@ static ssize_t terminal_version_store(struct device *dev,
 	/* only set ncm ready when terminal verision value is not zero */
 	if(value)
 		set_ncm_ready(true);
+	else
+		set_ncm_ready(false);
 	return size;
 }
 
@@ -182,7 +253,7 @@ static int create_terminal_attribute(struct device **pdev)
 {
 	int err;
 	if (IS_ERR(*pdev)) {
-		printk(KERN_DEBUG "usb: %s error pdev(%p)\n",
+		printk(KERN_DEBUG "usb: %s error pdev(%pK)\n",
 				__func__, *pdev);
 		return PTR_ERR(*pdev);
 	}
