@@ -1771,12 +1771,7 @@ free_interfaces:
 		goto free_interfaces;
 	}
 
-	dev->actconfig = cp;
-	if (cp)
-		usb_notify_config_device(dev);
-	
-	/*
-	 * Initialize the new interface structures and the
+	/* Initialize the new interface structures and the
 	 * hc/hcd/usbcore interface/endpoint state.
 	 */
 	for (i = 0; i < nintf; ++i) {
@@ -1820,6 +1815,9 @@ free_interfaces:
 	}
 	kfree(new_interfaces);
 
+	dev->actconfig = cp;
+	if (cp)
+		usb_notify_config_device(dev);
 	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			      USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
 			      NULL, 0, USB_CTRL_SET_TIMEOUT);
@@ -1834,13 +1832,13 @@ free_interfaces:
 			put_device(&cp->interface[i]->dev);
 			cp->interface[i] = NULL;
 		}
-		cp = NULL;
+		dev->actconfig = cp = NULL;
 	}
 
-	dev->actconfig = cp;
 	mutex_unlock(hcd->bandwidth_mutex);
 
 	if (!cp) {
+		usb_notify_config_device(dev);
 		usb_set_device_state(dev, USB_STATE_ADDRESS);
 
 		/* Leave LPM disabled while the device is unconfigured. */

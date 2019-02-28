@@ -9,6 +9,9 @@
  */
 
 #include <linux/host_notify.h>
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include <linux/usb_notify_sysfs.h>
+#endif
 #include <linux/of_gpio.h>
 
 #if defined (CONFIG_CHARGER_BQ24260) || defined (CONFIG_CHARGER_SMB358)
@@ -398,21 +401,24 @@ struct sec_cable {
 
 static struct sec_cable support_cable_list[] = {
 	{ .cable_type = EXTCON_USB, },
+#ifdef CONFIG_USB_HOST_NOTIFY
 	{ .cable_type = EXTCON_USB_HOST, },
 	{ .cable_type = EXTCON_USB_HOST_5V, },
 	{ .cable_type = EXTCON_TA, },
 	{ .cable_type = EXTCON_AUDIODOCK, },
 	{ .cable_type = EXTCON_SMARTDOCK_TA, },
+#endif
 	{ .cable_type = EXTCON_SMARTDOCK_USB, },
 	{ .cable_type = EXTCON_JIG_USBON, },
 	{ .cable_type = EXTCON_CHARGE_DOWNSTREAM, },
 };
 
-#ifdef CONFIG_USB_HOST_NOTIFY
 /* USB3.0 Popup option */
 #if defined(CONFIG_SEC_K_PROJECT)
 extern u8 usb30en;
 #endif
+
+extern void set_ncm_ready(bool ready);
 static void sec_usb_work(int usb_mode)
 {
 	struct power_supply *psy;
@@ -427,30 +433,47 @@ static void sec_usb_work(int usb_mode)
 /* USB3.0 Popup option */
 		usb30en = 0;
 #endif
+	if(!usb_mode)
+		set_ncm_ready(false);
 
 	psy = power_supply_get_by_name("dwc-usb");
 	pr_info("usb: dwc3 power supply set(%d)", usb_mode);
 	power_supply_set_present(psy, usb_mode);
 }
-#endif
 
 static void sec_cable_event_worker(struct work_struct *work)
 {
 	struct sec_cable *cable =
 			    container_of(work, struct sec_cable, work);
+#ifdef CONFIG_USB_HOST_NOTIFY
+	int usb_block_mode;
+#endif
 
 	pr_info("sec otg: %s is %s\n",
 		extcon_cable_name[cable->cable_type],
 		cable->cable_state ? "attached" : "detached");
 
 #ifdef CONFIG_USB_HOST_NOTIFY
+	usb_block_mode = check_usb_block_type();
+#endif
+
 	switch (cable->cable_type) {
 	case EXTCON_USB:
 	case EXTCON_SMARTDOCK_USB:
 	case EXTCON_JIG_USBON:
 	case EXTCON_CHARGE_DOWNSTREAM:
-		sec_usb_work(cable->cable_state);
+#ifdef CONFIG_USB_HOST_NOTIFY
+		if (usb_block_mode == NOTIFY_BLOCK_TYPE_NONE || usb_block_mode == NOTIFY_BLOCK_TYPE_HOST)
+#endif
+			sec_usb_work(cable->cable_state);
+#ifdef CONFIG_USB_HOST_NOTIFY
+		if (cable->cable_state)
+			sec_otg_notify(HNOTIFY_VBUS);
+		else
+			sec_otg_notify(HNOTIFY_NONE);
+#endif
 		break;
+#ifdef CONFIG_USB_HOST_NOTIFY
 	case EXTCON_USB_HOST:
 		if (cable->cable_state)
 			sec_otg_notify(HNOTIFY_ID);
@@ -476,9 +499,9 @@ static void sec_cable_event_worker(struct work_struct *work)
 		else
 			sec_otg_notify(HNOTIFY_OTG_POWER_OFF);
 		break;
+#endif
 	default : break;
 	}
-#endif
 }
 
 static int sec_cable_notifier(struct notifier_block *nb,

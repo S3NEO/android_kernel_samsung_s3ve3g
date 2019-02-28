@@ -621,6 +621,14 @@ struct dwc3_hwparams {
 /* HWPARAMS1 */
 #define DWC3_NUM_INT(n)		(((n) & (0x3f << 15)) >> 15)
 
+/* HWPARAMS3 */
+#define DWC3_NUM_IN_EPS_MASK	(0x1f << 18)
+#define DWC3_NUM_EPS_MASK	(0x3f << 12)
+#define DWC3_NUM_EPS(p)		(((p)->hwparams3 &		\
+			(DWC3_NUM_EPS_MASK)) >> 12)
+#define DWC3_NUM_IN_EPS(p)	(((p)->hwparams3 &		\
+			(DWC3_NUM_IN_EPS_MASK)) >> 18)
+
 /* HWPARAMS7 */
 #define DWC3_RAM1_DEPTH(n)	((n) & 0xffff)
 
@@ -631,6 +639,7 @@ struct dwc3_request {
 
 	u8			epnum;
 	struct dwc3_trb		*trb;
+	struct dwc3_trb		*ztrb;
 	dma_addr_t		trb_dma;
 
 	unsigned		direction:1;
@@ -687,6 +696,8 @@ struct dwc3_scratchpad_array {
  * @u2pel: parameter from Set SEL request.
  * @u1sel: parameter from Set SEL request.
  * @u1pel: parameter from Set SEL request.
+ * @num_out_eps: number of out endpoints
+ * @num_in_eps: number of in endpoints
  * @ep0_next_event: hold the next expected event
  * @ep0state: state of endpoint zero
  * @link_state: link state
@@ -695,6 +706,8 @@ struct dwc3_scratchpad_array {
  * @hwparams: copy of hwparams registers
  * @root: debugfs root folder pointer
  * @tx_fifo_size: Available RAM size for TX fifo allocation
+ * @err_evt_seen: previous event in queue was erratic error
+ * @irq_cnt: total irq count
  */
 struct dwc3 {
 	struct usb_ctrlrequest	*ctrl_req;
@@ -705,8 +718,10 @@ struct dwc3 {
 	dma_addr_t		ep0_trb_addr;
 	dma_addr_t		ep0_bounce_addr;
 	struct dwc3_request	ep0_usb_req;
+
 	/* device lock */
 	spinlock_t		lock;
+
 	struct device		*dev;
 
 	struct dwc3_otg		*dotg;
@@ -765,6 +780,9 @@ struct dwc3 {
 
 	u8			speed;
 
+	u8			num_out_eps;
+	u8			num_in_eps;
+
 	void			*mem;
 
 	struct dwc3_hwparams	hwparams;
@@ -787,6 +805,8 @@ struct dwc3 {
 #endif
 	int			tx_fifo_size;
 	bool			tx_fifo_reduced;
+	bool			err_evt_seen;
+	unsigned long		irq_cnt;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -940,7 +960,7 @@ int dwc3_event_buffers_setup(struct dwc3 *dwc);
 
 extern void dwc3_set_notifier(
 		void (*notify) (struct dwc3 *dwc3, unsigned event));
-extern void dwc3_notify_event(struct dwc3 *dwc3, unsigned event);
+extern int dwc3_notify_event(struct dwc3 *dwc3, unsigned event);
 extern int dwc3_get_device_id(void);
 extern void dwc3_put_device_id(int id);
 

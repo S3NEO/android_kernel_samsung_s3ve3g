@@ -583,7 +583,6 @@ int usb_match_one_id(struct usb_interface *interface,
 
 	return usb_match_one_id_intf(dev, intf, id);
 }
-
 EXPORT_SYMBOL_GPL(usb_match_one_id);
 
 /**

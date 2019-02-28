@@ -318,7 +318,7 @@ int dwc3_event_buffers_setup(struct dwc3 *dwc)
 
 	for (n = 0; n < dwc->num_event_buffers; n++) {
 		evt = dwc->ev_buffs[n];
-		dev_dbg(dwc->dev, "Event buf %p dma %08llx length %d\n",
+		dev_dbg(dwc->dev, "Event buf %pK dma %08llx length %d\n",
 				evt->buf, (unsigned long long) evt->dma,
 				evt->length);
 
@@ -351,6 +351,17 @@ static void dwc3_event_buffers_cleanup(struct dwc3 *dwc)
 		dwc3_writel(dwc->regs, DWC3_GEVNTSIZ(n), 0);
 		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(n), 0);
 	}
+}
+
+static void dwc3_core_num_eps(struct dwc3 *dwc)
+{
+	struct dwc3_hwparams	*parms = &dwc->hwparams;
+
+	dwc->num_in_eps = DWC3_NUM_IN_EPS(parms);
+	dwc->num_out_eps = DWC3_NUM_EPS(parms) - dwc->num_in_eps;
+
+	dev_vdbg(dwc->dev, "found %d IN and %d OUT endpoints\n",
+			dwc->num_in_eps, dwc->num_out_eps);
 }
 
 static void dwc3_cache_hwparams(struct dwc3 *dwc)
@@ -430,6 +441,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
 	 */
 	if (dwc->revision < DWC3_REVISION_190A)
 		reg |= DWC3_GCTL_U2RSTECN;
+
+	dwc3_core_num_eps(dwc);
 
 	dwc3_writel(dwc->regs, DWC3_GCTL, reg);
 
@@ -528,10 +541,16 @@ void dwc3_set_notifier(void (*notify)(struct dwc3 *, unsigned))
 }
 EXPORT_SYMBOL(dwc3_set_notifier);
 
-void dwc3_notify_event(struct dwc3 *dwc, unsigned event)
+int dwc3_notify_event(struct dwc3 *dwc, unsigned event)
 {
+	int ret = 0;
+
 	if (dwc->notify_event)
 		dwc->notify_event(dwc, event);
+	else
+		ret = -ENODEV;
+
+	return ret;
 }
 EXPORT_SYMBOL(dwc3_notify_event);
 

@@ -153,7 +153,7 @@ int config_ep_by_speed(struct usb_gadget *g,
 		}
 		/* else: fall through */
 	default:
-		speed_desc = f->descriptors;
+		speed_desc = f->fs_descriptors;
 	}
 	/* find descriptors */
 	for_each_ep_desc(speed_desc, d_spd) {
@@ -220,7 +220,7 @@ int usb_add_function(struct usb_configuration *config,
 {
 	int	value = -EINVAL;
 
-	DBG(config->cdev, "adding '%s'/%p to config '%s'/%p\n",
+	DBG(config->cdev, "adding '%s'/%pK to config '%s'/%pK\n",
 			function->name, function,
 			config->label, config);
 
@@ -245,7 +245,7 @@ int usb_add_function(struct usb_configuration *config,
 	 * as full speed ... it's the function drivers that will need
 	 * to avoid bulk and ISO transfers.
 	 */
-	if (!config->fullspeed && function->descriptors)
+	if (!config->fullspeed && function->fs_descriptors)
 		config->fullspeed = true;
 	if (!config->highspeed && function->hs_descriptors)
 		config->highspeed = true;
@@ -254,7 +254,7 @@ int usb_add_function(struct usb_configuration *config,
 
 done:
 	if (value)
-		DBG(config->cdev, "adding '%s'/%p --> %d\n",
+		DBG(config->cdev, "adding '%s'/%pK --> %d\n",
 				function->name, function, value);
 	return value;
 }
@@ -415,7 +415,7 @@ static int config_buf(struct usb_configuration *config,
 			descriptors = f->hs_descriptors;
 			break;
 		default:
-			descriptors = f->descriptors;
+			descriptors = f->fs_descriptors;
 		}
 
 		if (!descriptors)
@@ -639,6 +639,16 @@ static int set_config(struct usb_composite_dev *cdev,
 	unsigned		power = gadget_is_otg(gadget) ? 8 : 100;
 	int			tmp;
 
+	/*
+	 * ignore 2nd time SET_CONFIGURATION
+	 * only for same config value twice.
+	 */
+	if (cdev->config && (cdev->config->bConfigurationValue == number)) {
+		DBG(cdev, "already in the same config with value %d\n",
+				number);
+		return 0;
+	}
+
 	if (number) {
 		list_for_each_entry(c, &cdev->configs, list) {
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
@@ -696,6 +706,11 @@ static int set_config(struct usb_composite_dev *cdev,
 				union power_supply_propval value;
 				int main_type = POWER_SUPPLY_TYPE_USB_DCP;
 
+				if (!f->ss_descriptors) {
+					pr_err("%s(): No SS desc for function:%s\n",
+								__func__, f->name);
+					return -EINVAL;
+				}
 				descriptors = f->ss_descriptors;
 				if (!psy) {
 					pr_err("%s: fail to get %s psy\n", __func__, PSY_CHG_NAME);
@@ -709,7 +724,7 @@ static int set_config(struct usb_composite_dev *cdev,
 			descriptors = f->hs_descriptors;
 			break;
 		default:
-			descriptors = f->descriptors;
+			descriptors = f->fs_descriptors;
 		}
 
 		for (; *descriptors; ++descriptors) {
@@ -727,7 +742,7 @@ static int set_config(struct usb_composite_dev *cdev,
 
 		result = f->set_alt(f, tmp, 0);
 		if (result < 0) {
-			DBG(cdev, "interface %d (%s/%p) alt 0 --> %d\n",
+			DBG(cdev, "interface %d (%s/%pK) alt 0 --> %d\n",
 					tmp, f->name, f, result);
 
 			reset_config(cdev);
@@ -776,7 +791,7 @@ int usb_add_config(struct usb_composite_dev *cdev,
 	int				status = -EINVAL;
 	struct usb_configuration	*c;
 
-	DBG(cdev, "adding config #%u '%s'/%p\n",
+	DBG(cdev, "adding config #%u '%s'/%pK\n",
 			config->bConfigurationValue,
 			config->label, config);
 
@@ -805,7 +820,7 @@ int usb_add_config(struct usb_composite_dev *cdev,
 	} else {
 		unsigned	i;
 
-		DBG(cdev, "cfg %d/%p speeds:%s%s%s\n",
+		DBG(cdev, "cfg %d/%pK speeds:%s%s%s\n",
 			config->bConfigurationValue, config,
 			config->superspeed ? " super" : "",
 			config->highspeed ? " high" : "",
@@ -820,7 +835,7 @@ int usb_add_config(struct usb_composite_dev *cdev,
 
 			if (!f)
 				continue;
-			DBG(cdev, "  interface %d = %s/%p\n",
+			DBG(cdev, "  interface %d = %s/%pK\n",
 				i, f->name, f);
 		}
 	}
@@ -847,13 +862,13 @@ static int unbind_config(struct usb_composite_dev *cdev,
 				struct usb_function, list);
 		list_del(&f->list);
 		if (f->unbind) {
-			DBG(cdev, "unbind function '%s'/%p\n", f->name, f);
+			DBG(cdev, "unbind function '%s'/%pK\n", f->name, f);
 			f->unbind(config, f);
 			/* may free memory for "f" */
 		}
 	}
 	if (config->unbind) {
-		DBG(cdev, "unbind config '%s'/%p\n", config->label, config);
+		DBG(cdev, "unbind config '%s'/%pK\n", config->label, config);
 		config->unbind(config);
 			/* may free memory for "c" */
 	}
@@ -874,7 +889,7 @@ int usb_remove_config(struct usb_composite_dev *cdev,
 {
 	unsigned long flags;
 
-	printk(KERN_DEBUG "usb: %s cdev->config=%p, config=%p\n",
+	printk(KERN_DEBUG "usb: %s cdev->config=%pK, config=%pK\n",
 			__func__, cdev->config, config);
 	spin_lock_irqsave(&cdev->lock, flags);
 
@@ -1204,7 +1219,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					DBG(cdev, "Config SS device in HS\n");
 				}
 			} else if (gadget->l1_supported) {
-				cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+				cdev->desc.bcdUSB = cpu_to_le16(0x0201);
 				DBG(cdev, "Config HS device with LPM(L1)\n");
 			}
 
@@ -1331,7 +1346,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		 * upon set config#1. Call set_alt for non-zero
 		 * alternate setting.
 		 */
-		if (!w_value && cdev->config) {
+		if (!w_value && cdev->config && !f->get_alt) {
 			value = 0;
 			break;
 		}

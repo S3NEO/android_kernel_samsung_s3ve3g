@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,10 +25,6 @@
 #include <linux/termios.h>
 #include <asm/unaligned.h>
 #include <mach/usb_bridge.h>
-
-/* polling interval for Interrupt ep */
-#define HS_INTERVAL		7
-#define FS_LS_INTERVAL		3
 
 #define ACM_CTRL_DTR		(1 << 0)
 #define DEFAULT_READ_URB_LENGTH	4096
@@ -586,7 +582,7 @@ static ssize_t ctrl_bridge_read_stats(struct file *file, char __user *ubuf,
 			continue;
 
 		temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-				"\nName#%s dev %p\n"
+				"\nName#%s dev %pK\n"
 				"snd encap cmd cnt: %u\n"
 				"get encap res cnt: %u\n"
 				"res available cnt: %u\n"
@@ -719,8 +715,7 @@ ctrl_bridge_probe(struct usb_interface *ifc, struct usb_host_endpoint *int_in,
 		goto free_inturb;
 	}
 
-	interval =
-		(udev->speed == USB_SPEED_HIGH) ? HS_INTERVAL : FS_LS_INTERVAL;
+	interval = int_in->desc.bInterval;
 
 	usb_fill_int_urb(dev->inturb, udev, dev->int_pipe,
 				dev->intbuf, wMaxPacketSize,

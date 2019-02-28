@@ -30,6 +30,8 @@
    descriptor */
 #define USB_QUIRK_DELAY_INIT		0x00000040
 
+#define USB_QUIRK_OTG_PET		0x00000080
+
 /* device can't handle device_qualifier descriptor requests */
 #define USB_QUIRK_DEVICE_QUALIFIER	0x00000100
 
@@ -43,7 +45,5 @@
  * calculation instead of the exponent variable used in the calculation.
  */
 #define USB_QUIRK_LINEAR_UFRAME_INTR_BINTERVAL	0x00000080
-
-#define USB_QUIRK_OTG_PET		0x00000080
 
 #endif /* __LINUX_USB_QUIRKS_H */

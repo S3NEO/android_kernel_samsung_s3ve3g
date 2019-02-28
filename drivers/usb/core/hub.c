@@ -24,8 +24,8 @@
 #include <linux/kthread.h>
 #include <linux/mutex.h>
 #include <linux/freezer.h>
-#include <linux/random.h>
 #include <linux/usb/otg.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
@@ -114,6 +114,8 @@ struct usb_hub {
 	struct delayed_work	init_work;
 	void			**port_owners;
 };
+
+int deny_new_usb = 0;
 
 static inline int hub_is_superspeed(struct usb_device *hdev)
 {
@@ -358,8 +360,7 @@ static void led_work (struct work_struct *work)
 		changed++;
 	}
 	if (changed)
-		queue_delayed_work(system_power_efficient_wq,
-				&hub->leds, LED_CYCLE_PERIOD);
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
 }
 
 /* use a short timeout for hub/port status fetches */
@@ -887,8 +888,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 				goto init2;
 #endif
 			PREPARE_DELAYED_WORK(&hub->init_work, hub_init_func2);
-			queue_delayed_work(system_power_efficient_wq,
-					&hub->init_work,
+			schedule_delayed_work(&hub->init_work,
 					msecs_to_jiffies(delay));
 
 			/* Suppress autosuspend until init is done */
@@ -1043,8 +1043,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Don't do a long sleep inside a workqueue routine */
 		if (type == HUB_INIT2) {
 			PREPARE_DELAYED_WORK(&hub->init_work, hub_init_func3);
-			queue_delayed_work(system_power_efficient_wq,
-					&hub->init_work,
+			schedule_delayed_work(&hub->init_work,
 					msecs_to_jiffies(delay));
 			device_unlock(hub->intfdev);
 			return;		/* Continues at init3: below */
@@ -1059,8 +1058,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 	if (status < 0)
 		dev_err(hub->intfdev, "activate --> %d\n", status);
 	if (hub->has_indicators && blinkenlights)
-		queue_delayed_work(system_power_efficient_wq,
-				&hub->leds, LED_CYCLE_PERIOD);
+		schedule_delayed_work(&hub->leds, LED_CYCLE_PERIOD);
 
 	/* Scan all ports that need attention */
 	kick_khubd(hub);
@@ -2155,6 +2153,13 @@ int usb_new_device(struct usb_device *udev)
 	/* Tell the world! */
 	announce_device(udev);
 
+#ifdef CONFIG_USB_HOST_NOTIFY
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
+	call_audiodock_notify(udev);
+#endif
+	call_battery_notify(udev, 1);
+#endif
+
 	if (udev->serial)
 		add_device_randomness(udev->serial, strlen(udev->serial));
 	if (udev->product)
@@ -2163,12 +2168,6 @@ int usb_new_device(struct usb_device *udev)
 		add_device_randomness(udev->manufacturer,
 				      strlen(udev->manufacturer));
 
-#ifdef CONFIG_USB_HOST_NOTIFY
-#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
-	call_audiodock_notify(udev);
-#endif
-	call_battery_notify(udev, 1);
-#endif
 	device_enable_async_suspend(&udev->dev);
 
 	/*
@@ -2348,6 +2347,7 @@ static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 		if ((portstatus & USB_PORT_STAT_ENABLE)) {
 			if (!udev)
 				return 0;
+
 			if (hub_is_wusb(hub))
 				udev->speed = USB_SPEED_WIRELESS;
 			else if (hub_is_superspeed(hub->hdev))
@@ -2358,7 +2358,6 @@ static int hub_port_wait_reset(struct usb_hub *hub, int port1,
 				udev->speed = USB_SPEED_LOW;
 			else
 				udev->speed = USB_SPEED_FULL;
-
 			return 0;
 		}
 
@@ -3303,7 +3302,8 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	for (i = 0; i < GET_DESCRIPTOR_TRIES; (++i, msleep(100))) {
 		if (USE_NEW_SCHEME(retry_counter) &&
 			!(hcd->driver->flags & HCD_USB3) &&
-			!(hcd->driver->flags & HCD_OLD_ENUM)) {
+			!((hcd->driver->flags & HCD_RT_OLD_ENUM) &&
+				!hdev->parent)) {
 			struct usb_device_descriptor *buf;
 			int r = 0;
 
@@ -3405,7 +3405,8 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			msleep(10);
 			if (USE_NEW_SCHEME(retry_counter) &&
 				!(hcd->driver->flags & HCD_USB3) &&
-				!(hcd->driver->flags & HCD_OLD_ENUM))
+				!((hcd->driver->flags & HCD_RT_OLD_ENUM) &&
+					!hdev->parent))
 				break;
   		}
 
@@ -3512,8 +3513,7 @@ check_highspeed (struct usb_hub *hub, struct usb_device *udev, int port1)
 		/* hub LEDs are probably harder to miss than syslog */
 		if (hub->has_indicators) {
 			hub->indicator[port1-1] = INDICATOR_GREEN_BLINK;
-			queue_delayed_work(system_power_efficient_wq,
-					&hub->leds, 0);
+			schedule_delayed_work (&hub->leds, 0);
 		}
 	}
 	kfree(qual);
@@ -3666,6 +3666,11 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		return;
 	}
 
+	if (deny_new_usb) {
+		dev_err(hub_dev, "denied insert of USB device on port %d\n", port1);
+		goto done;
+	}
+
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
 
 		/* reallocate for each attempt, since references
@@ -3729,9 +3734,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 				if (hub->has_indicators) {
 					hub->indicator[port1-1] =
 						INDICATOR_AMBER_BLINK;
-					queue_delayed_work(
-						system_power_efficient_wq,
-						&hub->leds, 0);
+					schedule_delayed_work (&hub->leds, 0);
 				}
 				status = -ENOTCONN;	/* Don't retry */
 				goto loop_disable;
@@ -4226,6 +4229,7 @@ static void hub_events(void)
 				int status;
 				struct usb_device *udev =
 					hub->hdev->children[i - 1];
+
 				dev_dbg(hub_dev, "warm reset port %d\n", i);
 				if (!udev ||
 				    !(portstatus & USB_PORT_STAT_CONNECTION) ||
