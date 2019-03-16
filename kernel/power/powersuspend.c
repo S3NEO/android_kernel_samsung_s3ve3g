@@ -14,14 +14,6 @@
  *
  *  v1.4 - add a hybrid-kernel mode, accepting both kernel hooks (first wins)
  *
- *  v1.5 - fix hybrid-kernel mode cannot be set through sysfs
- *
- *  v1.6 - remove autosleep and hybrid modes (autosleep not working on shamu)
- *
- *  v1.6.1 - add autosleep and hybrid modes and hybrid default (UpInTheAir@XDA)
- *
- *  v1.7 - do only run state change if change actually requests a new state
- *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -39,7 +31,9 @@
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	7
+#define MINOR_VERSION	5
+
+#define POWER_SUSPEND_DEBUG // Add debugging prints in dmesg
 
 struct workqueue_struct *suspend_work_queue;
 
@@ -82,7 +76,7 @@ static void power_suspend(struct work_struct *work)
 	unsigned long irqflags;
 	int abort = 0;
 
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] entering suspend...\n");
 	#endif
 	mutex_lock(&power_suspend_lock);
@@ -94,7 +88,7 @@ static void power_suspend(struct work_struct *work)
 	if (abort)
 		goto abort_suspend;
 
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] suspending...\n");
 	#endif
 	list_for_each_entry(pos, &power_suspend_handlers, link) {
@@ -102,7 +96,7 @@ static void power_suspend(struct work_struct *work)
 			pos->suspend(pos);
 		}
 	}
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] suspend completed.\n");
 	#endif
 abort_suspend:
@@ -115,7 +109,7 @@ static void power_resume(struct work_struct *work)
 	unsigned long irqflags;
 	int abort = 0;
 
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] entering resume...\n");
 	#endif
 	mutex_lock(&power_suspend_lock);
@@ -127,7 +121,7 @@ static void power_resume(struct work_struct *work)
 	if (abort)
 		goto abort_resume;
 
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] resuming...\n");
 	#endif
 	list_for_each_entry_reverse(pos, &power_suspend_handlers, link) {
@@ -135,46 +129,44 @@ static void power_resume(struct work_struct *work)
 			pos->resume(pos);
 		}
 	}
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] resume completed.\n");
 	#endif
 abort_resume:
 	mutex_unlock(&power_suspend_lock);
 }
 
+bool power_suspended = false;
+
 void set_power_suspend_state(int new_state)
 {
 	unsigned long irqflags;
 
-	if (state != new_state) {
-		spin_lock_irqsave(&state_lock, irqflags);
-		if (state == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
-			#ifdef CONFIG_POWERSUSPEND_DEBUG
-			pr_info("[POWERSUSPEND] state activated.\n");
-			#endif
-			state = new_state;
-			queue_work(suspend_work_queue, &power_suspend_work);
-		} else if (state == POWER_SUSPEND_ACTIVE && new_state == POWER_SUSPEND_INACTIVE) {
-			#ifdef CONFIG_POWERSUSPEND_DEBUG
-			pr_info("[POWERSUSPEND] state deactivated.\n");
-			#endif
-			state = new_state;
-			queue_work(suspend_work_queue, &power_resume_work);
-		}
-		spin_unlock_irqrestore(&state_lock, irqflags);
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
-	} else {
-		pr_info("[POWERSUSPEND] state change requested, but unchanged ?! Ignored !\n");
-	#endif
+	spin_lock_irqsave(&state_lock, irqflags);
+	if (state == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
+		#ifdef POWER_SUSPEND_DEBUG
+		pr_info("[POWERSUSPEND] state activated.\n");
+		#endif
+		state = new_state;
+                power_suspended = true;
+		queue_work(suspend_work_queue, &power_suspend_work);
+	} else if (state == POWER_SUSPEND_ACTIVE && new_state == POWER_SUSPEND_INACTIVE) {
+		#ifdef POWER_SUSPEND_DEBUG
+		pr_info("[POWERSUSPEND] state deactivated.\n");
+		#endif
+		state = new_state;
+                power_suspended = false;
+		queue_work(suspend_work_queue, &power_resume_work);
 	}
+	spin_unlock_irqrestore(&state_lock, irqflags);
 }
 
 void set_power_suspend_state_autosleep_hook(int new_state)
 {
-#ifdef POWER_SUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] autosleep resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
-#endif
-	// Only allow autosleep hook changes in autosleep & hybrid mode
+	#endif
+	// Yank555.lu : Only allow autosleep hook changes in autosleep & hybrid mode
 	if (mode == POWER_SUSPEND_AUTOSLEEP || mode == POWER_SUSPEND_HYBRID)
 		set_power_suspend_state(new_state);
 }
@@ -183,11 +175,11 @@ EXPORT_SYMBOL(set_power_suspend_state_autosleep_hook);
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] panel resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
 	#endif
-	// Only allow autosleep hook changes in autosleep & hybrid mode
-	if (mode == POWER_SUSPEND_AUTOSLEEP || mode == POWER_SUSPEND_HYBRID)
+	// Yank555.lu : Only allow autosleep hook changes in autosleep & hybrid mode
+	if (mode == POWER_SUSPEND_PANEL || mode == POWER_SUSPEND_HYBRID)
 		set_power_suspend_state(new_state);
 }
 
@@ -212,7 +204,7 @@ static ssize_t power_suspend_state_store(struct kobject *kobj,
 
 	sscanf(buf, "%d\n", &new_state);
 
-	#ifdef CONFIG_POWERSUSPEND_DEBUG
+	#ifdef POWER_SUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] userspace resquests %s.\n", new_state == POWER_SUSPEND_ACTIVE ? "sleep" : "wakeup");
 	#endif
 	if(new_state == POWER_SUSPEND_ACTIVE || new_state == POWER_SUSPEND_INACTIVE)
@@ -242,7 +234,7 @@ static ssize_t power_suspend_mode_store(struct kobject *kobj,
 	switch (data) {
 		case POWER_SUSPEND_AUTOSLEEP:
 		case POWER_SUSPEND_PANEL:
-		case POWER_SUSPEND_USERSPACE:	mode = data;
+		case POWER_SUSPEND_USERSPACE:
 		case POWER_SUSPEND_HYBRID:	mode = data;
 						return count;
 		default:
@@ -333,4 +325,3 @@ MODULE_AUTHOR("Paul Reioux <reioux@gmail.com> / Jean-Pierre Rasquin <yank555.lu@
 MODULE_DESCRIPTION("power_suspend - A replacement kernel PM driver for"
         "Android's deprecated early_suspend/late_resume PM driver!");
 MODULE_LICENSE("GPL v2");
-
