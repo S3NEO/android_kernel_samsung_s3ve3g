@@ -20,23 +20,6 @@
 		status = "ok";
 	};
 
-	firmware: firmware {
-		android {
-			compatible = "android,firmware";
-			fstab {
-				compatible = "android,fstab";
-				system {
-					compatible = "android,system";
-					dev = "/dev/block/platform/msm_sdcc.1/by-name/system";
-					type = "ext4";
-					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait";
-					status = "ok";
-				};
-			};
-		};
-	};
-
 	i2c@f9925000 {
 		pn547@2B {
 			compatible = "pn547";
