@@ -1252,7 +1252,6 @@ regulator_turn_off:
     return 0;
 }
 
-extern void change_boost_control(int on);
 static int qpnp_flash_set(struct qpnp_led_data *led)
 {
 	int rc, error;
@@ -1267,7 +1266,6 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 
 	/* Set led current */
 	if (val > 0) {
-		change_boost_control(1);
 		if (led->flash_cfg->torch_enable) {
 			if (led->flash_cfg->peripheral_subtype ==
 							FLASH_SUBTYPE_DUAL) {
@@ -1445,7 +1443,6 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 			}
 		}
 	} else {
-		change_boost_control(0);
 		rc = qpnp_led_masked_write(led,
 			FLASH_LED_STROBE_CTRL(led->base),
 			led->flash_cfg->trigger_flash,
