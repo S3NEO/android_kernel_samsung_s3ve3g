@@ -2856,6 +2856,8 @@ static long do_rmdir(int dfd, const char __user *pathname)
 	char * name;
 	struct dentry *dentry;
 	struct nameidata nd;
+	char *path_buf = NULL;
+	char *propagate_path = NULL;
 
 	error = user_path_parent(dfd, pathname, &nd, &name);
 	if (error)
