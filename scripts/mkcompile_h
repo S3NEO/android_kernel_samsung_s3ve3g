@@ -42,7 +42,11 @@ if [ -z "$KBUILD_BUILD_TIMESTAMP" ]; then
 else
 	TIMESTAMP=$KBUILD_BUILD_TIMESTAMP
 fi
-LINUX_COMPILE_BY="prototype"
+if test -z "$KBUILD_BUILD_USER"; then
+	LINUX_COMPILE_BY=$(whoami | sed 's/\\/\\\\/')
+else
+	LINUX_COMPILE_BY=$KBUILD_BUILD_USER
+fi
 if test -z "$KBUILD_BUILD_HOST"; then
 	LINUX_COMPILE_HOST=`hostname`
 else
