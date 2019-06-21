@@ -1,0 +1,10 @@
+# SEPerienceKernel rules #
+/build_kernel.sh
+
+# Compiled source #
+*.o
+*.so
+
+# Packages #
+*.gz
+*.image
