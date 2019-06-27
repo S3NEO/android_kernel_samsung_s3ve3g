@@ -352,13 +352,6 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 		return -ENOTSUPP;
 	}
 
-#if defined(CONFIG_MDSS_UD_FLIP)
-	if (req->flags & MDP_FLIP_UD)
-		req->flags &= ~MDP_FLIP_UD;
-	else
-		req->flags |= MDP_FLIP_UD;
-#endif
-
 	if ((req->dst_rect.w > MAX_DST_W) || (req->dst_rect.h > MAX_DST_H)) {
 		pr_err("exceeded max mixer supported resolution %dx%d\n",
 				req->dst_rect.w, req->dst_rect.h);
@@ -499,13 +492,13 @@ static int mdss_mdp_overlay_pipe_setup(struct msm_fb_data_type *mfd,
 	pipe->src_fmt = fmt;
 
 	if((pipe->src.h > 2500) && (pipe->src.h > pipe->dst.h)
-				&& (pipe->src.h - 2 <= pipe->dst.h)){
-			pr_debug("[QCT_TEST] mixer_height : %d, width : %d \n",pipe->mixer->height,pipe->mixer->width);
+				&& (pipe->src.h - 2 <= pipe->dst.h)){ 
+			pr_debug("[QCT_TEST] mixer_height : %d, width : %d \n",pipe->mixer->height,pipe->mixer->width); 
 
-			pipe->dst.h= pipe->src.h;
-			if(pipe->dst.h+pipe->dst.y > pipe->mixer->height)
-				pipe->dst.y -= (pipe->dst.h + pipe->dst.y - pipe->mixer->height);
-	}
+			pipe->dst.h= pipe->src.h; 
+			if(pipe->dst.h+pipe->dst.y > pipe->mixer->height) 
+				pipe->dst.y -= (pipe->dst.h + pipe->dst.y - pipe->mixer->height); 
+	} 
 	pipe->mixer_stage = req->z_order;
 	pipe->is_fg = req->is_fg;
 	pipe->alpha = req->alpha;
@@ -681,14 +674,6 @@ static int mdss_mdp_overlay_set(struct msm_fb_data_type *mfd,
 	}
 
 	if (req->flags & MDSS_MDP_ROT_ONLY) {
-#if defined(CONFIG_MDSS_UD_FLIP)
-		if (req->flags & MDP_BWC_EN) {
-			if (req->flags & MDP_FLIP_LR)
-				req->flags &= ~MDP_FLIP_LR;
-			else
-				req->flags |= MDP_FLIP_LR;
-	}
-#endif
 		ret = mdss_mdp_rotator_setup(mfd, req);
 	} else if (req->src.format == MDP_RGB_BORDERFILL) {
 		req->id = BORDERFILL_NDX;
@@ -719,6 +704,7 @@ int mdss_mdp_overlay_get_buf(struct msm_fb_data_type *mfd,
 	if ((num_planes <= 0) || (num_planes > MAX_PLANES))
 		return -EINVAL;
 
+	mdss_bus_bandwidth_ctrl(1);
 	memset(data, 0, sizeof(*data));
 	for (i = 0; i < num_planes; i++) {
 		data->p[i].flags = flags;
@@ -732,6 +718,7 @@ int mdss_mdp_overlay_get_buf(struct msm_fb_data_type *mfd,
 			break;
 		}
 	}
+	mdss_bus_bandwidth_ctrl(0);
 
 	data->num_planes = i;
 
@@ -741,8 +728,11 @@ int mdss_mdp_overlay_get_buf(struct msm_fb_data_type *mfd,
 int mdss_mdp_overlay_free_buf(struct mdss_mdp_data *data)
 {
 	int i;
+
+	mdss_bus_bandwidth_ctrl(1);
 	for (i = 0; i < data->num_planes && data->p[i].len; i++)
 		mdss_mdp_put_img(&data->p[i]);
+	mdss_bus_bandwidth_ctrl(0);
 
 	data->num_planes = 0;
 
@@ -882,9 +872,6 @@ static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 	if (ctl->power_on) {
 		if (!mdp5_data->mdata->batfet)
 			mdss_mdp_batfet_ctrl(mdp5_data->mdata, true);
-		if (!is_mdss_iommu_attached() &&
-			!mfd->panel_info->cont_splash_enabled)
-			mdss_iommu_attach(mdp5_data->mdata);
 		return 0;
 	}
 
@@ -956,7 +943,6 @@ static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 				MDSS_MDP_PIPE_TYPE_VIG);
 			__mdss_mdp_handoff_cleanup_pipes(mfd,
 				MDSS_MDP_PIPE_TYPE_DMA);
-#if !defined(CONFIG_FB_MSM_MDSS_SHARP_HD_PANEL)
 		} else {
 			/* Add all the handed off pipes to the cleanup list */
 			__mdss_mdp_handoff_cleanup_pipes(mfd,
@@ -966,10 +952,6 @@ static int mdss_mdp_overlay_start(struct msm_fb_data_type *mfd)
 			__mdss_mdp_handoff_cleanup_pipes(mfd,
 				MDSS_MDP_PIPE_TYPE_DMA);
 		}
-#else
-
-		} // if closed
-#endif
 		rc = mdss_mdp_ctl_splash_finish(ctl, mdp5_data->handoff);
 		/*
 		 * Remove the vote for footswitch even if above function
@@ -1008,14 +990,9 @@ static void mdss_mdp_overlay_update_pm(struct mdss_overlay_private *mdp5_data)
 
 #if defined(CONFIG_MDNIE_LITE_TUNING)
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) \
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6TNMR7_PT_PANEL)
+		|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 static bool mdss_first_init = true;
 #endif
-#endif
-
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-int get_lcd_ldi_info(void);
 #endif
 
 int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
@@ -1027,12 +1004,11 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	struct mdss_mdp_ctl *tmp;
 	int ret = 0;
 	int sd_in_pipe = 0;
-	 bool need_cleanup = false;
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-	int te_ret = 0;
-#endif
-	if (!is_mdss_iommu_attached() && !mfd->panel_info->cont_splash_enabled)
-		mdss_iommu_attach(mdp5_data->mdata);
+
+	if (!ctl) {
+		pr_warn("kickoff on fb=%d without a ctl attched\n", mfd->index);
+		return ret;
+	}
 
 	if (ctl->shared_lock)
 		mutex_lock(ctl->shared_lock);
@@ -1065,14 +1041,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	if (data)
 		mdss_mdp_set_roi(ctl, data);
 
-	 if (!list_empty(&mdp5_data->pipes_cleanup))
-		need_cleanup = true;
-
-	 list_for_each_entry(pipe, &mdp5_data->pipes_cleanup, cleanup_list) {
-            mdss_mdp_pipe_queue_data(pipe, NULL);
-           mdss_mdp_mixer_pipe_unstage(pipe);
-       }
-
 	pipes_used_dbg = &mdp5_data->pipes_used;
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		struct mdss_mdp_data *buf;
@@ -1092,12 +1060,10 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 		 * block mode configuration.
 		 */
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
-#if !defined(CONFIG_MACH_KS01SKT) && !defined(CONFIG_MACH_KS01EUR) && !defined(CONFIG_MACH_KS01KTT) && !defined(CONFIG_MACH_KS01LGT) && !defined(CONFIG_SEC_ATLANTIC_PROJECT)
 		if (pre_csc_update != csc_update) {
 			if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG)
 				pipe->params_changed = 1;
 		}
-#endif
 #endif
 		if ((pipe->type == MDSS_MDP_PIPE_TYPE_DMA) &&
 		    (ctl->shared_lock && !ctl->mdata->has_wfd_blk)) {
@@ -1153,25 +1119,22 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 			pipe->ndx == BIT(4) ? "RGB1" : pipe->ndx == BIT(5) ? "RGB2" :
 			pipe->ndx == BIT(6) ? "DMA0" : "DMA1" ,
 			pipe->mixer_stage - MDSS_MDP_STAGE_0, pipe->flags,
-			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h,
+			pipe->src.x, pipe->src.y, pipe->src.w, pipe->src.h, 
 			pipe->dst.x, pipe->dst.y, pipe->dst.w, pipe->dst.h);
 
 	}
 
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
-#if !defined(CONFIG_MACH_KS01SKT) && !defined(CONFIG_MACH_KS01EUR) && !defined(CONFIG_MACH_KS01KTT) && !defined(CONFIG_MACH_KS01LGT) && !defined(CONFIG_SEC_ATLANTIC_PROJECT)
 	if (pre_csc_update != csc_update)
 			pre_csc_update = csc_update;
-#endif
 #endif
 	if (mfd->panel.type == WRITEBACK_PANEL)
 		ret = mdss_mdp_wb_kickoff(mfd);
 	else
 		ret = mdss_mdp_display_commit(mdp5_data->ctl, NULL);
-	if (!need_cleanup) {
-		atomic_set(&mfd->kickoff_pending, 0);
-		wake_up_all(&mfd->kickoff_wait_q);
-	}
+
+	atomic_set(&mfd->kickoff_pending, 0);
+	wake_up_all(&mfd->kickoff_wait_q);
 	mutex_unlock(&mfd->lock);
 
 	if (IS_ERR_VALUE(ret))
@@ -1197,8 +1160,7 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 
 #if defined(CONFIG_MDNIE_LITE_TUNING)
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) \
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) \
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6TNMR7_PT_PANEL)
+		|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 	if(mdss_first_init)
 	{
 		mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_MDNIE_DEFAULT_UPDATE, NULL);
@@ -1207,20 +1169,8 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 #endif
 #endif
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-	if (get_lcd_ldi_info()) {
-		te_ret = mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_TE_UPDATE, NULL);
-		if (te_ret < 0) {
-			mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_TE_RESTORE, NULL);
-		}
-	}
-#endif
-
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) || defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)\
-	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) || defined(CONFIG_FB_MSM_MIPI_JDI_TFT_VIDEO_FULL_HD_PT_PANEL)\
-        || defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL) \
-        || defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6TNMR7_PT_PANEL) \
-        || defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQXGA_S6E3HA1_PT_PANEL)
+	|| defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 	mdss_mdp_ctl_intf_event(mdp5_data->ctl, MDSS_EVENT_FRAME_UPDATE, NULL);
 #endif
 #if defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL) &&  !defined(CONFIG_MACH_DEGASLTE_SPR)
@@ -1230,14 +1180,11 @@ commit_fail:
 	mdss_mdp_overlay_cleanup(mfd);
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	mdss_mdp_ctl_notify(ctl, MDP_NOTIFY_FRAME_FLUSHED);
-	if (need_cleanup) {
-		atomic_set(&mfd->kickoff_pending, 0);
-		wake_up_all(&mfd->kickoff_wait_q);
-	}
+
 	mutex_unlock(&mdp5_data->ov_lock);
 	if (ctl->shared_lock)
 		mutex_unlock(ctl->shared_lock);
-
+	
 #if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
 	if(get_lcd_attached() == 0)
 		return 0;
@@ -1251,7 +1198,7 @@ static int mdss_mdp_overlay_release(struct msm_fb_data_type *mfd, int ndx)
 	struct mdss_mdp_pipe *pipe;
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 	u32 pipe_ndx, unset_ndx = 0;
-	int i;
+	int i, destroy_pipe;
 
 	for (i = 0; unset_ndx != ndx && i < MDSS_MDP_MAX_SSPP; i++) {
 		pipe_ndx = BIT(i);
@@ -1262,16 +1209,22 @@ static int mdss_mdp_overlay_release(struct msm_fb_data_type *mfd, int ndx)
 				pr_warn("unknown pipe ndx=%x\n", pipe_ndx);
 				continue;
 			}
+
 			mutex_lock(&mfd->lock);
 			pipe->pid = 0;
+			destroy_pipe = pipe->play_cnt == 0;
+
 			if (!list_empty(&pipe->used_list)) {
 				list_del_init(&pipe->used_list);
-				list_add(&pipe->cleanup_list,
-					&mdp5_data->pipes_cleanup);
+				if (!destroy_pipe)
+					list_add(&pipe->cleanup_list,
+						&mdp5_data->pipes_cleanup);
 			}
 			mutex_unlock(&mfd->lock);
 			mdss_mdp_mixer_pipe_unstage(pipe);
 			mdss_mdp_pipe_unmap(pipe);
+			if (destroy_pipe)
+				mdss_mdp_pipe_destroy(pipe);
 		}
 	}
 	return 0;
@@ -1308,7 +1261,7 @@ static int mdss_mdp_overlay_unset(struct msm_fb_data_type *mfd, int ndx)
 		goto done;
 	}
 	}
-
+	
 #else
 	if (!mfd->panel_power_on) {
 		ret = -EPERM;
@@ -1699,22 +1652,6 @@ static void mdss_mdp_overlay_handle_vsync(struct mdss_mdp_ctl *ctl,
 	}
 
 	pr_debug("vsync on fb%d play_cnt=%d\n", mfd->index, ctl->play_cnt);
-#if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01EUR) || defined(CONFIG_MACH_KS01KTT) || defined(CONFIG_MACH_KS01LGT) ||defined(CONFIG_SEC_ATLANTIC_PROJECT)
-#ifdef CONFIG_FB_MSM_CAMERA_CSC
-	if (csc_update != prev_csc_update) {
-		struct mdss_mdp_pipe *pipe, *next;
-
-		list_for_each_entry_safe(pipe, next, &mdp5_data->pipes_used,
-				used_list) {
-			if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG) {
-				mdss_mdp_csc_setup(MDSS_MDP_BLOCK_SSPP, pipe->num, 1,
-						MDSS_MDP_CSC_YUV2RGB);
-			}
-		}
-		prev_csc_update = csc_update;
-	}
-#endif
-#endif
 
 	mdp5_data->vsync_time = t;
 	sysfs_notify_dirent(mdp5_data->vsync_event_sd);
@@ -1855,7 +1792,7 @@ static ssize_t mdss_mdp_vsync_show_event(struct device *dev,
 	vsync_ticks = ktime_to_ns(mdp5_data->vsync_time);
 
 	pr_debug("fb%d vsync=%llu", mfd->index, vsync_ticks);
-	ret = scnprintf(buf, PAGE_SIZE, "VSYNC=%llu", vsync_ticks);
+	ret = scnprintf(buf, PAGE_SIZE, "VSYNC=%llu\n", vsync_ticks);
 
 	return ret;
 }
@@ -2312,6 +2249,10 @@ static int mdss_fb_get_hw_caps(struct msm_fb_data_type *mfd,
 		caps->features |= MDP_BWC_EN;
 	if (mdata->has_decimation)
 		caps->features |= MDP_DECIMATION_EN;
+
+	caps->max_smp_cnt = mdss_res->smp_mb_cnt;
+	caps->smp_per_pipe = mdata->smp_mb_per_pipe;
+
 	return 0;
 }
 
@@ -2926,7 +2867,6 @@ static void __vsync_retire_work_handler(struct work_struct *work)
 
 	sync_pt_data = &mdp5_data->ctl->mfd->mdp_sync_pt_data;
 	mutex_lock(&sync_pt_data->sync_mutex);
-
 	if (mdp5_data->retire_cnt > 0) {
 		sw_sync_timeline_inc(mdp5_data->vsync_timeline, 1);
 
@@ -3066,16 +3006,13 @@ int mdss_mdp_overlay_init(struct msm_fb_data_type *mfd)
 			pr_err("Error dfps sysfs creation ret=%d\n", rc);
 			goto init_fail;
 		}
-	}
-
-	if (mfd->panel_info->type == MIPI_CMD_PANEL) {
+	} else if (mfd->panel_info->type == MIPI_CMD_PANEL) {
 		rc = __vsync_retire_setup(mfd);
 		if (IS_ERR_VALUE(rc)) {
 			pr_err("unable to create vsync timeline\n");
 			goto init_fail;
 		}
 	}
-	
 	mfd->mdp_sync_pt_data.async_wait_fences = true;
 	rc = sysfs_create_link_nowarn(&dev->kobj,
 			&mdp5_data->mdata->pdev->dev.kobj, "mdp");
@@ -3216,7 +3153,7 @@ void mdss_mdp_underrun_dump_info(struct msm_fb_data_type *mfd)
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
 
 	pr_info(" ============ dump_start ===========\n");
-
+	
 	list_for_each_entry(pipe, &mdp5_data->pipes_used, used_list) {
 		if (pipe)
 			pr_info(" [%4d, %4d, %4d, %4d] -> [%4d, %4d, %4d, %4d]"

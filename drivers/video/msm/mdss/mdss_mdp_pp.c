@@ -431,6 +431,7 @@ static void pp_ad_bypass_config(struct mdss_ad_info *ad,
 				struct mdss_mdp_ctl *ctl, u32 num, u32 *opmode);
 static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd);
 static void pp_ad_cfg_lut(char __iomem *addr, u32 *data);
+static u32 pp_ad_attenuate_bl(u32 bl, struct mdss_ad_info *ad);
 static int pp_num_to_side(struct mdss_mdp_ctl *ctl, u32 num);
 static inline bool pp_sts_is_enabled(u32 sts, int side);
 static inline void pp_sts_set_split_bits(u32 *sts, u32 bits);
@@ -863,7 +864,7 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 		 * TODO: Needs to be part of dirty bit logic: if there is a
 		 * previously configured pipe need to re-configure CSC matrix
 		 */
-#if defined(CONFIG_FB_MSM_CAMERA_CSC) && !defined(CONFIG_MACH_KS01SKT) && !defined(CONFIG_MACH_KS01EUR) && !defined(CONFIG_MACH_KS01KTT) && !defined(CONFIG_MACH_KS01LGT) && !defined(CONFIG_SEC_ATLANTIC_PROJECT)
+#ifdef CONFIG_FB_MSM_CAMERA_CSC
 		if ((pipe->play_cnt == 0)||(pre_csc_update != csc_update)) {
 #else
 		if ((pipe->play_cnt == 0)) {
@@ -1634,7 +1635,7 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 	if (mdata->nad_cfgs == 0)
 		valid_mixers = false;
 	for (i = 0; i < mixer_cnt && valid_mixers; i++) {
-		if (mixer_id[i] > mdata->nad_cfgs)
+		if (mixer_id[i] >= mdata->nad_cfgs)
 			valid_mixers = false;
 	}
 	if (valid_mixers && (mixer_cnt <= mdata->nmax_concurrent_ad_hw)) {
@@ -1693,6 +1694,7 @@ int mdss_mdp_pp_resume(struct mdss_mdp_ctl *ctl, u32 dspp_num)
 			if (ad->state & PP_AD_STATE_BL_LIN) {
 				bl = ad->bl_lin[bl >> ad->bl_bright_shift];
 				bl = bl << ad->bl_bright_shift;
+				bl = pp_ad_attenuate_bl(bl, ad);
 			}
 			ad->bl_data = bl;
 			pp_ad_input_write(&mdata->ad_off[dspp_num], ad);
@@ -3824,9 +3826,8 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 			struct mdss_ad_init_cfg *init_cfg)
 {
 	struct mdss_ad_info *ad;
-	struct mdss_mdp_ctl *ctl;
 	struct msm_fb_data_type *bl_mfd;
-	int lin_ret = -1, inv_ret = -1, ret = 0;
+	int lin_ret = -1, inv_ret = -1, att_ret = -1, ret = 0;
 	u32 ratio_temp, shift = 0, last_ops;
 
 	ret = mdss_mdp_get_ad(mfd, &ad);
@@ -3852,10 +3853,12 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 		if (init_cfg->params.init.bl_lin_len == AD_BL_LIN_LEN) {
 			lin_ret = copy_from_user(&ad->bl_lin,
 				init_cfg->params.init.bl_lin,
-				AD_BL_LIN_LEN * sizeof(uint32_t));
+				init_cfg->params.init.bl_lin_len *
+				sizeof(uint32_t));
 			inv_ret = copy_from_user(&ad->bl_lin_inv,
 				init_cfg->params.init.bl_lin_inv,
-				AD_BL_LIN_LEN * sizeof(uint32_t));
+				init_cfg->params.init.bl_lin_len *
+				sizeof(uint32_t));
 			if (lin_ret || inv_ret)
 				ret = -ENOMEM;
 			ratio_temp =  mfd->panel_info->bl_max / AD_BL_LIN_LEN;
@@ -3864,13 +3867,31 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 				shift++;
 			}
 			ad->bl_bright_shift = shift;
-		} else if (init_cfg->params.init.bl_lin_len) {
+		} else {
 			ret = -EINVAL;
 		}
-		if (!lin_ret && !inv_ret)
+		if (ret) {
+			ad->state &= ~PP_AD_STATE_BL_LIN;
+			goto ad_config_exit;
+		} else
 			ad->state |= PP_AD_STATE_BL_LIN;
-		else
-			ad->state &= !PP_AD_STATE_BL_LIN;
+
+		if ((init_cfg->params.init.bl_att_len == AD_BL_ATT_LUT_LEN) &&
+			(init_cfg->params.init.bl_att_lut)) {
+			att_ret = copy_from_user(&ad->bl_att_lut,
+				init_cfg->params.init.bl_att_lut,
+				init_cfg->params.init.bl_att_len *
+				sizeof(uint32_t));
+			if (att_ret)
+				ret = -ENOMEM;
+		} else {
+			ret = -EINVAL;
+		}
+		if (ret) {
+			ad->state &= ~PP_AD_STATE_BL_LIN;
+			goto ad_config_exit;
+		} else
+			ad->state |= PP_AD_STATE_BL_LIN;
 
 		ad->sts |= PP_AD_STS_DIRTY_INIT;
 	} else if (init_cfg->ops & MDP_PP_AD_CFG) {
@@ -3912,8 +3933,8 @@ int mdss_mdp_ad_config(struct msm_fb_data_type *mfd,
 		ad->mfd = mfd;
 		ad->bl_mfd = bl_mfd;
 	}
+ad_config_exit:
 	mutex_unlock(&ad->lock);
-	ctl = mfd_to_ctl(mfd);
 	return ret;
 }
 
@@ -4298,6 +4319,7 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 			if (ad->state & PP_AD_STATE_BL_LIN) {
 				bl = ad->bl_lin[bl >> ad->bl_bright_shift];
 				bl = bl << ad->bl_bright_shift;
+				bl = pp_ad_attenuate_bl(bl, ad);
 			}
 			ad->bl_data = bl;
 		}
@@ -4372,6 +4394,8 @@ static int mdss_mdp_ad_setup(struct msm_fb_data_type *mfd)
 								AD_BL_LIN_LEN);
 			memset(&ad->bl_lin_inv, 0, sizeof(uint32_t) *
 								AD_BL_LIN_LEN);
+			memset(&ad->bl_att_lut, 0, sizeof(uint32_t) *
+				AD_BL_ATT_LUT_LEN);
 			memset(&ad->init, 0, sizeof(struct mdss_ad_init));
 			memset(&ad->cfg, 0, sizeof(struct mdss_ad_cfg));
 			mutex_lock(&bl_mfd->bl_lock);
@@ -4433,7 +4457,7 @@ static void pp_ad_calc_worker(struct work_struct *work)
 	ctl = mfd_to_ctl(ad->mfd);
 	mdata = mfd_to_mdata(ad->mfd);
 
-	if (!mdata || ad->calc_hw_num > mdata->nad_cfgs) {
+	if (!mdata || ad->calc_hw_num >= mdata->nad_cfgs) {
 		mutex_unlock(&ad->lock);
 		return;
 	}
@@ -4514,6 +4538,30 @@ static void pp_ad_cfg_lut(char __iomem *addr, u32 *data)
 	}
 	writel_relaxed(data[PP_AD_LUT_LEN - 1] << 16,
 			addr + ((PP_AD_LUT_LEN - 1) * 2));
+}
+
+static u32 pp_ad_attenuate_bl(u32 bl, struct mdss_ad_info *ad)
+{
+	u32 shift = 0, ratio_temp = 0;
+	u32 n, lut_interval, bl_att, out;
+
+	ratio_temp = ad->cfg.backlight_max / (AD_BL_ATT_LUT_LEN - 1);
+	while (ratio_temp > 0) {
+		ratio_temp = ratio_temp >> 1;
+		shift++;
+	}
+	n = bl >> shift;
+	lut_interval = (ad->cfg.backlight_max + 1) / (AD_BL_ATT_LUT_LEN - 1);
+	bl_att = ad->bl_att_lut[n] + (bl - lut_interval * n) *
+			(ad->bl_att_lut[n + 1] - ad->bl_att_lut[n]) /
+			lut_interval;
+	if (ad->init.alpha_base)
+		out = (ad->init.alpha * bl_att +
+			(ad->init.alpha_base - ad->init.alpha) * bl) /
+			ad->init.alpha_base;
+	else
+		out = bl;
+	return out;
 }
 
 int mdss_mdp_ad_addr_setup(struct mdss_data_type *mdata, u32 *ad_offsets)

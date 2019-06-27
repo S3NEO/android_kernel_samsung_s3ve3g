@@ -175,12 +175,6 @@ enum mdss_intf_events {
 	MDSS_EVENT_MDNIE_DEFAULT_UPDATE,
 	MDSS_EVENT_ENABLE_PARTIAL_UPDATE,
 	MDSS_EVENT_BACKLIGHT_LATE_ON,
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-	MDSS_EVENT_TE_UPDATE,
-	MDSS_EVENT_TE_UPDATE2,
-	MDSS_EVENT_TE_SET,
-	MDSS_EVENT_TE_RESTORE,
-#endif
 };
 
 struct lcd_panel_info {
@@ -336,12 +330,6 @@ struct mdss_panel_info {
 	bool dynamic_fps;
 	char dfps_update;
 	int new_fps;
-    u32 xstart_pix_align;
-	u32 width_pix_align;
-	u32 ystart_pix_align;
-	u32 height_pix_align;
-    u32 min_width;
-	u32 min_height;
 
 	u32 cont_splash_enabled;
 	u32 partial_update_enabled;

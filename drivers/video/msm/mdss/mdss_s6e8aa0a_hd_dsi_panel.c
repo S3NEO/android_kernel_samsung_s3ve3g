@@ -702,7 +702,7 @@ static int  aid_operation(int lux)
 			aid_status = 1;
 		}
 		pr_debug("%s brightness_level : %d adi_status:%d\n", __func__,lux, aid_status);
-
+	
 	no_change = (panel_cond_aid_ref_1 == panel_cond_aid_ref[1])
 		&& (panel_cond_aid_ref_18 == panel_cond_aid_ref[18])
 		&& (etc_cond_set3_aid_ref_9 == etc_cond_set3_aid_ref[9]);
@@ -929,7 +929,7 @@ void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *c
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = cmds;
 	cmdreq.cmds_cnt = cnt;
-
+	
 	if (flag & CMD_REQ_SINGLE_TX) {
 		cmdreq.flags = CMD_REQ_SINGLE_TX | CMD_CLK_CTRL | CMD_REQ_COMMIT;
 	}else
@@ -937,7 +937,7 @@ void mdss_dsi_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *c
 
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
-
+	
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 	
 }
@@ -975,15 +975,15 @@ u32 mdss_dsi_cmd_receive(struct mdss_dsi_ctrl_pdata *ctrl, struct dsi_cmd_desc *
         cmdreq.flags = CMD_REQ_RX | CMD_REQ_COMMIT;
         cmdreq.rlen = rlen;
         cmdreq.cb = NULL;
-
+        
         // This mutex is to sync up with dynamic FPS changes
     	// so that DSI lockups shall not happen
-
+    	
     	BUG_ON(msd.ctrl_pdata == NULL);
 //    	mutex_lock(&msd.ctrl_pdata->dfps_mutex);
         mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 //      mutex_unlock(&msd.ctrl_pdata->dfps_mutex);
-
+        
          // blocked here, untill call back called
         return ctrl->rx_buf.len;
 }
@@ -1011,7 +1011,7 @@ static void read_reg(char srcReg, int srcLength, char *destBuffer,
 
 	struct dsi_cmd_desc *cmd_desc;
 	int cmd_size = 0;
-	
+        
 	int flag = 0;
 
 
@@ -1036,7 +1036,7 @@ static void read_reg(char srcReg, int srcLength, char *destBuffer,
 	cmd_size = ARRAY_SIZE(s6e8aa0_packet_size_cmd);
 
 	packet_size[0] = (char)srcLength;
-
+	
 	mdss_dsi_cmds_send(msd.ctrl_pdata, cmd_desc, cmd_size, flag);
 
 
@@ -1183,7 +1183,7 @@ static struct dsi_cmd_desc cabc_cmd= {
 
 static void mdss_dsi_panel_cabc_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int siop_status)
 {
-
+	
 	struct dcs_cmd_req cmdreq;
 
 	pr_debug("%s: cabc=%d\n", __func__, siop_status);
@@ -1312,7 +1312,7 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 				panel_data);
 
 #if !defined(CONFIG_MACH_S3VE3G_EUR)
-	 flag = CMD_REQ_SINGLE_TX;
+	flag = CMD_REQ_SINGLE_TX;
 #endif
 	switch (enable) {
 
@@ -1329,7 +1329,7 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 			cmd_size = mpd.acl_off.size;
 
 			break;
-
+			
 		case PANEL_ACL_UPDATE:
 
 			cmd_desc = mpd.acl_update.cmd;
@@ -1339,7 +1339,7 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 
 		default:
 		pr_err("%s: Unknown acl_ctrl configuration\n",__func__);
-
+		
 		break;
 	}
 
@@ -1347,8 +1347,8 @@ static void mdss_dsi_panel_acl_ctrl(struct mdss_panel_data *pdata, int enable)
 				for (i = 0; i < cmd_size; i++)
 				{
 					for (j = 0; j < cmd_desc[i].dchdr.dlen; j++)
-						pr_debug("%x ",cmd_desc[i].payload[j]);
-					pr_debug("\n");
+						pr_err("%x ",cmd_desc[i].payload[j]);
+					pr_err("\n");
 				}
 #endif
 
@@ -1402,7 +1402,7 @@ static void err_fg_work_func(struct work_struct *work)
 	err_fg_working = 1;
 
 	mdss_mdp_rotator_unset(MDSS_MDP_ROT_SESSION_MASK);
-
+	
 	msd.mfd->fbi->esd_active = true;
 	msd.mfd->fbi->fbops->fb_blank(FB_BLANK_POWERDOWN, msd.mfd->fbi);
 	msd.mfd->fbi->fbops->fb_blank(FB_BLANK_UNBLANK, msd.mfd->fbi);
@@ -1469,6 +1469,8 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	int i,j;
 #endif
 
+	printk("CALL mdss_dsi_panel_bl_ctrl backlight = %d\n", bl_level);
+
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return;
@@ -1479,11 +1481,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	if(first_boot == 0)
 	{
-
+		
 		msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
 		panel_state = MIPI_RESUME_STATE;
 		msd.mpd = pdata;
-
+	
 		msd.ctrl_pdata = ctrl_pdata;
 		first_boot =1;
 
@@ -1498,9 +1500,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 				psmart->plux_table = mpd.lux_table;
 				psmart->lux_table_max = mpd.lux_table_max_cnt;
 				psmart->ldi_revision = 0x60;
-
+		
 				smart_dimming_init(psmart);
-
+		
 				msd.dstat.is_smart_dim_loaded = true;
 
 			}
@@ -1513,7 +1515,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			if(lcd_connected_status == 1){
 #endif
 					INIT_WORK(&err_fg_work, err_fg_work_func);
-
+					
 					rc = request_threaded_irq(err_fg_gpio, NULL, err_fg_irq_handler, 
 						IRQF_TRIGGER_LOW | IRQF_ONESHOT, "esd_detect", NULL);
 					if (rc) {
@@ -1528,7 +1530,14 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 #endif
 #endif
 	}
-	
+
+#if !defined(CONFIG_MACH_S3VE3G_EUR)
+	if( msd.mfd->panel_power_on == false){
+		pr_err("%s: panel power off no bl ctrl\n", __func__);
+		return;
+	}
+#endif
+
 #if defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	if (err_fg_working) {
 		pr_info("[LCD] %s : esd is working!! return.. \n", __func__);
@@ -1536,9 +1545,10 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	}
 #endif
 
+#if defined(CONFIG_MACH_S3VE3G_EUR)
 	if(bl_level)
-	msd.mfd->bl_previous = bl_level;
-
+	msd.mfd->bl_previous = bl_level;	
+#endif
 	switch (ctrl_pdata->bklt_ctrl) {
 
 	case BL_DCS_CMD:
@@ -1553,7 +1563,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 					pr_info("cmds_sent: %x\n", cmds_sent);
 					goto end;
 				}
-
+				
 				cmd_desc = mpd.combined_ctrl.cmd;
 				cmd_size = mpd.combined_ctrl.size;
 
@@ -1567,14 +1577,14 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 #endif
 
 				mdss_dsi_cmds_send(ctrl_pdata, cmd_desc, cmd_size, flag);				
-
+				
 				}
-
+			
 		break;
-
+		
 	default:
 		pr_err("%s: Unknown bl_ctrl configuration\n",__func__);
-
+		
 		break;
 	}
 
@@ -1585,33 +1595,62 @@ int bl_first_update=0;
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
-
+	
 	msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-
+	
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 	
 	msd.ctrl_pdata = ctrl;
 	msd.mpd = pdata;
-
-	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 	
+	printk("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
+
+#if 0
+	if (!msd.dstat.is_elvss_loaded) {
+			mpd.lcd_elvss_data[0] = lcd_id3;
+			msd.dstat.is_elvss_loaded = true;
+	}
+	
+	if (!msd.dstat.is_smart_dim_loaded) {
+         	char pBuffer[256] = {0,};
+        	int i;
+        	char *mtp_data;
+        	int mtp_cnt;
+
+		psmart = &(mpd.smart_s6e8aa0x01);
+                mtp_data = (char *)&(mpd.smart_s6e8aa0x01.MTP);
+		mtp_cnt = find_mtp(msd.mfd, mtp_data);
+
+		for (i = 0; i < MTP_DATA_SIZE; i++)
+			snprintf(pBuffer + strnlen(pBuffer, 256), 256, " %02x",
+				mtp_data[i]);
+			pr_debug("MTP: %s", pBuffer);
+
+			psmart->plux_table = mpd.lux_table;
+			psmart->lux_table_max = mpd.lux_table_max_cnt;
+			psmart->ldi_revision = 0x60;
+	
+			smart_dimming_init(psmart);
+	
+			msd.dstat.is_smart_dim_loaded = true;
+
+		}
+#endif
+
 			get_min_lux_table(&(mpd.gamma_initial[2]),
 						GAMMA_SET_MAX);
 			reset_gamma_level();
 
 	if (ctrl->on_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
-
 #if defined(CONFIG_MACH_S3VE3G_EUR)	
-	if(bl_first_update== 0){
-		bl_first_update =1;
+	if(bl_first_update== 0)
 		pr_err("to maintain ddefault brightness \n");
-	}
 	else
 		mdss_dsi_panel_bl_ctrl(pdata,msd.mfd->bl_previous);
 #endif
@@ -1944,7 +1983,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->mipi.dst_format =
 			DSI_VIDEO_DST_FORMAT_RGB888;
 	}
-
+	
 	pdest = of_get_property(np,
 			"qcom,mdss-dsi-panel-destination", NULL);
 	if (strlen(pdest) != 9) {
@@ -2075,7 +2114,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-color-order", &tmp);
 	pinfo->mipi.rgb_swap = (!rc ? tmp : DSI_RGB_SWAP_RGB);
-
+	
 	rc = of_property_read_u32(np, "qcom,mdss-force-clk-lane-hs", &tmp);
 	pinfo->mipi.force_clk_lane_hs = (!rc ? tmp : 0);
 
@@ -2141,7 +2180,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	}
 	for (i = 0; i < len; i++)
 		pinfo->mipi.dsi_phy_db.timing[i] = data[i];
-
+		
 		pinfo->mipi.dsi_phy_db.timing[8] = 0x20;
 
 	mdss_dsi_parse_fbc_params(np, pinfo);
@@ -2185,7 +2224,7 @@ static ssize_t mipi_samsung_disp_acl_show(struct device *dev,
 {
 	int rc;
 
-	rc = snprintf((char *)buf, sizeof(*buf), "%d\n", msd.dstat.acl_on);
+	rc = sprintf((char *)buf, "%d\n", msd.dstat.acl_on);
 	printk("acl status: %d\n", *buf);
 
 	return rc;
@@ -2199,7 +2238,7 @@ static ssize_t mipi_samsung_disp_acl_store(struct device *dev,
 	struct msm_fb_data_type *mfd;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_data *pdata = msd.mpd;
-
+	
 	mfd = msd.mfd;
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 							panel_data);
@@ -2277,14 +2316,14 @@ static ssize_t mdss_siop_enable_show(struct device *dev,
 static ssize_t mdss_siop_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
-
+	
 	if (sysfs_streq(buf, "1") && !msd.dstat.siop_status)
 		msd.dstat.siop_status = true;
 	else if (sysfs_streq(buf, "0") && msd.dstat.siop_status)
 		msd.dstat.siop_status = false;
 	else
 		pr_info("%s: Invalid argument!!", __func__);
-
+	
 	return size;
 
 }
@@ -2306,7 +2345,7 @@ static ssize_t mdss_s6e8aa0a_auto_brightness_show(struct device *dev,
 {
 	int rc;
 
-	rc = snprintf(buf, sizeof(*buf), "%d\n",
+	rc = sprintf(buf, "%d\n",
 					msd.dstat.auto_brightness);
 	pr_info("%s : auto_brightness : %d\n", __func__, msd.dstat.auto_brightness);
 
@@ -2471,11 +2510,11 @@ static int __init detect_lcd_panel_vendor(char* read_id)
 		lcd_connected_status = 1;
 	else
 		lcd_connected_status = 0;
-
+	
 	pr_info("detect_lcd_panel_vendor lcd_id = %x & lcd_id3 = %x\n",lcd_id,lcd_id3);
 	pr_info("%s %s", __func__, lcd_connected_status == 1 ?
 				"lcd_attached" : "lcd_detached");
-
+	
 	return 1;
 }
 __setup("lcd_id=0x", detect_lcd_panel_vendor);
@@ -2567,32 +2606,32 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	mpd.gamma_update.cmd= samsung_panel_gamma_update_cmds;
 	mpd.gamma_update.size =  ARRAY_SIZE(samsung_panel_gamma_update_cmds);
-
+			
 	mpd.elvss_update.cmd= samsung_panel_elvss_update_cmds;
 	mpd.elvss_update.size= ARRAY_SIZE(samsung_panel_elvss_update_cmds);
-
+				 
 	mpd.elvss_update_4_8.cmd = samsung_panel_elvss_update_cmds_4_8;
 	mpd.elvss_update_4_8.size =	 ARRAY_SIZE(samsung_panel_elvss_update_cmds_4_8);
-
+				 
 	mpd.acl_on.cmd = samsung_panel_acl_on_cmds;
 	mpd.acl_on.size =	ARRAY_SIZE(samsung_panel_acl_on_cmds);
-
+					
 	mpd.acl_off.cmd = samsung_panel_acl_off_cmds;
 	mpd.acl_off.size =  ARRAY_SIZE(samsung_panel_acl_off_cmds);
-
+					
 	mpd.acl_update.cmd = samsung_panel_acl_update_cmds;
 	mpd.acl_update.size = ARRAY_SIZE(samsung_panel_acl_update_cmds);
-	
+			
 	mpd.combined_ctrl.cmd = combined_ctrl;
 	mpd.combined_ctrl.size = ARRAY_SIZE(combined_ctrl);
-
+	
 	mpd.gamma_initial = gamma_cond_set_4_8;
 	mpd.gamma_smartdim_4_8 = gamma_cond_300cd_4_8;
 
 	mpd.lcd_current_cd_idx = -1;
 	mpd.lux_table = lux_tbl_acl;
 	mpd.lux_table_max_cnt = ARRAY_SIZE(lux_tbl_acl);
-	
+		
 	mpd.set_acl = set_acl_on_level;
 	mpd.prepare_brightness_control_cmd_array = prepare_brightness_control_cmd_array;
 	msd.dstat.gamma_mode = GAMMA_SMART;
@@ -2629,7 +2668,7 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("sysfs create fail-%s\n",
 				dev_attr_power_reduce.attr.name);
 	}
-
+	
 	rc= sysfs_create_file(&lcd_device->dev.kobj,
 					&dev_attr_siop_enable.attr);
 	if (rc) {

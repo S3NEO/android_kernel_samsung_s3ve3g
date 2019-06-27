@@ -29,7 +29,6 @@ static DEFINE_MUTEX(mdss_mdp_sspp_lock);
 static DEFINE_MUTEX(mdss_mdp_smp_lock);
 
 static int mdss_mdp_pipe_free(struct mdss_mdp_pipe *pipe);
-static int mdss_mdp_smp_mmb_set(int client_id, unsigned long *smp);
 static struct mdss_mdp_pipe *mdss_mdp_pipe_search_by_client_id(
 	struct mdss_data_type *mdata, int client_id);
 static void mdss_mdp_smp_mmb_free(unsigned long *smp, bool write);
@@ -65,16 +64,9 @@ static u32 mdss_mdp_smp_mmb_reserve(struct mdss_mdp_pipe *pipe, struct mdss_mdp_
 	 * of smp blocks), so that fallback solution happens.
 	 */
 	if (pipe->src_fmt->is_yuv || (pipe->flags & MDP_BACKEND_COMPOSITION)) {
-		if (i != 0 && n != i && !force_alloc) {
-		pr_debug("Can't change mmb config, num_blks: %d alloc: %d\n",
-			n, i);
+	if (i != 0 && n != i && !force_alloc) {
 		pr_debug("Can't change mmb configuration in set call\n");
 		return 0;
-	} else {
-		if (i != 0 && n != i) {
-		pr_debug("Can't change mmb configuration in set call\n");
-		return 0;
-		}
 	}
 	}
 	
@@ -198,7 +190,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	bool force_alloc = 0;
 	u32 nlines, format;
 	u16 width;
-#if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL) || defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined(CONFIG_SEC_MATISSE_PROJECT)
 	int wb_mixer = 0;
 #endif
 
@@ -256,12 +248,13 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 
 	nlines = pipe->bwc_mode ? 1 : 2;
 
-#if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL) || defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined(CONFIG_SEC_MATISSE_PROJECT)
 	if (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
 		wb_mixer = 1;
 #endif
 
-	force_alloc = !(pipe->flags & MDP_BACKEND_COMPOSITION);
+	force_alloc = pipe->flags & MDP_SMP_FORCE_ALLOC;
+
 	mutex_lock(&mdss_mdp_smp_lock);
 	if (pipe->src_fmt->is_yuv || (pipe->flags & MDP_BACKEND_COMPOSITION)) {
 	for (i = (MAX_PLANES - 1); i >= ps.num_planes; i--) {
@@ -275,7 +268,7 @@ int mdss_mdp_smp_reserve(struct mdss_mdp_pipe *pipe)
 	}
 
 	for (i = 0; i < ps.num_planes; i++) {
-#if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL) || defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)
+#if defined(CONFIG_SEC_MATISSE_PROJECT)
 		if (rot_mode || wb_mixer) {
 #else
 		if (rot_mode) {
@@ -643,13 +636,17 @@ static int mdss_mdp_pipe_free(struct mdss_mdp_pipe *pipe)
 	pr_debug("ndx=%x pnum=%d ref_cnt=%d\n", pipe->ndx, pipe->num,
 			atomic_read(&pipe->ref_cnt));
 
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-	mdss_mdp_pipe_sspp_term(pipe);
-	mdss_mdp_smp_free(pipe);
+	if (pipe->play_cnt) {
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
+		mdss_mdp_pipe_sspp_term(pipe);
+		mdss_mdp_smp_free(pipe);
+		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+	} else {
+		mdss_mdp_smp_unreserve(pipe);
+	}
+
 	pipe->flags = 0;
 	pipe->bwc_mode = 0;
-
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 
 	return 0;
 }
@@ -726,6 +723,7 @@ int mdss_mdp_pipe_handoff(struct mdss_mdp_pipe *pipe)
 		pipe->src_fmt->bpp);
 
 	pipe->is_handed_off = true;
+	pipe->play_cnt = 1;
 	atomic_inc(&pipe->ref_cnt);
 
 error:
@@ -796,26 +794,13 @@ static int mdss_mdp_image_setup(struct mdss_mdp_pipe *pipe,
 	dst = pipe->dst;
 	src = pipe->src;
 
-	if (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_INTF) {
+	if (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_INTF)
 		mdss_mdp_crop_rect(&src, &dst, &sci);
-        if (pipe->flags & MDP_FLIP_LR) {
-			src.x = pipe->src.x + (pipe->src.x + pipe->src.w)
-				- (src.x + src.w);
-		}
-		if (pipe->flags & MDP_FLIP_UD) {
-			src.y = pipe->src.y + (pipe->src.y + pipe->src.h)
-				- (src.y + src.h);
-		}
-	}
 
 	src_size = (src.h << 16) | src.w;
 	src_xy = (src.y << 16) | src.x;
 	dst_size = (dst.h << 16) | dst.w;
-#if defined(CONFIG_MDSS_UD_FLIP)
-	dst_xy = (((pipe->mixer->height - pipe->dst.y - pipe->dst.h) << 16) | pipe->dst.x);
-#else
 	dst_xy = (dst.y << 16) | dst.x;
-#endif
 
 	ystride0 =  (pipe->src_planes.ystride[0]) |
 			(pipe->src_planes.ystride[1] << 16);

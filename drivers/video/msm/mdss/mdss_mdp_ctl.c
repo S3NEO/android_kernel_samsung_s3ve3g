@@ -139,7 +139,7 @@ static void __mdss_mdp_ctrl_perf_ovrd(struct mdss_data_type *mdata,
 	}
 
 #if !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_FULL_HD_PT_PANEL) && !defined (CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)\
-	&& !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL) &&!defined (CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
+	&& !defined(CONFIG_FB_MSM_MIPI_SAMSUNG_YOUM_CMD_FULL_HD_PT_PANEL)
 	*ab_quota = MDSS_MDP_BUS_FUDGE_FACTOR_AB(*ab_quota);
 	if (npipe > 1)
 		*ib_quota = MDSS_MDP_BUS_FUDGE_FACTOR_HIGH_IB(*ib_quota);
@@ -295,6 +295,7 @@ int mdss_mdp_perf_calc_pipe(struct mdss_mdp_pipe *pipe,
 			pr_debug("*** Exceptional case : more than 10x Upscale!!!\n");
 			perf->ib_quota = perf->ib_quota * 10;
 			perf->ab_quota = perf->ab_quota * 10;
+			perf->mdp_clk_rate = perf->mdp_clk_rate * 2;
 	}
 
 	pr_debug("mixer=%d pnum=%d clk_rate=%u bus ab=%u ib=%u\n",
@@ -500,7 +501,7 @@ static int mdss_mdp_ctl_perf_update(struct mdss_mdp_ctl *ctl)
 		if (need_more_bw) {
 			if ((display_width % 10) || (display_height % 10)) {
 				if (rotate_mode) {
-					if ((display_width < 500) || (display_height < 500)) {
+					if ((display_width < 360) || (display_height < 360)) {
 						/* add 390% more bw*/
 						total_ab_quota *= (ADDING_BW_ROTATE_MODE * 3);
 						total_ib_quota *= (ADDING_BW_ROTATE_MODE * 3);
@@ -1789,25 +1790,30 @@ struct mdss_mdp_mixer *mdss_mdp_mixer_get(struct mdss_mdp_ctl *ctl, int mux)
 {
 	struct mdss_mdp_mixer *mixer = NULL;
 	struct mdss_overlay_private *mdp5_data = NULL;
-	if (!ctl || !ctl->mfd) {
+	bool is_mixer_swapped = false;
+
+	if (!ctl) {
 		pr_err("ctl not initialized\n");
 		return NULL;
 	}
 
-	mdp5_data = mfd_to_mdp5_data(ctl->mfd);
-	if (!mdp5_data) {
-		pr_err("ctl not initialized\n");
-		return NULL;
+	if (ctl->mfd) {
+		mdp5_data = mfd_to_mdp5_data(ctl->mfd);
+		if (!mdp5_data) {
+			pr_err("mdp5_data not initialized\n");
+			return NULL;
+		}
+		is_mixer_swapped = mdp5_data->mixer_swap;
 	}
 
 	switch (mux) {
 	case MDSS_MDP_MIXER_MUX_DEFAULT:
 	case MDSS_MDP_MIXER_MUX_LEFT:
-		mixer = mdp5_data->mixer_swap ?
+		mixer = is_mixer_swapped ?
 			ctl->mixer_right : ctl->mixer_left;
 		break;
 	case MDSS_MDP_MIXER_MUX_RIGHT:
-		mixer = mdp5_data->mixer_swap ?
+		mixer = is_mixer_swapped ?
 			ctl->mixer_left : ctl->mixer_right;
 		break;
 	}
@@ -2033,7 +2039,6 @@ int mdss_mdp_display_wait4comp(struct mdss_mdp_ctl *ctl)
 		ret = ctl->wait_fnc(ctl, NULL);
 
 	if (ctl->perf_changed) {
-		if (ctl->mixer_left && !ctl->mixer_left->rotator_mode)
 		mdss_mdp_ctl_perf_commit(ctl->mdata, ctl->perf_changed);
 		ctl->perf_changed = 0;
 	}

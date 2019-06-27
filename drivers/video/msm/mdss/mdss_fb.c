@@ -52,6 +52,7 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
+#include "mdss_mdp.h"
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -71,13 +72,10 @@ static u32 mdss_fb_pseudo_palette[16] = {
 };
 
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
-#if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01EUR) || defined(CONFIG_MACH_KS01KTT) || defined(CONFIG_MACH_KS01LGT) || defined(CONFIG_SEC_ATLANTIC_PROJECT)
-u8 prev_csc_update = 1;
-#endif
 u8 csc_update = 1;
 #endif
 
-#if (defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
+#if defined(CONFIG_MACH_S3VE3G_EUR) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
 struct mutex esd_lock;
 #endif
 
@@ -402,23 +400,85 @@ static ssize_t mdss_fb_get_idle_notify(struct device *dev,
 	return ret;
 }
 
-static ssize_t mdss_fb_get_panel_info(struct device *dev,
+static int pcc_r = 32768, pcc_g = 32768, pcc_b = 32768;
+static ssize_t mdss_get_rgb(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	struct fb_info *fbi = dev_get_drvdata(dev);
-	struct msm_fb_data_type *mfd = fbi->par;
-	struct mdss_panel_info *pinfo = mfd->panel_info;
-	int ret;
+	u32 copyback = 0;
+	struct mdp_pcc_cfg_data pcc_cfg;
 
-	ret = scnprintf(buf, PAGE_SIZE,
-			"pu_en=%d\nxstart=%d\nwalign=%d\nystart=%d\nhalign=%d\n"
-			"min_w=%d\nmin_h=%d",
- 			pinfo->partial_update_enabled, pinfo->xstart_pix_align,
- 			pinfo->width_pix_align, pinfo->ystart_pix_align,
-			pinfo->height_pix_align, pinfo->min_width,
-			pinfo->min_height);
+	memset(&pcc_cfg, 0, sizeof(struct mdp_pcc_cfg_data));
 
-	return ret;
+	pcc_cfg.block = MDP_LOGICAL_BLOCK_DISP_0;
+	pcc_cfg.ops = MDP_PP_OPS_READ;
+
+	mdss_mdp_pcc_config(&pcc_cfg, &copyback);
+
+	/* We disable pcc when using default values and reg
+	 * are zeroed on pp resume, so ignore empty values.
+	 */
+	if (pcc_cfg.r.r && pcc_cfg.g.g && pcc_cfg.b.b) {
+		pcc_r = pcc_cfg.r.r;
+		pcc_g = pcc_cfg.g.g;
+		pcc_b = pcc_cfg.b.b;
+	}
+
+	return scnprintf(buf, PAGE_SIZE, "%d %d %d\n", pcc_r, pcc_g, pcc_b);
+}
+
+/**
+ * simple color temperature interface using polynomial color correction
+ *
+ * input values are r/g/b adjustments from 0-32768 representing 0 -> 1
+ *
+ * example adjustment @ 3500K:
+ * 1.0000 / 0.5515 / 0.2520 = 32768 / 25828 / 17347
+ *
+ * reference chart:
+ * http://www.vendian.org/mncharity/dir3/blackbody/UnstableURLs/bbr_color.html
+ */
+static ssize_t mdss_set_rgb(struct device *dev,
+							struct device_attribute *attr,
+							const char *buf, size_t count)
+{
+	uint32_t r = 0, g = 0, b = 0;
+	struct mdp_pcc_cfg_data pcc_cfg;
+	u32 copyback = 0;
+
+    if (count > 19)
+		return -EINVAL;
+
+	sscanf(buf, "%d %d %d", &r, &g, &b);
+
+	if (r < 0 || r > 32768)
+		return -EINVAL;
+	if (g < 0 || g > 32768)
+		return -EINVAL;
+	if (b < 0 || b > 32768)
+		return -EINVAL;
+
+	pr_info("%s: r=%d g=%d b=%d", __func__, r, g, b);
+
+	memset(&pcc_cfg, 0, sizeof(struct mdp_pcc_cfg_data));
+
+	pcc_cfg.block = MDP_LOGICAL_BLOCK_DISP_0;
+	if (r == 32768 && g == 32768 && b == 32768)
+		pcc_cfg.ops = MDP_PP_OPS_DISABLE;
+	else
+		pcc_cfg.ops = MDP_PP_OPS_ENABLE;
+	pcc_cfg.ops |= MDP_PP_OPS_WRITE;
+	pcc_cfg.r.r = r;
+	pcc_cfg.g.g = g;
+	pcc_cfg.b.b = b;
+
+	if (mdss_mdp_pcc_config(&pcc_cfg, &copyback) == 0) {
+		pcc_r = r;
+		pcc_g = g;
+		pcc_b = b;
+		return count;
+	}
+
+	return -EINVAL;
 }
 
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
@@ -427,7 +487,7 @@ static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
 static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
-static DEVICE_ATTR(msm_fb_panel_info, S_IRUGO, mdss_fb_get_panel_info, NULL);
+static DEVICE_ATTR(rgb, S_IRUGO | S_IWUSR | S_IWGRP, mdss_get_rgb, mdss_set_rgb);
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
@@ -435,7 +495,7 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_show_blank_event.attr,
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
-	&dev_attr_msm_fb_panel_info.attr,
+	&dev_attr_rgb.attr,
 	NULL,
 };
 
@@ -519,7 +579,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 
 	mutex_init(&mfd->lock);
 	mutex_init(&mfd->bl_lock);
-#if (defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
+#if defined(CONFIG_MACH_S3VE3G_EUR) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	mutex_init(&esd_lock);
 #endif
 	mutex_init(&mfd->power_state);
@@ -570,12 +630,13 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		 mfd->mdp_sync_pt_data.timeline =
 				sw_sync_timeline_create(timeline_name);
 		if (mfd->mdp_sync_pt_data.timeline == NULL) {
-			pr_err("%s: cannot create time line", __func__);
+			pr_err("cannot create release fence time line\n");
 			return -ENOMEM;
 		}
 		mfd->mdp_sync_pt_data.notifier.notifier_call =
 			__mdss_fb_sync_buf_done_callback;
 	}
+
 	switch (mfd->panel.type) {
 	case WRITEBACK_PANEL:
 		mfd->mdp_sync_pt_data.threshold = 1;
@@ -862,8 +923,10 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 			mfd->bl_level = bkl_lvl;
 			return;
 		}
+#if defined(CONFIG_MACH_S3VE3G_EUR)
 		if(mfd->panel_power_on == true)
-		   pdata->set_backlight(pdata, temp);
+#endif
+		pdata->set_backlight(pdata, temp);
 		mfd->bl_level = bkl_lvl;
 		mfd->bl_level_old = temp;
 
@@ -886,10 +949,6 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 	if (mfd->unset_bl_level && !mfd->bl_updated) {
 		pdata = dev_get_platdata(&mfd->pdev->dev);
 		if ((pdata) && (pdata->set_backlight)) {
-#if defined(CONFIG_MACH_KANAS3G_CTC)
-			pr_info("[TSP]extend 200ms delay from LCD backlight\n");
-			msleep(100);
-#endif
 			mutex_lock(&mfd->bl_lock);
 			mfd->bl_level = mfd->unset_bl_level;
 			pr_info("mfd->bl_level (%d), bl_updated (%d)\n", 
@@ -980,12 +1039,12 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	}
         mutex_unlock(&mfd->ctx_lock);
 	mutex_unlock(&mfd->power_state);
+	
+	pr_info("FB_NUM:%d, MDSS_FB_%s -- \n", mfd->panel_info->fb_num,
+			blank_mode ? "BLANK": "UNBLANK");
 
 	/* Notify listeners */
 	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
-
-	pr_info("FB_NUM:%d, MDSS_FB_%s -- \n", mfd->panel_info->fb_num,
-			blank_mode ? "BLANK": "UNBLANK");
 
 	return ret;
 }
@@ -993,7 +1052,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 static int mdss_fb_blank(int blank_mode, struct fb_info *info)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-#if (defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
+#if defined(CONFIG_MACH_S3VE3G_EUR) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	static int nblank_mode = FB_BLANK_UNBLANK;
 	static int final_state = -1;
 	int ret;
@@ -1041,12 +1100,12 @@ NEXT_STEP2:
 		else
 			mfd->suspend.panel_power_on = false;
 
-#if (defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
+#if defined(CONFIG_MACH_S3VE3G_EUR) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
 		mutex_unlock(&esd_lock);
 #endif
 		return 0;
 	}
-#if (defined(CONFIG_MACH_S3VE3G_EUR) || defined(CONFIG_MACH_VICTOR3GDSDTV_LTN)) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
+#if defined(CONFIG_MACH_S3VE3G_EUR) && defined(CONFIG_ESD_ERR_FG_RECOVERY)
 	ret = mdss_fb_blank_sub(blank_mode, info, mfd->op_enable);
 	mutex_unlock(&esd_lock);
 	return ret;
@@ -1598,6 +1657,9 @@ static int mdss_fb_release_all(struct fb_info *info, bool release_all)
 	}
 
 	if (!mfd->ref_cnt) {
+#if defined(CONFIG_WHITE_PANEL)
+		mdss_fb_set_backlight(mfd, 0);
+#endif
 		if (mfd->disp_thread) {
 			kthread_stop(mfd->disp_thread);
 			mfd->disp_thread = NULL;
@@ -1823,20 +1885,20 @@ static int mdss_fb_wait_for_kickoff(struct msm_fb_data_type *mfd)
 
 	ret = wait_event_timeout(mfd->kickoff_wait_q,
 			(!atomic_read(&mfd->kickoff_pending) ||
-			mfd->shutdown_pending),
+			 mfd->shutdown_pending),
 			msecs_to_jiffies(WAIT_DISP_OP_TIMEOUT / 2));
 	if (!ret) {
 		pr_err("wait for kickoff timeout %d pending=%d\n",
-			ret, atomic_read(&mfd->kickoff_pending));
+				ret, atomic_read(&mfd->kickoff_pending));
 
-	}else if (mfd->shutdown_pending) {
+	} else if (mfd->shutdown_pending) {
 		pr_debug("Shutdown signalled\n");
 		return -EPERM;
 	}
 
 	return 0;
-
 }
+
 static int mdss_fb_pan_display_ex(struct fb_info *info,
 		struct mdp_display_commit *disp_commit)
 {
@@ -2014,7 +2076,6 @@ static int __mdss_fb_display_thread(void *data)
 
 	atomic_set(&mfd->commits_pending, 0);
 	atomic_set(&mfd->kickoff_pending, 0);
-	wake_up_all(&mfd->kickoff_wait_q);
 	wake_up_all(&mfd->idle_wait_q);
 
 	return ret;
@@ -2495,7 +2556,8 @@ static int __ioctl_wait_idle(struct msm_fb_data_type *mfd, u32 cmd)
 		(cmd != MSMFB_OVERLAY_VSYNC_CTRL) &&
 		(cmd != MSMFB_ASYNC_BLIT) &&
 		(cmd != MSMFB_BLIT) &&
-		(cmd != MSMFB_NOTIFY_UPDATE)) {
+		(cmd != MSMFB_NOTIFY_UPDATE) &&
+		(cmd != MSMFB_OVERLAY_PREPARE)) {
 		ret = mdss_fb_pan_idle(mfd);
 	}
 

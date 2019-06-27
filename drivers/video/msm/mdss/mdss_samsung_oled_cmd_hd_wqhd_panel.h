@@ -34,11 +34,8 @@
 #define LCD_DEBUG(X, ...) pr_info("[LCD]%s:"X, __func__, ## __VA_ARGS__);
 
 #include "smart_dimming.h"
-#if defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_CMD_HD_PT_PANEL)
-#include "smart_mtp_ea8064.h"
-#else
 #include "smart_mtp_s6e3.h"
-#endif
+
 #define MAX_BL 255
 
 enum mipi_samsung_cmd_list {
@@ -73,15 +70,8 @@ enum mipi_samsung_cmd_list {
 	PANEL_ALPM_SET_PARTIAL_AREA,
 	PANEL_HSYNC_ON,
 	PANEL_ALPM_SET_BL,
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-	PANEL_SET_TE_OSC_B,
-	PANEL_SET_TE_RESTORE,
-	PANEL_SET_TE,
-	PANEL_SET_TE_1,
-	PANEL_SET_TE_2,
-#endif
 #if defined(CONFIG_LCD_HMT)
-	PANEL_HMT_BRIGHT,
+	PANEL_HMT_BRIGHT,	
 	PANEL_HMT_AID_READY_TO_FOWARD,
 	PANEL_DUAL_SCAN_FULL_ENABLE,
 	PANEL_DUAL_SCAN_DISABLE,
@@ -167,17 +157,6 @@ struct hmt_status {
 };
 #endif
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-struct te_fctrl_lookup_table {
-	int te;
-	char value;
-} __packed;
-struct te_offset_lookup_table {
-	int te;
-	int offset;
-} __packed;
-#endif
-
 struct mipi_samsung_driver_data {
 	struct display_status dstat;
 
@@ -211,7 +190,6 @@ enum {
 	PANEL_FHD_OCTA_S6E3FA0,
 	PANEL_FHD_OCTA_S6E3FA0_CMD,
 	PANEL_FHD_OCTA_S6E3FA2_CMD,
-	PANEL_FHD_OCTA_EA8064G_CMD,
 	PANEL_WQHD_OCTA_S6E3HA0_CMD,
 	PANEL_720P_AMOLED_S6E8AA3X01,
 	PANEL_1080P_OCTA_S6E8FA0,
@@ -221,12 +199,6 @@ enum {
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_WVGA_S6E88A0_PT_PANEL)
 	PANEL_WVGA_OCTA_S6E88A0,
 #endif
-	PANEL_HD_OCTA_EA8064G_CMD,
-};
-
-enum {
-	MAGNA_PANEL,
-	SLSI_PANEL,
 };
 
 struct panel_hrev {

@@ -459,8 +459,10 @@ int mdss_mdp_rotator_setup(struct msm_fb_data_type *mfd,
 			ret = -ENODEV;
 			goto rot_err;
 		}
+
 		if (rot->format != fmt->format)
 			format_changed = true;
+
 	} else {
 		pr_err("invalid rotator session id=%x\n", req->id);
 		ret = -EINVAL;
@@ -579,11 +581,13 @@ int mdss_mdp_rotator_setup(struct msm_fb_data_type *mfd,
 	}
 
 	rot->params_changed++;
+
 	/* If the format changed, release the smp alloc */
 	if (format_changed && rot->pipe) {
 		mdss_mdp_rotator_busy_wait(rot);
 		mdss_mdp_smp_release(rot->pipe);
 	}
+
 	ret = __rotator_pipe_reserve(rot);
 	if (!ret && rot->next)
 		ret = __rotator_pipe_reserve(rot->next);
@@ -599,7 +603,6 @@ int mdss_mdp_rotator_setup(struct msm_fb_data_type *mfd,
 		if (rot && (req->id == MSMFB_NEW_REQUEST))
 			mdss_mdp_rotator_finish(rot);
 	}
-
 	/*
 	 * overwrite the src format for rotator to dst format
 	 * for use by the user. On subsequent set calls, the
@@ -635,7 +638,7 @@ static int mdss_mdp_rotator_finish(struct mdss_mdp_rotator_session *rot)
 	}
 
 	if (!list_empty(&rot->list))
-		list_del(&rot->list);
+		list_del_init(&rot->list);
 
 	rot_sync_pt_data = rot->rot_sync_pt_data;
 	commit_work = rot->commit_work;

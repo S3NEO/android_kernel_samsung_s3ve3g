@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,19 +27,8 @@
 #define MSM_FB_MAX_DEV_LIST 32
 
 #define MSM_FB_ENABLE_DBGFS
-/*
- * This temporary work around of fence time-out modification is being added to handle
- * screen being locked up/blank after resuming - being discussed in SR# 01515705.
- * needs to be rolled back once a solution is found to address the issue at hand
- */
-#if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL) || defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)\
-		|| defined(CONFIG_FB_MSM_MDSS_CPT_QHD_PANEL) || defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
-#define WAIT_FENCE_FIRST_TIMEOUT (0.5 * MSEC_PER_SEC)
-#define WAIT_FENCE_FINAL_TIMEOUT (1 * MSEC_PER_SEC)
-#else
 #define WAIT_FENCE_FIRST_TIMEOUT (3 * MSEC_PER_SEC)
 #define WAIT_FENCE_FINAL_TIMEOUT (10 * MSEC_PER_SEC)
-#endif
 /* Display op timeout should be greater than total timeout */
 #define WAIT_DISP_OP_TIMEOUT ((WAIT_FENCE_FIRST_TIMEOUT + \
 		WAIT_FENCE_FINAL_TIMEOUT) * MDP_MAX_FENCE_FD)
@@ -192,7 +181,9 @@ struct msm_fb_data_type {
 	u32 ext_bl_ctrl;
 	u32 calib_mode;
 	u32 bl_level;
+#if defined(CONFIG_MACH_S3VE3G_EUR)
 	u32 bl_previous;
+#endif
 	u32 bl_scale;
 	u32 bl_min_lvl;
 	u32 unset_bl_level;
@@ -268,15 +259,9 @@ static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
 	}
 }
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
-#if defined(CONFIG_MACH_KS01SKT) || defined(CONFIG_MACH_KS01EUR) || defined(CONFIG_MACH_KS01KTT) || defined(CONFIG_MACH_KS01LGT) || defined(CONFIG_SEC_ATLANTIC_PROJECT)
-extern u8 prev_csc_update;
-#endif
 extern u8 csc_update;
-#if !defined(CONFIG_MACH_KS01SKT) && !defined(CONFIG_MACH_KS01EUR) && !defined(CONFIG_MACH_KS01KTT) && !defined(CONFIG_MACH_KS01LGT) && !defined(CONFIG_SEC_ATLANTIC_PROJECT)
 extern u8 pre_csc_update;
 #endif
-#endif
-
 #if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
 
 enum{
@@ -295,16 +280,6 @@ struct mdss_tick_debug {
 };
 void mdss_dbg_tick_save(int op_name);
 
-#endif
-
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-enum TE_SETTING {
-	TE_SET_INIT = -1,
-	TE_SET_READY,
-	TE_SET_START,
-	TE_SET_DONE,
-	TE_SET_FAIL,
-};
 #endif
 
 extern int boot_mode_lpm, boot_mode_recovery;

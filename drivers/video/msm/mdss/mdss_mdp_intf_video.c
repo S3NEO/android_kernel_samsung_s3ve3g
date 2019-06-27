@@ -568,8 +568,7 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 		pr_err("invalid ctx\n");
 		return -ENODEV;
 	}
-#if !defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION) && \
-	!defined(CONFIG_FB_MSM_MIPI_MAGNA_OCTA_VIDEO_WXGA_PT_DUAL_PANEL)
+#if !defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
 	if (get_lcd_attached() == 0) {
 		pr_err("%s : lcd is not attached..\n",__func__);
 		return -ENODEV;
@@ -584,24 +583,6 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 	}
 
 	if (!ctx->timegen_en) {
-#if defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
-		if(ctl->panel_data->panel_info.cont_splash_enabled) {
-			pr_debug("%s:MDSS_EVENT_BLANK \n", __func__);
-			rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_BLANK, NULL);
-			if (rc == -EBUSY) {
-				pr_debug("intf #%d busy don't turn off\n",
-					 ctl->intf_num);
-				return rc;
-			}
-			WARN(rc, "intf %d blank error (%d)\n", ctl->intf_num, rc);
-
-			mdp_video_write(ctx, MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 0);
-			ctx->timegen_en = false;
-			pr_debug("%s:MDSS_EVENT_PANEL_OFF \n", __func__);
-			rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_PANEL_OFF, NULL);
-			WARN(rc, "intf %d timegen off error (%d)\n", ctl->intf_num, rc);
-		}
-#endif
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_UNBLANK, NULL);
 		if (rc) {
 			pr_warn("intf #%d unblank error (%d)\n",
@@ -711,7 +692,7 @@ int mdss_mdp_video_reconfigure_splash_done(struct mdss_mdp_ctl *ctl,
 		goto error;
 	}
 
-#if defined(CONFIG_FB_MSM_MDSS_S6E8AA0A_HD_PANEL)
+#if defined(CONFIG_FB_MSM_MDSS_S6E8AA0A_HD_PANEL)	
 	ret = mdss_mdp_ctl_intf_event(ctl, MTP_READ,NULL);
 #endif
 
@@ -733,7 +714,7 @@ int mdss_mdp_video_reconfigure_splash_done(struct mdss_mdp_ctl *ctl,
 		ret = mdss_mdp_ctl_intf_event(ctl,
 			MDSS_EVENT_CONT_SPLASH_FINISH, NULL);
 	}
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL) || defined(CONFIG_FB_MSM_MDSS_SHARP_HD_PANEL)
+#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_VIDEO_FULL_HD_PT_PANEL) && defined(CONFIG_FB_MSM_MDSS_S6E8AA0A_HD_PANEL)
 	mdss_mdp_ctl_intf_event(ctl,MDSS_EVENT_CONT_SPLASH_FINISH, NULL);
 #endif
 error:
@@ -750,7 +731,6 @@ error:
 				 mdp5_data->splash_mem_size);
 	}
 
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
 	return ret;
 }
 
