@@ -1551,6 +1551,7 @@ void __init msm8226_init_gpiomux(void)
 #endif
 }
 #ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
+#error we got here
 static void wcnss_switch_to_gpio(void)
 {
 	/* Switch MUX to GPIO */

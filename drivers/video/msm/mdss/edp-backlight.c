@@ -215,18 +215,6 @@ void edp_backlight_disable(void)
 	gpio_set_value(info->pdata->gpio_backlight_en, 0);
 }
 
-int edp_backlight_status(void)
-{
-	struct edp_backlight_info *info = pinfo;
-
-	if (!info) {
-		pr_info("%s error pinfo", __func__);
-		return -ENODEV;
-	}
-
-	return gpio_get_value(info->pdata->gpio_backlight_en);
-}
-
 static int __devinit edp_backlight_probe(struct i2c_client *client,
 				  const struct i2c_device_id *id)
 {

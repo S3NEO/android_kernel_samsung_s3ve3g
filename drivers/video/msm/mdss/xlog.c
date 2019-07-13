@@ -20,7 +20,7 @@
 #include <mach/hardware.h>
 
 
-#define XENTRY	512
+#define XENTRY	256
 
 struct tlog {
 	u64 tick;

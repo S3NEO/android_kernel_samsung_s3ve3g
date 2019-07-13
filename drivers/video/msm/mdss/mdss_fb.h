@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2015, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,26 +21,14 @@
 #include <linux/notifier.h>
 
 #include "mdss_panel.h"
-#include "mdss_mdp_splash_logo.h"
 
 #define MSM_FB_DEFAULT_PAGE_SIZE 2
 #define MFD_KEY  0x11161126
 #define MSM_FB_MAX_DEV_LIST 32
 
 #define MSM_FB_ENABLE_DBGFS
-/*
- * This temporary work around of fence time-out modification is being added to handle
- * screen being locked up/blank after resuming - being discussed in SR# 01515705.
- * needs to be rolled back once a solution is found to address the issue at hand
- */
-#if defined(CONFIG_FB_MSM_MDSS_TC_DSI2LVDS_WXGA_PANEL) || defined(CONFIG_FB_MSM_MDSS_SDC_WXGA_PANEL)\
-		|| defined(CONFIG_FB_MSM_MDSS_CPT_QHD_PANEL) || defined(CONFIG_FB_MSM_MDSS_MAGNA_OCTA_VIDEO_720P_PANEL)
-#define WAIT_FENCE_FIRST_TIMEOUT (0.5 * MSEC_PER_SEC)
-#define WAIT_FENCE_FINAL_TIMEOUT (1 * MSEC_PER_SEC)
-#else
 #define WAIT_FENCE_FIRST_TIMEOUT (3 * MSEC_PER_SEC)
 #define WAIT_FENCE_FINAL_TIMEOUT (10 * MSEC_PER_SEC)
-#endif
 /* Display op timeout should be greater than total timeout */
 #define WAIT_DISP_OP_TIMEOUT ((WAIT_FENCE_FIRST_TIMEOUT + \
 		WAIT_FENCE_FINAL_TIMEOUT) * MDP_MAX_FENCE_FD)
@@ -52,9 +40,6 @@
 #ifndef MIN
 #define  MIN(x, y) (((x) < (y)) ? (x) : (y))
 #endif
-
-#define MDP_PP_AD_BL_LINEAR	0x0
-#define MDP_PP_AD_BL_LINEAR_INV	0x1
 
 /**
  * enum mdp_notify_event - Different frame events to indicate frame update state
@@ -93,9 +78,6 @@ struct disp_info_notify {
 	struct completion comp;
 	struct mutex lock;
 	int value;
-	int is_suspend;
-	int ref_count;
-	bool init_done;
 };
 
 struct msm_sync_pt_data {
@@ -137,16 +119,11 @@ struct msm_mdp_interface {
 	int (*lut_update)(struct msm_fb_data_type *mfd, struct fb_cmap *cmap);
 	int (*do_histogram)(struct msm_fb_data_type *mfd,
 				struct mdp_histogram *hist);
-	int (*ad_calc_bl)(struct msm_fb_data_type *mfd, int bl_in,
-		int *bl_out, bool *bl_out_notify);
-	int (*ad_shutdown_cleanup)(struct msm_fb_data_type *mfd);
+	int (*update_ad_input)(struct msm_fb_data_type *mfd);
 	int (*panel_register_done)(struct mdss_panel_data *pdata);
 	u32 (*fb_stride)(u32 fb_index, u32 xres, int bpp);
-	int (*splash_init_fnc)(struct msm_fb_data_type *mfd);
 	struct msm_sync_pt_data *(*get_sync_fnc)(struct msm_fb_data_type *mfd,
 				const struct mdp_buf_sync *buf_sync);
-	void (*check_dsi_status)(struct work_struct *work, uint32_t interval);
-	int (*configure_panel)(struct msm_fb_data_type *mfd, int mode);
 	void *private1;
 };
 
@@ -203,16 +180,17 @@ struct msm_fb_data_type {
 	int ext_ad_ctrl;
 	u32 ext_bl_ctrl;
 	u32 calib_mode;
-	u32 ad_bl_level;
 	u32 bl_level;
+#if defined(CONFIG_MACH_S3VE3G_EUR)
 	u32 bl_previous;
+#endif
 	u32 bl_scale;
 	u32 bl_min_lvl;
 	u32 unset_bl_level;
 	u32 bl_updated;
-	u32 bl_level_scaled;
-	u32 bl_level_prev_scaled;
+	u32 bl_level_old;
 	struct mutex bl_lock;
+	struct mutex lock;
 	struct mutex power_state;
 	struct mutex ctx_lock;
 
@@ -248,8 +226,6 @@ struct msm_fb_data_type {
 	wait_queue_head_t kickoff_wait_q;
 	bool shutdown_pending;
 
-	struct msm_fb_splash_info splash_info;
-
 	wait_queue_head_t ioctl_q;
 	atomic_t ioctl_ref_cnt;
 
@@ -260,8 +236,6 @@ struct msm_fb_data_type {
 	u32 dcm_state;
 	struct list_head proc_list;
 	u32 wait_for_kickoff;
-	struct ion_client *fb_ion_client;
-	struct ion_handle *fb_ion_handle;
 
 	int blank_mode;
 };
@@ -286,9 +260,8 @@ static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
 }
 #ifdef CONFIG_FB_MSM_CAMERA_CSC
 extern u8 csc_update;
-extern u8 csc_change;
+extern u8 pre_csc_update;
 #endif
-
 #if defined (CONFIG_FB_MSM_MDSS_DBG_SEQ_TICK)
 
 enum{
@@ -309,19 +282,8 @@ void mdss_dbg_tick_save(int op_name);
 
 #endif
 
-#if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OCTA_CMD_WQHD_PT_PANEL)
-enum TE_SETTING {
-	TE_SET_INIT = -1,
-	TE_SET_READY,
-	TE_SET_START,
-	TE_SET_DONE,
-	TE_SET_FAIL,
-};
-#endif
-
 extern int boot_mode_lpm, boot_mode_recovery;
 int mdss_fb_get_phys_info(unsigned long *start, unsigned long *len, int fb_num);
-int mdss_fb_get_first_cmt_flag(void);
 void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl);
 void mdss_fb_update_backlight(struct msm_fb_data_type *mfd);
 void mdss_fb_wait_for_fence(struct msm_sync_pt_data *sync_pt_data);
@@ -333,5 +295,4 @@ int mdss_fb_register_mdp_instance(struct msm_mdp_interface *mdp);
 void mdss_negative_color(int is_negative_on);
 #endif
 int mdss_fb_dcm(struct msm_fb_data_type *mfd, int req_state);
-int mdss_fb_suspres_panel(struct device *dev, void *data);
 #endif /* MDSS_FB_H */

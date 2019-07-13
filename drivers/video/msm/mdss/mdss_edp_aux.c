@@ -1242,6 +1242,7 @@ static int edp_link_rate_down_shift(struct mdss_edp_drv_pdata *ep)
 static void edp_clear_training_pattern(struct mdss_edp_drv_pdata *ep)
 {
 	pr_debug("%s:\n", __func__);
+	edp_write(ep->base + EDP_STATE_CTRL, 0);
 	edp_train_pattern_set_write(ep, 0);
 	usleep(ep->dpcd.training_read_interval);
 }
@@ -1270,7 +1271,6 @@ train_start:
 	mdss_edp_config_ctrl(ep);
 	mdss_edp_lane_power_ctrl(ep, 1);
 
-	mdss_edp_state_ctrl(ep, 0);
 	edp_clear_training_pattern(ep);
 	usleep(ep->dpcd.training_read_interval);
 
@@ -1285,10 +1285,6 @@ train_start:
 		}
 	}
 
-
-	pr_debug("%s: Training 1 completed successfully", __func__);
-
-	mdss_edp_state_ctrl(ep, 0);
 	/* recovery_done : 0x1111*/
 	pr_info("%s: Training 1 completed successfully recovery_done : 0x%x", __func__,
 		(ep->link_status.lane_23_status << 8) | ep->link_status.lane_01_status);
@@ -1368,12 +1364,7 @@ int mdss_edp_sink_power_state(struct mdss_edp_drv_pdata *ep, char state)
 
 int mdss_edp_link_train(struct mdss_edp_drv_pdata *ep)
 {
-	int ret;
-
-	mutex_lock(&ep->train_mutex);
-	ret = edp_aux_link_train(ep);
-	mutex_unlock(&ep->train_mutex);
-	return ret;
+	return edp_aux_link_train(ep);
 }
 
 void mdss_edp_aux_setup(struct mdss_edp_drv_pdata *ep)
@@ -1510,7 +1501,6 @@ void read_firmware_version(char *string)
 void mdss_edp_aux_init(struct mdss_edp_drv_pdata *ep)
 {
 	mutex_init(&ep->aux_mutex);
-	mutex_init(&ep->train_mutex);
 	init_completion(&ep->aux_comp);
 	init_completion(&ep->train_comp);
 	init_completion(&ep->idle_comp);

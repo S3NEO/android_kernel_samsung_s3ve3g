@@ -44,19 +44,11 @@ static struct gpiomux_setting hdmi_active_1_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 };
 
-#ifdef CONFIG_MACH_JACTIVESKT
-static struct gpiomux_setting hdmi_suspend_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-#else
 static struct gpiomux_setting hdmi_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
-#endif
 
 static struct qpnp_pin_cfg  MHL_PIN_PM_GPIO_WAKE = {
 	.mode = 1, /*QPNP_PIN_MODE_DIG_OUT*/
@@ -130,7 +122,7 @@ static struct msm_gpiomux_config msm_hdmi_ddc_configs[] = {
 		},
 	},
 };
-static bool mhl_power_on;
+
 #ifdef CONFIG_ARCH_MSM8974
 int platform_ap_hdmi_hdcp_auth(struct sii8240_data *sii8240)
 {
@@ -259,20 +251,6 @@ static void sii8240_charger_mhl_cb(bool otg_enable, int charger)
 		pdata->charging_type = POWER_SUPPLY_TYPE_MHL_USB;
 	} else
 		pdata->charging_type = POWER_SUPPLY_TYPE_BATTERY;
-
-#ifdef CONFIG_MUIC_SUPPORT_MULTIMEDIA_DOCK
-	pr_info("MMDock_code\n");
-	if (pdata->is_multimediadock == true) {
-		pr_info("MMDock platform variable was found true. Check otg value and update enum\n");
-		if (otg_enable == true || charger == 0x00) {
-			pr_info("MMDock_connected otg_enable = %d  charger = 0x%02x\n", otg_enable, charger);
-            return;
-        } else if (pdata->charging_type != POWER_SUPPLY_TYPE_BATTERY) {
-			pdata->charging_type = (charger == 0x03) ? POWER_SUPPLY_TYPE_MDOCK_USB :POWER_SUPPLY_TYPE_MDOCK_TA;
-			pr_info("sii8240 : %s MDOCK_TA with charger(0x%02x)\n", __func__, charger);
-        }
-	}
-#endif
 
 	if (otg_enable) {
 		if (!sii8240_vbus_present()) {
@@ -481,14 +459,6 @@ static void of_sii8240_gpio_config(enum mhl_sleep_state sleep_status)
 			pr_err("[ERROR] %s() gpio_mhl_en is NULL\n", __func__);
 		}
 	}
-#if defined(CONFIG_MACH_KACTIVELTE_DCM)
-	gpio_tlmm_config (GPIO_CFG(pdata->gpio_mhl_sda, GPIOMUX_FUNC_3,
-				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
-	gpio_tlmm_config (GPIO_CFG(pdata->gpio_mhl_scl, GPIOMUX_FUNC_3,
-				GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-			GPIO_CFG_ENABLE);
-#endif
 }
 
 static void of_sii8240_hw_onoff(bool onoff)
@@ -496,11 +466,7 @@ static void of_sii8240_hw_onoff(bool onoff)
 	int ret;
 	struct sii8240_platform_data *pdata = g_pdata;
 	pr_info("%s: Onoff: %d\n", __func__, onoff);
-	if (mhl_power_on == onoff) {
-		pr_info("sii8240 : MHL power is already %d\n", onoff);
-		return;
-	}
-	mhl_power_on = onoff;
+
 	if (onoff) {
 		/*
 		if(pdata->gpio_barcode_emul)
@@ -707,11 +673,6 @@ static int of_sii8240_parse_dt(void)
 				&pdata->swing_level))
 		pr_info("swing_level = 0x%X\n", pdata->swing_level);
 #endif
-	if (!of_property_read_u32(np, "sii8240,damping",
-				&pdata->damping))
-		pr_info("damping = 0x%X\n", pdata->damping);
-	else
-		pdata->damping = BIT_MHLTX_CTL3_DAMPING_SEL_OFF;
 
 	pdata->gpio_barcode_emul = of_property_read_bool(np,
 			"sii8240,barcode_emul");

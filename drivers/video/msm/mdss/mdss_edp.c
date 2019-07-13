@@ -168,7 +168,6 @@ static int duty_ratio_table[256] = {
 extern void edp_backlight_enable(void);
 extern void edp_backlight_disable(void);
 extern void edp_backlight_power_enable(void);
-extern int edp_backlight_status(void);
 static struct completion edp_power_sync;
 static int edp_power_state;
 static int recovery_mode;
@@ -176,7 +175,6 @@ static int edp_power_state;
 
 DEFINE_MUTEX(edp_power_state_chagne);
 DEFINE_MUTEX(edp_event_state_chagne);
-DEFINE_MUTEX(brightness_mutex);
 
 int get_edp_power_state(void)
 {
@@ -512,8 +510,6 @@ void mdss_edp_set_backlight(struct mdss_panel_data *pdata, u32 bl_level)
 		return;
 	}
 
-	mutex_lock(&brightness_mutex);
-
 	bl_max = edp_drv->panel_data.panel_info.bl_max;
 	if (bl_level > bl_max)
 		bl_level = bl_max;
@@ -522,7 +518,6 @@ void mdss_edp_set_backlight(struct mdss_panel_data *pdata, u32 bl_level)
 
 	if (edp_drv->duty_level == duty_level) {
 		pr_err("%s : same duty level..(%d) do not pwm_config..\n", __func__, duty_level);
-		mutex_unlock(&brightness_mutex);
 		return;
 	}
 
@@ -536,14 +531,12 @@ void mdss_edp_set_backlight(struct mdss_panel_data *pdata, u32 bl_level)
 	ret = pwm_config(edp_drv->bl_pwm, duty_period * NSEC_PER_USEC, edp_drv->pwm_period * NSEC_PER_USEC);
 	if (ret) {
 		pr_err("%s: pwm_config() failed err=%d.\n", __func__, ret);
-		mutex_unlock(&brightness_mutex);
 		return;
 	}
 
 	ret = pwm_enable(edp_drv->bl_pwm);
 	if (ret) {
 		pr_err("%s: pwm_enable() failed err=%d\n", __func__, ret);
-		mutex_unlock(&brightness_mutex);
 		return;
 	}
 
@@ -555,8 +548,6 @@ void mdss_edp_set_backlight(struct mdss_panel_data *pdata, u32 bl_level)
 	edp_drv->current_bl = bl_level;
 #endif
 	edp_drv->duty_level = duty_level;
-
-	mutex_unlock(&brightness_mutex);
 
 	pr_info("%s bl_level : %d duty_level : %d duty_period : %d  duty_ratio : %d",
 				__func__, bl_level, duty_level, duty_period,
@@ -732,7 +723,7 @@ void mdss_edp_lane_power_ctrl(struct mdss_edp_drv_pdata *ep, int up)
 void mdss_edp_clock_synchrous(struct mdss_edp_drv_pdata *ep, int sync)
 {
 	u32 data;
-	u32 color;
+	int color;
 
 	/* EDP_MISC1_MISC0 */
 	data = edp_read(ep->base + 0x02c);
@@ -744,21 +735,24 @@ void mdss_edp_clock_synchrous(struct mdss_edp_drv_pdata *ep, int sync)
 
 	/* only legacy rgb mode supported */
 	color = 0; /* 6 bits */
-	if (ep->edid.color_depth == 8)
-		color = 0x01;
-	else if (ep->edid.color_depth == 10)
-		color = 0x02;
-	else if (ep->edid.color_depth == 12)
-		color = 0x03;
-	else if (ep->edid.color_depth == 16)
-		color = 0x04;
 
-	color <<= 5;    /* bit 5 to bit 7 */
+	if (ep->edid.color_depth == 8)
+	       color = 0x01;
+	else if (ep->edid.color_depth == 10)
+	       color = 0x02;
+	else if (ep->edid.color_depth == 12)
+	       color = 0x03;
+	else if (ep->edid.color_depth == 16)
+	       color = 0x04;
+
+	color <<= 5;	/* bit 5 to bit 7 */
 
 	data |= color;
+
 	/* EDP_MISC1_MISC0 */
 	edp_write(ep->base + 0x2c, data);
 }
+
 
 /* voltage mode and pre emphasis cfg */
 void mdss_edp_phy_vm_pe_init(struct mdss_edp_drv_pdata *ep)
@@ -868,6 +862,7 @@ int mdss_edp_wait4train(struct mdss_edp_drv_pdata *edp_drv)
 
 	return ret;
 }
+
 
 static void mdss_edp_irq_enable(struct mdss_edp_drv_pdata *edp_drv);
 static void mdss_edp_irq_disable(struct mdss_edp_drv_pdata *edp_drv);
@@ -984,10 +979,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	pr_err("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
-
-	/* wait until link training is completed */
-	mutex_lock(&edp_drv->train_mutex);
+	pr_info("%s:+, cont_splash=%d\n", __func__, edp_drv->cont_splash);
 
 	INIT_COMPLETION(edp_drv->idle_comp);
 	mdss_edp_state_ctrl(edp_drv, ST_PUSH_IDLE);
@@ -1019,6 +1011,7 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 	mdss_edp_unprepare_clocks(edp_drv);
 
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
+
 	mdss_edp_aux_ctrl(edp_drv, 0);
 
 	mdss_edp_regulator_off(edp_drv);
@@ -1031,9 +1024,8 @@ int mdss_edp_off(struct mdss_panel_data *pdata)
 	qpnp_pin_config(edp_drv->gpio_panel_en, &LCD_EN_PM_GPIO_SLEEP);
 #endif
 	msleep(100); /* NDRA needs some delay after shutdown power */
-	pr_err("%s:-- %s\n", __func__, eeprom_version);
+	pr_info("%s:- %s\n", __func__, eeprom_version);
 
-	mutex_unlock(&edp_drv->train_mutex);
 	return 0;
 }
 
@@ -1067,7 +1059,6 @@ int mdss_edp_off_cont_splash(struct mdss_panel_data *pdata)
 
 	mdss_edp_regulator_off(edp_drv);
 
-	mutex_unlock(&edp_drv->train_mutex);
 	pr_info("%s:-\n", __func__);
 	return 0;
 }
@@ -1093,10 +1084,8 @@ static int mdss_edp_event_handler(struct mdss_panel_data *pdata,
 	switch (event) {
 	case MDSS_EVENT_RESET:
 #if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
-		if (edp_backlight_status() > 0) {
-			pwm_disable(edp_drv->bl_pwm);
-			edp_backlight_disable();
-		}
+		pwm_disable(edp_drv->bl_pwm);
+		edp_backlight_disable();
 		break;
 #endif
 	case MDSS_EVENT_UNBLANK:
@@ -1195,9 +1184,6 @@ static int mdss_edp_device_register(struct mdss_edp_drv_pdata *edp_drv)
 	edp_drv->panel_data.panel_info.brightness_max =
 		(!ret ? tmp : MDSS_MAX_BL_BRIGHTNESS);
 
-	edp_drv->panel_data.panel_info.edp.frame_rate =
-				DEFAULT_FRAME_RATE;/* 60 fps */
-
 	edp_drv->panel_data.event_handler = mdss_edp_event_handler;
 	edp_drv->panel_data.set_backlight = mdss_edp_set_backlight;
 
@@ -1283,6 +1269,7 @@ static void mdss_edp_do_link_train(struct mdss_edp_drv_pdata *ep)
 	if (ep->cont_splash)
 		return;
 
+	INIT_COMPLETION(ep->train_comp);
 	mdss_edp_link_train(ep);
 }
 
@@ -1438,7 +1425,6 @@ static int edp_event_thread(void *data)
 #if defined(CONFIG_FB_MSM_EDP_SAMSUNG)
 						edp_power_state = 1;
 						edp_backlight_enable();
-						mdss_edp_set_backlight(&ep->panel_data, ep->current_bl);
 						complete(&edp_power_sync);
 #endif
 					}
@@ -1490,7 +1476,7 @@ irqreturn_t edp_isr(int irq, void *ptr)
 	isr1 &= ~mask1;	/* remove masks bit */
 	isr2 &= ~mask2;
 
-	pr_err("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
+	pr_debug("%s: isr=%x mask=%x isr2=%x mask2=%x\n",
 			__func__, isr1, mask1, isr2, mask2);
 
 	ack = isr1 & EDP_INTR_STATUS1;

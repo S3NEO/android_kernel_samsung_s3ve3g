@@ -129,11 +129,6 @@ static int swire_set_backlight(int user_intensity)
 					}
 			}
 		}
-	}else{
-		 pr_err("%s: [ZERO]user_intensity :%d\n",__func__,user_intensity);
-		gpio_set_value(msd.lcd_on_gpio,0);
-		real_level = 0;
-		return 0;
 	}
 	if (real_level==tune_level){
         return 0;
@@ -420,13 +415,7 @@ void mdss_dsi_cpt_panel_reset(struct mdss_panel_data *pdata, int enable)
 			else if (pinfo->mode_gpio_state == MODE_GPIO_LOW)
 				gpio_set_value((ctrl_pdata->mode_gpio), 0);
 		}
-		if( system_rev >= 5)
-			if (gpio_is_valid(msd.lcd_io_1p8_en_gpio)) {
-			gpio_tlmm_config(GPIO_CFG(msd.lcd_io_1p8_en_gpio, 0,
-						GPIO_CFG_OUTPUT,GPIO_CFG_NO_PULL,GPIO_CFG_8MA),
-						GPIO_CFG_ENABLE);
-			gpio_set_value((msd.lcd_io_1p8_en_gpio), 1);
-		}
+
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
@@ -459,13 +448,6 @@ void mdss_dsi_cpt_panel_reset(struct mdss_panel_data *pdata, int enable)
 				gpio_set_value(msd.lcd_en_gpio,0);
 			}
 		}
-		if( system_rev >= 5)
-			if (gpio_is_valid(msd.lcd_io_1p8_en_gpio)) {
-				gpio_tlmm_config(GPIO_CFG(msd.lcd_io_1p8_en_gpio, 0,
-					GPIO_CFG_OUTPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
-					GPIO_CFG_DISABLE);
-			gpio_set_value((msd.lcd_io_1p8_en_gpio), 0);
-		}
 	}
 	return;
 }
@@ -494,7 +476,7 @@ static int mdss_dsi_panel_partial_update(struct mdss_panel_data *pdata)
 				panel_data);
 	mipi  = &pdata->panel_info.mipi;
 
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	caset[1] = (((pdata->panel_info.roi_x) & 0xFF00) >> 8);
 	caset[2] = (((pdata->panel_info.roi_x) & 0xFF));
@@ -575,7 +557,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
-	u32 tmp;
 	msd.mfd = (struct msm_fb_data_type *)registered_fb[0]->par;
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -585,18 +566,11 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	if (ctrl->on_cmds.cmd_cnt)
-	{	
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 
-			tmp = MIPI_INP((ctrl->ctrl_base) + 0xac);
-			tmp |= (1<<28);
-			MIPI_OUTP((ctrl->ctrl_base) + 0xac, tmp);
-			wmb();
-		 mdss_dsi_panel_cmds_send(ctrl,&ctrl->disp_on_cmd);
-	}
 	msd.mfd->resume_state = MIPI_RESUME_STATE;
 
 #if defined(CONFIG_LCD_CLASS_DEVICE)
@@ -632,7 +606,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 		cancel_work_sync(&err_fg_work);
 	}
 #endif
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
 	mdelay(2);
@@ -839,28 +813,6 @@ static int mdss_panel_parse_dt_gpio(struct device_node *np,
 				
 	
 	}
-	if( system_rev >= 5) {
-		msd.lcd_io_1p8_en_gpio = of_get_named_gpio(np,
-							     "qcom,lcd-io-1p8v-en-gpio", 0);
-		if (!gpio_is_valid(msd.lcd_io_1p8_en_gpio)) {
-			pr_err("%s:%d lcd_io_1p8_en_gpio  not specified\n",
-							__func__, __LINE__);
-		} else {
-			rc = gpio_request(msd.lcd_io_1p8_en_gpio, "lcd_enable");
-			if (rc) {
-				pr_err("request lcd_io_1p8_en_gpio   failed, rc=%d\n",
-				       rc);
-				gpio_free(msd.lcd_io_1p8_en_gpio);
-			}
-			else{
-				rc = gpio_tlmm_config(GPIO_CFG(msd.lcd_io_1p8_en_gpio, 0,
-							GPIO_CFG_OUTPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-							GPIO_CFG_ENABLE);
-				if(rc)
-					pr_err("%s: tlmm config of lcd_io_1p8_en_gpio failed\n", __func__);
-			}
-		}
-	}
 	return 0;
 }
 
@@ -927,6 +879,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
+	static const char *on_cmds_state, *off_cmds_state;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -1211,10 +1164,31 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	mdss_dsi_parse_fbc_params(np, pinfo);
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
 		"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
-	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->disp_on_cmd,
-		"qcom,mdss-display-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
+
+	on_cmds_state = of_get_property(np,
+				"qcom,mdss-dsi-on-command-state", NULL);
+	if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
+		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
+	} else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
+		ctrl_pdata->dsi_on_state = DSI_HS_MODE;
+	} else {
+		pr_debug("%s: ON cmds state not specified. Set Default\n",
+							__func__);
+		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
+	}
+
+	off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL);
+	if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
+		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
+	} else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
+		ctrl_pdata->dsi_off_state = DSI_HS_MODE;
+	} else {
+		pr_debug("%s: ON cmds state not specified. Set Default\n",
+							__func__);
+		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
+	}
 
 	return 0;
 error:
@@ -1576,7 +1550,7 @@ static void load_tuning_file(char *filename)
 	filp = filp_open(filename, O_RDONLY, 0);
 	if (IS_ERR(filp)) {
 		printk(KERN_ERR "%s File open failed\n", __func__);
-		goto err;
+		return;
 	}
 
 	l = filp->f_path.dentry->d_inode->i_size;
@@ -1586,7 +1560,7 @@ static void load_tuning_file(char *filename)
 	if (dp == NULL) {
 		pr_info("Can't not alloc memory for tuning file load\n");
 		filp_close(filp, current->files);
-		goto err;
+		return;
 	}
 	pos = 0;
 	memset(dp, 0, l);
@@ -1599,7 +1573,7 @@ static void load_tuning_file(char *filename)
 		pr_info("vfs_read() filed ret : %d\n", ret);
 		kfree(dp);
 		filp_close(filp, current->files);
-		goto err;
+		return;
 	}
 
 	filp_close(filp, current->files);
@@ -1609,10 +1583,6 @@ static void load_tuning_file(char *filename)
 	sending_tune_cmd(dp, l);
 
 	kfree(dp);
-
-	return;
-err:
-	set_fs(fs);
 }
 
 static ssize_t tuning_show(struct  device *dev,
@@ -1653,7 +1623,7 @@ static DEVICE_ATTR(tuning, S_IRUGO | S_IWUSR | S_IWGRP,
 
 int get_samsung_lcd_attached(void)
 {
-	return lcd_attached;
+	return 1;
 }
 EXPORT_SYMBOL(get_samsung_lcd_attached);
 

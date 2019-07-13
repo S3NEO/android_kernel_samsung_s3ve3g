@@ -48,10 +48,6 @@ static int err_fg_working;
 static int lcd_attached;
 static int lcd_id;
 int get_lcd_attached(void);
-extern int system_rev;
-void __iomem *virt_mmss_gp0_base;
-#define MMSS_GP0_BASE 0xFD8C3420
-#define MMSS_GP0_SIZE  0x28
 
 #if defined(CONFIG_TC358764_I2C_CONTROL)
 struct i2c_client *lvds_i2c_client;
@@ -376,8 +372,8 @@ void mdss_dsi_tc358764_panel_reset(struct mdss_panel_data *pdata, int enable)
 
 		if (gpio_is_valid(msd.bl_ldi_en)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
-				GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
-				GPIO_CFG_DISABLE);
+				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
+				GPIO_CFG_ENABLE);
 			if (rc)
 				pr_err("tlmm config bl_ldi_en failed, rc=%d\n",rc);
 		}
@@ -397,30 +393,22 @@ void mdss_dsi_tc358764_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 		if (gpio_is_valid(msd.lcd_en_gpio))
 			gpio_set_value_cansleep(msd.lcd_en_gpio,0);
-#if defined(CONFIG_MACH_MATISSELTE_USC) || defined(CONFIG_MACH_MATISSELTE_OPEN)
 		if (gpio_is_valid(msd.bl_ldi_en)) {
 			gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
 				GPIO_CFG_DISABLE);
 		}
-#else
-		if (gpio_is_valid(msd.bl_ldi_en)) {
-			gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
-				GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
-				GPIO_CFG_DISABLE);
-		}
-#endif
 		if (gpio_is_valid(msd.bl_sda)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_sda, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-				GPIO_CFG_DISABLE);
+				GPIO_CFG_ENABLE);
 			if (rc)
 				pr_err("tlmm config bl_sda failed, rc=%d\n",rc);
 		}
 		if (gpio_is_valid(msd.bl_scl)) {
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_scl, 0,
 				GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
-				GPIO_CFG_DISABLE);
+				GPIO_CFG_ENABLE);
 			if (rc)
 				pr_err("tlmm config bl_scl failed, rc=%d\n",rc);
 		}
@@ -458,7 +446,7 @@ static int mdss_dsi_panel_partial_update(struct mdss_panel_data *pdata)
 				panel_data);
 	mipi  = &pdata->panel_info.mipi;
 
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 
 	caset[1] = (((pdata->panel_info.roi_x) & 0xFF00) >> 8);
 	caset[2] = (((pdata->panel_info.roi_x) & 0xFF));
@@ -540,7 +528,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);	
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);	
 
 #if !defined(CONFIG_TC358764_I2C_CONTROL)
 	if (ctrl->on_cmds.cmd_cnt)
@@ -605,7 +593,7 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 		cancel_work_sync(&err_fg_work);
 	}
 #endif
-	pr_debug("%s: ctrl=%pK ndx=%d\n", __func__, ctrl, ctrl->ndx);
+	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
 	if (gpio_is_valid(msd.bl_ap_pwm)) {
 			gpio_tlmm_config(GPIO_CFG(msd.bl_ap_pwm,0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_2MA), GPIO_CFG_DISABLE);
@@ -709,7 +697,7 @@ static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 
 	return 0;
 }
-int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
+static int mdss_panel_dt_get_dst_fmt(u32 bpp, char mipi_mode, u32 pixel_packing,
 				char *dst_format)
 {
 	int rc = 0;
@@ -849,12 +837,7 @@ static int mdss_panel_parse_dt_gpio(struct device_node *np,
 			gpio_free(msd.bl_ldi_en);
 
 		} else {
-			if(system_rev>4)
 			rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
-					GPIO_CFG_INPUT,GPIO_CFG_PULL_DOWN,GPIO_CFG_2MA),
-					GPIO_CFG_DISABLE);
-			else
-				rc = gpio_tlmm_config(GPIO_CFG(msd.bl_ldi_en, 0,
 					GPIO_CFG_INPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),
 					GPIO_CFG_ENABLE);
 			if (rc)
@@ -951,6 +934,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
+	static const char *on_cmds_state, *off_cmds_state;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-width", &tmp);
 	if (rc) {
@@ -1216,6 +1200,28 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
+	on_cmds_state = of_get_property(np,
+				"qcom,mdss-dsi-on-command-state", NULL);
+	if (!strncmp(on_cmds_state, "dsi_lp_mode", 11)) {
+		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
+	} else if (!strncmp(on_cmds_state, "dsi_hs_mode", 11)) {
+		ctrl_pdata->dsi_on_state = DSI_HS_MODE;
+	} else {
+		pr_debug("%s: ON cmds state not specified. Set Default\n",
+							__func__);
+		ctrl_pdata->dsi_on_state = DSI_LP_MODE;
+	}
+
+	off_cmds_state = of_get_property(np, "qcom,mdss-dsi-off-command-state", NULL);
+	if (!strncmp(off_cmds_state, "dsi_lp_mode", 11)) {
+		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
+	} else if (!strncmp(off_cmds_state, "dsi_hs_mode", 11)) {
+		ctrl_pdata->dsi_off_state = DSI_HS_MODE;
+	} else {
+		pr_debug("%s: ON cmds state not specified. Set Default\n",
+							__func__);
+		ctrl_pdata->dsi_off_state = DSI_LP_MODE;
+	}
 
 	return 0;
 error:
@@ -1441,11 +1447,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 	else
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 
-	virt_mmss_gp0_base = ioremap(MMSS_GP0_BASE,MMSS_GP0_SIZE);
-	if(virt_mmss_gp0_base == NULL) {
-		pr_err("%s: I/O remap failed \n", __func__);
-		return 0;
-	}
 
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
