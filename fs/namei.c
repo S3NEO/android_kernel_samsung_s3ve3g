@@ -2872,7 +2872,7 @@ EXPORT_SYMBOL(vfs_rmdir);
 static long do_rmdir(int dfd, const char __user *pathname)
 {
 	int error = 0;
-	char * name;
+	char *name;
 	struct dentry *dentry;
 	struct nameidata nd;
 	char *path_buf = NULL;
