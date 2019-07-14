@@ -250,9 +250,33 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 		__sync_icache_dcache(pteval);
 		ext |= PTE_EXT_NG;
 	}
-
 	set_pte_ext(ptep, pteval, ext);
 }
+
+#ifdef CONFIG_TIMA_RKP_L2_GROUP
+static inline void timal2group_set_pte_at(pte_t *ptep, pte_t pteval, 
+			unsigned long tima_l2group_entry_ptr, unsigned long addr,
+			unsigned long *tima_l2group_buffer_index)
+{
+	int ret;
+	if (addr >= TASK_SIZE) {
+		ret = cpu_v7_timal2group_set_pte_ext(ptep, pteval, 0, tima_l2group_entry_ptr);
+		if (ret == 0)
+			(*tima_l2group_buffer_index)++;
+	} else	{
+		__sync_icache_dcache(pteval);
+		ret = cpu_v7_timal2group_set_pte_ext(ptep, pteval, PTE_EXT_NG, tima_l2group_entry_ptr);
+		if (ret == 0)
+			(*tima_l2group_buffer_index)++;
+	}
+}
+static inline void timal2group_set_pte_commit(void *tima_l2group_entry_ptr,
+					unsigned long tima_l2group_entries_count)
+{
+	cpu_v7_timal2group_set_pte_commit(tima_l2group_entry_ptr,
+					 tima_l2group_entries_count);
+}
+#endif /* CONFIG_TIMA_RKP_L2_GROUP */
 
 #define PTE_BIT_FUNC(fn,op) \
 static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }

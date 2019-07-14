@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,6 +22,11 @@
 #include <linux/atomic.h>
 #include <asm/ioctls.h>
 #include "audio_utils.h"
+
+#define MIN_FRAME_SIZE  1536
+#define NUM_FRAMES     5
+#define META_SIZE      (sizeof(struct meta_out_dsp))
+#define FRAME_SIZE     (1 + ((MIN_FRAME_SIZE + META_SIZE) * NUM_FRAMES))
 
 static int audio_in_pause(struct q6audio_in  *audio)
 {
@@ -258,6 +263,11 @@ long audio_in_ioctl(struct file *file,
 			rc = -EINVAL;
 			break;
 		}
+		if ((cfg.buffer_size > FRAME_SIZE) ||
+			(cfg.buffer_count != FRAME_NUM)) {
+			rc = -EINVAL;
+			break;
+		}
 		audio->str_cfg.buffer_size = cfg.buffer_size;
 		audio->str_cfg.buffer_count = cfg.buffer_count;
 		if(audio->opened){
@@ -485,7 +495,7 @@ ssize_t audio_in_read(struct file *file,
 			count -= bytes_to_copy;
 			buf += bytes_to_copy;
 		} else {
-			pr_err("%s:session id %d: short read data[%p] bytesavail[%d]bytesrequest[%d]\n",
+			pr_err("%s:session id %d: short read data[%pK] bytesavail[%d]bytesrequest[%d]\n",
 				__func__,
 				audio->ac->session,
 				data, size, count);

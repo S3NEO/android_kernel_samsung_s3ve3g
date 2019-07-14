@@ -93,7 +93,8 @@ static struct gpiomux_setting nc_cfg = {
 };
 #endif
 
-#if defined(CONFIG_MACH_MATISSEWIFI_OPEN) || defined(CONFIG_MACH_MATISSELTE_OPEN)
+#if defined(CONFIG_MACH_MATISSEWIFI_OPEN) || defined(CONFIG_MACH_MATISSELTE_OPEN) || \
+	defined(CONFIG_MACH_MATISSEWIFIUS_OPEN)
 #define MAKE_NC_CONFIG_INIT_SLEEP(gpio_num) { \
 		.gpio = gpio_num, \
 		.settings ={ \
@@ -124,6 +125,40 @@ static struct msm_gpiomux_config matissewifi_open_nc_gpio_cfgs[] __initdata = {
 	MAKE_NC_CONFIG_INIT_SLEEP(66),
 	MAKE_NC_CONFIG_INIT_SLEEP(116),
 };
+#endif
+#if defined(CONFIG_MACH_MATISSEWIFIUS_OPEN)
+static struct msm_gpiomux_config matissewifiue_open_nc_gpio_cfgs[] __initdata = {
+#ifndef CONFIG_NFC_PN547
+	MAKE_NC_CONFIG_INIT_SLEEP(0),
+	MAKE_NC_CONFIG_INIT_SLEEP(1),
+#endif
+#ifndef CONFIG_IR_REMOCON_MC96FR116
+	MAKE_NC_CONFIG_INIT_SLEEP(4),
+	MAKE_NC_CONFIG_INIT_SLEEP(5),
+	MAKE_NC_CONFIG_INIT_SLEEP(62),
+	MAKE_NC_CONFIG_INIT_SLEEP(116),
+#endif
+	MAKE_NC_CONFIG_INIT_SLEEP(32),
+	MAKE_NC_CONFIG_INIT_SLEEP(56),
+	MAKE_NC_CONFIG_INIT_SLEEP(57),
+	MAKE_NC_CONFIG_INIT_SLEEP(58),
+	MAKE_NC_CONFIG_INIT_SLEEP(59),
+	MAKE_NC_CONFIG_INIT_SLEEP(60),
+	MAKE_NC_CONFIG_INIT_SLEEP(66),
+};
+
+static struct msm_gpiomux_config matissewifiue_open_nc_gpio_rev5_cfgs[] __initdata = {
+	MAKE_NC_CONFIG_INIT_SLEEP(53),
+};
+
+#if defined(CONFIG_MACH_MATISSEWIFIUS_GOOGLE)
+static struct msm_gpiomux_config matissewifigl_irda_irq_cfg_64[] __initdata = {
+	MAKE_NC_CONFIG_INIT_SLEEP(64),
+};
+static struct msm_gpiomux_config matissewifigl_irda_irq_cfg_65[] __initdata = {
+	MAKE_NC_CONFIG_INIT_SLEEP(65),
+};
+#endif
 #endif
 
 #if defined(CONFIG_MACH_MATISSELTE_OPEN)
@@ -920,9 +955,17 @@ static struct msm_gpiomux_config sd_card_det __initdata = {
 	},
 };
 
-
 #if defined (CONFIG_SEC_MILLET_PROJECT) || defined(CONFIG_SEC_MATISSE_PROJECT)
 static struct msm_gpiomux_config msm_nativesensors_configs[] __initdata = {
+#ifdef CONFIG_SENSORS_GRIP_ADJDET
+	{
+		.gpio      = 22,		/* ADJ_DET IRQ */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &grip_irq_config,
+			[GPIOMUX_SUSPENDED] = &grip_irq_config,
+		},
+	},
+#endif
 	{
 		.gpio      = 66,		/* GRIP IRQ */
 		.settings = {
@@ -942,10 +985,10 @@ static struct msm_gpiomux_config msm_nativesensors_configs[] __initdata = {
 
 #if defined(CONFIG_SEC_MATISSEWIFI_COMMON)
 
-static struct gpiomux_setting nfc_i2c_config = {
+static struct gpiomux_setting nfc_enable_config = {
 		.func = GPIOMUX_FUNC_GPIO,
 		.drv = GPIOMUX_DRV_2MA,
-		.pull = GPIOMUX_PULL_NONE,
+		.pull = GPIOMUX_PULL_DOWN,
 };
 
 static struct gpiomux_setting nfc_irq_cfg = {
@@ -973,8 +1016,8 @@ static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
 	{
 		.gpio = 0, /* NFC EN */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &nfc_i2c_config,
-			[GPIOMUX_SUSPENDED] = &nfc_i2c_config,
+			[GPIOMUX_ACTIVE] = &nfc_enable_config,
+			[GPIOMUX_SUSPENDED] = &nfc_enable_config,
 		},
 	},
 	{
@@ -1322,7 +1365,11 @@ static struct gpiomux_setting ovp_enable_cfg = {
 
 static struct msm_gpiomux_config ovp_enable_configs[] = {
   {
+     #if defined(CONFIG_MACH_MATISSELTE_VZW) || defined(CONFIG_MACH_MATISSELTE_USC) || defined (CONFIG_MACH_MATISSELTE_ATT)
+     .gpio = 104,              /* OVP enable */
+     #else
      .gpio = 64,              /* OVP enable */
+     #endif
      .settings = {
       [GPIOMUX_ACTIVE] = &ovp_enable_cfg,
       [GPIOMUX_SUSPENDED] = &ovp_enable_cfg,
@@ -1509,12 +1556,17 @@ static void msm_gpiomux_sdc3_install(void)
 static void msm_gpiomux_sdc3_install(void) {}
 #endif /* CONFIG_MMC_MSM_SDC3_SUPPORT */
 
-#if defined(CONFIG_MACH_MATISSELTE_VZW) || defined(CONFIG_MACH_MATISSELTE_USC)
+#if defined(CONFIG_SEC_MATISSE_PROJECT)
 static struct gpiomux_setting gpio_10_sda_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_OUT_LOW,
+};
+static struct gpiomux_setting gpio_12_sda_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
 };
 static struct msm_gpiomux_config msm_sda_configs[] = {
 	{
@@ -1522,8 +1574,44 @@ static struct msm_gpiomux_config msm_sda_configs[] = {
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &gpio_10_sda_config,
 			[GPIOMUX_SUSPENDED] = &gpio_10_sda_config,
-		},	
+		},
 	},
+	{
+		.gpio = 12,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_12_sda_config,
+			[GPIOMUX_SUSPENDED] = &gpio_12_sda_config,
+		},
+	},
+};
+#endif
+
+#ifdef CONFIG_IR_REMOCON_MC96FR116
+static struct gpiomux_setting irled_gpio_i2c_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+static struct msm_gpiomux_config irled_i2c_scl_config[] __initdata = {
+	{
+		.gpio      = 4,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &irled_gpio_i2c_config,
+			[GPIOMUX_SUSPENDED] = &irled_gpio_i2c_config,
+		},
+	},
+#ifdef CONFIG_MACH_MATISSELTE_USC
+	NC_GPIO_CONFIG(5),	// For IN-PD-2MA config. This PIN isn't NC
+#else
+	{
+		.gpio      = 5,
+		.settings = {
+			[GPIOMUX_ACTIVE] = &irled_gpio_i2c_config,
+			[GPIOMUX_SUSPENDED] = &irled_gpio_i2c_config,
+		},
+	},
+#endif
 };
 #endif
 
@@ -1539,7 +1627,7 @@ void __init msm8226_init_gpiomux(void)
 		return;
 	}
 
-#if defined(CONFIG_MACH_MATISSELTE_VZW) || defined(CONFIG_MACH_MATISSELTE_USC)
+#if defined(CONFIG_SEC_MATISSE_PROJECT)
 	msm_gpiomux_install(msm_sda_configs, ARRAY_SIZE(msm_sda_configs));
 #endif
 
@@ -1557,7 +1645,7 @@ void __init msm8226_init_gpiomux(void)
 			ARRAY_SIZE(msm_blsp_configs));
 
 	msm_gpiomux_install(wcnss_5wire_interface,
-				ARRAY_SIZE(wcnss_5wire_interface));
+			ARRAY_SIZE(wcnss_5wire_interface));
 
 	msm_gpiomux_install(&sd_card_det, 1);
 	if (of_board_is_skuf())
@@ -1587,13 +1675,15 @@ void __init msm8226_init_gpiomux(void)
 		msm_gpiomux_install(msm_sensor_configs_skuf_plus,
 			ARRAY_SIZE(msm_sensor_configs_skuf_plus));
 
-  msm_gpiomux_install(msm_ta_nchg_configs, ARRAY_SIZE(msm_ta_nchg_configs));
-  msm_gpiomux_install(msm_ta_int_n_configs, ARRAY_SIZE(msm_ta_int_n_configs));
-  if(system_rev > 1)
-     msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
-  msm_gpiomux_install(msm_hall_configs,
-      ARRAY_SIZE(msm_hall_configs));
-  if (of_board_is_cdp() || of_board_is_mtp() || of_board_is_xpm())
+	msm_gpiomux_install(msm_ta_nchg_configs, ARRAY_SIZE(msm_ta_nchg_configs));
+	msm_gpiomux_install(msm_ta_int_n_configs, ARRAY_SIZE(msm_ta_int_n_configs));
+
+	if(system_rev > 1)
+		msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
+
+	msm_gpiomux_install(msm_hall_configs, ARRAY_SIZE(msm_hall_configs));
+
+	if (of_board_is_cdp() || of_board_is_mtp() || of_board_is_xpm())
 		msm_gpiomux_install(usb_otg_sw_configs,
 					ARRAY_SIZE(usb_otg_sw_configs));
 #if defined(CONFIG_SEC_MATISSE_PROJECT)
@@ -1624,21 +1714,31 @@ void __init msm8226_init_gpiomux(void)
 	msm_gpiomux_install(msm_spk_en_gpio_configs, ARRAY_SIZE(msm_spk_en_gpio_configs));
 #ifdef CONFIG_SND_SOC_MAX98504
 #if defined(CONFIG_MACH_MILLETLTE_OPEN)
-				if ( system_rev >= 0 && system_rev < 3)
+	if ( system_rev >= 0 && system_rev < 3)
 #elif defined (CONFIG_MACH_MILLET3G_EUR)
-				if ( system_rev >= 2 && system_rev < 4)
+	if ( system_rev >= 2 && system_rev < 4)
 #elif defined(CONFIG_MACH_MILLETWIFI_OPEN)
-				if ( system_rev >= 0 && system_rev < 5)
+	if ( system_rev >= 0 && system_rev < 5)
 #endif
-
-		{
-			msm_gpiomux_install(msm8226_tertiary_mi2s_configs,ARRAY_SIZE(msm8226_tertiary_mi2s_configs));
-			msm_gpiomux_install(msm8226_blsp_codec_configs,ARRAY_SIZE(msm8226_blsp_codec_configs));
-		}
+	{
+		msm_gpiomux_install(msm8226_tertiary_mi2s_configs,ARRAY_SIZE(msm8226_tertiary_mi2s_configs));
+		msm_gpiomux_install(msm8226_blsp_codec_configs,ARRAY_SIZE(msm8226_blsp_codec_configs));
+	}
 #endif
 /* Install NC Configurations */
 #if defined(CONFIG_MACH_MATISSEWIFI_OPEN)
 	msm_gpiomux_install(matissewifi_open_nc_gpio_cfgs, ARRAY_SIZE(matissewifi_open_nc_gpio_cfgs));
+#endif
+#if defined(CONFIG_MACH_MATISSEWIFIUS_OPEN)
+	msm_gpiomux_install(matissewifiue_open_nc_gpio_cfgs, ARRAY_SIZE(matissewifiue_open_nc_gpio_cfgs));
+	if (system_rev >= 5)
+		msm_gpiomux_install(matissewifiue_open_nc_gpio_rev5_cfgs, ARRAY_SIZE(matissewifiue_open_nc_gpio_rev5_cfgs));
+#if defined(CONFIG_MACH_MATISSEWIFIUS_GOOGLE)
+	if (system_rev < 2)
+		msm_gpiomux_install(matissewifigl_irda_irq_cfg_64, ARRAY_SIZE(matissewifigl_irda_irq_cfg_64));
+	else
+		msm_gpiomux_install(matissewifigl_irda_irq_cfg_65, ARRAY_SIZE(matissewifigl_irda_irq_cfg_65));
+#endif
 #endif
 
 #if defined(CONFIG_MACH_MATISSELTE_OPEN)
@@ -1651,6 +1751,10 @@ void __init msm8226_init_gpiomux(void)
 
 #if defined (CONFIG_MACH_MATISSE3G_OPEN)
 	msm_gpiomux_install(matisse3g_nc_gpio_cfgs, ARRAY_SIZE(matisse3g_nc_gpio_cfgs));
+#endif
+
+#ifdef CONFIG_IR_REMOCON_MC96FR116
+	msm_gpiomux_install(irled_i2c_scl_config, ARRAY_SIZE(irled_i2c_scl_config));
 #endif
 }
 

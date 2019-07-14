@@ -1,3 +1,4 @@
+#
 # arch/arm/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -22,7 +23,6 @@ KBUILD_CFLAGS	+=$(call cc-option,-marm,)
 
 # Never generate .eh_frame
 KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
-KBUILD_CFLAGS	+= -fno-pic
 
 # Do not use arch/arm/defconfig - it's always outdated.
 # Select a platform tht is kept up-to-date

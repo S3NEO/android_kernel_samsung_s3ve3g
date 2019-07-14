@@ -465,6 +465,9 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 	for (i = 0; i < mi->nr_banks; i++)
 		memblock_add(mi->bank[i].start, mi->bank[i].size);
 
+#ifdef CONFIG_TIMA_RKP_30
+	memblock_reserve(__pa(_text), PAGE_SIZE);
+#endif /*CONFIG_TIMA_RKP_30*/
 	/* Register the kernel text, kernel data and initrd with memblock. */
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata);
@@ -750,7 +753,7 @@ static void __init free_highpages(void)
 #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
 
 #ifdef CONFIG_ENABLE_VMALLOC_SAVING
-void print_vmalloc_lowmem_info(void)
+static void print_vmalloc_lowmem_info(void)
 {
 	int i;
 	void *va_start, *va_end;
@@ -770,11 +773,21 @@ void print_vmalloc_lowmem_info(void)
 		}
 		if (i && ((meminfo.bank[i-1].start + meminfo.bank[i-1].size) !=
 			   meminfo.bank[i].start)) {
+			phys_addr_t end_phys;
+
+			if((meminfo.bank[i-1].start + meminfo.bank[i-1].size) > arm_lowmem_limit)
+				continue;
+
+			if(meminfo.bank[i].start > arm_lowmem_limit)
+				end_phys = arm_lowmem_limit;
+			else
+				end_phys = meminfo.bank[i].start;
+
 			if (meminfo.bank[i-1].start + meminfo.bank[i-1].size
 				   <= MAX_HOLE_ADDRESS) {
 				va_start = __va(meminfo.bank[i-1].start
 						+ meminfo.bank[i-1].size);
-				va_end = __va(meminfo.bank[i].start);
+				va_end = __va(end_phys);
 				printk(KERN_NOTICE
 				"	   vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n",
 					   MLM((unsigned long)va_start,
