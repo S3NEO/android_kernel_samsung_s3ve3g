@@ -124,7 +124,7 @@ static int MHL_Connected;
 #ifdef CONFIG_KEYBOARD_CYPRESS_TKEY_HL
 #include <linux/i2c/touchkey_hl.h>
 #endif
-static struct switch_dev switch_dock = {
+struct switch_dev switch_dock = {
 	.name = "dock",
 };
 
@@ -1943,7 +1943,7 @@ device_initcall(midas_sec_switch_init);
 
 int current_cable_type = POWER_SUPPLY_TYPE_BATTERY;
 
-static struct switch_dev switch_dock = {
+struct switch_dev switch_dock = {
       .name = "dock",
 };
 
@@ -2918,7 +2918,7 @@ static void fsa9485_usb_cdp_cb(bool attached)
 	}
 }
 
-static struct switch_dev switch_dock = {
+struct switch_dev switch_dock = {
 	.name = "dock",
 };
 
