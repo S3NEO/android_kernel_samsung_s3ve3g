@@ -16,6 +16,9 @@
 #include <asm/hwcap.h>
 #include <asm/pgtable-hwdef.h>
 #include <asm/pgtable.h>
+#ifdef TIMA_EMUL_ENABLED
+#include <asm/entry-macro-tima.S>
+#endif
 
 #include "proc-macros.S"
 
@@ -120,31 +123,34 @@ ENTRY(cpu_v7_do_resume)
 	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
 	mcr	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
 	ldmia	r0, {r6 - r11}
-#ifndef CONFIG_TIMA_RKP_EMUL_CP15_INSTR
+#ifndef TIMA_EMUL_ENABLED
 	mcr	p15, 0, r6, c3, c0, 0	@ Domain ID
+#else
+	tima_macro_emul_crit_instn r6, 0x3f806221
+
 #endif
 #ifndef CONFIG_ARM_LPAE
 	ALT_SMP(orr	r1, r1, #TTB_FLAGS_SMP)
 	ALT_UP(orr	r1, r1, #TTB_FLAGS_UP)
 #endif
-#ifndef	CONFIG_TIMA_RKP_EMUL_CP15_INSTR
+#ifndef TIMA_EMUL_ENABLED
 	mcr	p15, 0, r1, c2, c0, 0	@ TTB 0
+#else
+	tima_macro_emul_crit_instn r7, 0x3f803221
+
 #endif
+#ifndef TIMA_EMUL_ENABLED
 	mcr	p15, 0, r7, c2, c0, 1	@ TTB 1
-#ifndef	CONFIG_TIMA_RKP_EMUL_CP15_INSTR
+#else
+	tima_macro_emul_crit_instn r8, 0x3f804221
+
+#endif
+#ifndef TIMA_EMUL_ENABLED
 	mcr	p15, 0, r11, c2, c0, 2	@ TTB control register
-#endif
+#else
+	tima_macro_emul_crit_instn ip, 0x3f805221
 
-#ifdef CONFIG_TIMA_RKP_EMUL_CP15_INSTR
-	mov	r4, r0
-	ldr	r0, =0x3f806221
-	smc	#1
-	mov	r0, r4
-	/* Flush TLB */
-	mcr    p15, 0, r0, c8, c3, 0
-	dsb
 #endif
-
 	mrc	p15, 0, r4, c1, c0, 1	@ Read Auxiliary control register
 	teq	r4, r9			@ Is it already set?
 	mcrne	p15, 0, r9, c1, c0, 1	@ No, so write it
@@ -275,31 +281,6 @@ __v7_setup:
 	mcr	p15, 0, r6, c10, c2, 1		@ write NMRR
 #endif
 	dsb					@ Complete invalidations
-
-#if defined(CONFIG_ARCH_MSM_SCORPION) && !defined(CONFIG_MSM_SMP)
-	mov     r0, #0x33
-	mcr     p15, 3, r0, c15, c0, 3          @ set L2CR1
-#endif
-#if defined (CONFIG_ARCH_MSM_SCORPION)
-	mrc     p15, 0, r0, c1, c0, 1           @ read ACTLR
-#ifdef CONFIG_CPU_CACHE_ERR_REPORT
-	orr     r0, r0, #0x37                   @ turn on L1/L2 error reporting
-#else
-	bic     r0, r0, #0x37
-#endif
-#if defined (CONFIG_ARCH_MSM_SCORPIONMP)
-	orr    r0, r0, #0x1 << 24     @ optimal setting for Scorpion MP
-#endif
-#ifndef CONFIG_ARCH_MSM_KRAIT
-	mcr     p15, 0, r0, c1, c0, 1           @ write ACTLR
-#endif
-#endif
-#if defined (CONFIG_ARCH_MSM_SCORPIONMP)
-	mrc     p15, 3, r0, c15, c0, 2  @ optimal setting for Scorpion MP
-	orr         r0, r0, #0x1 << 21
-	mcr     p15, 3, r0, c15, c0, 2
-#endif
-
 #ifndef CONFIG_ARM_THUMBEE
 	mrc	p15, 0, r0, c0, c1, 0		@ read ID_PFR0 for ThumbEE
 	and	r0, r0, #(0xf << 12)		@ ThumbEE enabled field

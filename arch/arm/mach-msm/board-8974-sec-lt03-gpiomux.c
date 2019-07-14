@@ -354,7 +354,7 @@ static struct gpiomux_setting grip_i2c_cfg = {
 	.dir = GPIOMUX_IN,
 };
 
-#if defined(CONFIG_MACH_LT03_VZW) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
+#if defined(CONFIG_MACH_LT03_VZW)
 static struct gpiomux_setting ext_buck_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -403,22 +403,6 @@ static struct msm_gpiomux_config hap_lvl_shft_config[] __initdata = {
 };
 
 static struct msm_gpiomux_config msm_grip_configs[] __initdata = {
-#if defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
-	{
-		.gpio      = 10,
-		.settings = {
-			[GPIOMUX_ACTIVE] = &grip_i2c_cfg,
-			[GPIOMUX_SUSPENDED] = &grip_i2c_cfg,
-		},
-	},
-	{
-		.gpio      = 11,
-		.settings = {
-			[GPIOMUX_ACTIVE] = &grip_i2c_cfg,
-			[GPIOMUX_SUSPENDED] = &grip_i2c_cfg,
-		},
-	},
-#else
 	{
 		.gpio      = 60,
 		.settings = {
@@ -433,10 +417,7 @@ static struct msm_gpiomux_config msm_grip_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &grip_i2c_cfg,
 		},
 	},
-#endif
-#if defined(CONFIG_MACH_LT03_EUR) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) \
-	|| defined(CONFIG_MACH_LT03LGT)
-
+#if defined(CONFIG_MACH_LT03_EUR)
 	{
 		.gpio	   = 64,
 		.settings = {
@@ -464,23 +445,6 @@ static struct msm_gpiomux_config ext_buck_configs[] __initdata = {
 	},
 	{
 		.gpio      = 11,		/* Ext.BUCK SCL */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &ext_buck_act_cfg,
-			[GPIOMUX_SUSPENDED] = &ext_buck_sus_cfg,
-		},
-	},
-};
-#elif defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) ||defined(CONFIG_MACH_LT03LGT)
-static struct msm_gpiomux_config ext_buck_configs[] __initdata = {
-	{
-		.gpio      = 60,		/* Ext.BUCK SDA */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &ext_buck_act_cfg,
-			[GPIOMUX_SUSPENDED] = &ext_buck_sus_cfg,
-		},
-	},
-	{
-		.gpio      = 61,		/* Ext.BUCK SCL */
 		.settings = {
 			[GPIOMUX_ACTIVE] = &ext_buck_act_cfg,
 			[GPIOMUX_SUSPENDED] = &ext_buck_sus_cfg,
@@ -617,17 +581,6 @@ static struct msm_gpiomux_config msm_sensors_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &sensor_cfg[0],
 		},
 	},
-#if defined(CONFIG_MACH_LT03_EUR) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) \
-	|| defined(CONFIG_MACH_LT03LGT)
-
-	{
-		.gpio = 82,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &sensor_cfg[0],
-			[GPIOMUX_SUSPENDED] = &sensor_cfg[0],
-		},
-	},
-#else
 	{
 		.gpio = 82,
 		.settings = {
@@ -635,7 +588,6 @@ static struct msm_gpiomux_config msm_sensors_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &sensor_cfg[1],
 		},
 	},
-#endif
 	{
 		.gpio = 81,
 		.settings = {
@@ -1471,8 +1423,7 @@ static struct msm_gpiomux_config ear_send_end_config[] __initdata = {
 	{
 		.gpio	= 77,		/* EAR_SEND_END */
 		.settings = {
-#if defined(CONFIG_MACH_LT03_VZW) || defined(CONFIG_MACH_LT03_EUR) || defined(CONFIG_MACH_LT03_TMO) \
-|| defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
+#ifdef CONFIG_MACH_LT03_VZW
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
 #else
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[2],
@@ -1480,8 +1431,7 @@ static struct msm_gpiomux_config ear_send_end_config[] __initdata = {
 		},
 	},
 };
-#if defined(CONFIG_MACH_LT03_VZW) || defined(CONFIG_MACH_LT03_EUR) || defined(CONFIG_MACH_LT03_TMO) \
-|| defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
+#ifdef CONFIG_MACH_LT03_VZW || defined(CONFIG_MACH_LT03_EUR)
 static struct msm_gpiomux_config spk_ext_config[] __initdata = {
 	{
 		.gpio	= 43,		/* SPK AMP ENABLE */
@@ -1835,29 +1785,8 @@ static struct msm_gpiomux_config gpio_nc_configs[] __initdata = {
 	GPIOMUX_SET_NC(28),
 	GPIOMUX_SET_NC(63),
 	GPIOMUX_SET_NC(103),
-#if defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
-	GPIOMUX_SET_NC(112),
-	GPIOMUX_SET_NC(113),
-#endif
 };
 #endif
-
-static struct gpiomux_setting gpio_audio_pullnone_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_IN,
-};
-
-static struct msm_gpiomux_config msm8974_audio_configs[] __initdata = {
-	{
-		.gpio      = 77,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &gpio_audio_pullnone_config,
-			[GPIOMUX_SUSPENDED] = &gpio_audio_pullnone_config,
-		},
-	},
-};
 
 static struct msm_gpiomux_config apq8074_dragonboard_ts_config[] __initdata = {
 	{
@@ -2077,11 +2006,10 @@ void __init msm_8974_init_gpiomux(void)
 
 	msm_gpiomux_install(msm_taiko_config, ARRAY_SIZE(msm_taiko_config));
 	msm_gpiomux_install(ear_send_end_config, ARRAY_SIZE(ear_send_end_config));
-#if defined(CONFIG_MACH_LT03_VZW) || defined(CONFIG_MACH_LT03_EUR) || defined(CONFIG_MACH_LT03_TMO) \
-|| defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
+#ifdef CONFIG_MACH_LT03_VZW || defined(CONFIG_MACH_LT03_EUR)
 	msm_gpiomux_install(spk_ext_config, ARRAY_SIZE(spk_ext_config));
 #endif
-
+	
 	msm_gpiomux_install(msm_hsic_hub_configs,
 				ARRAY_SIZE(msm_hsic_hub_configs));
 
@@ -2134,9 +2062,6 @@ void __init msm_8974_init_gpiomux(void)
 				    ARRAY_SIZE(msm_rumi_blsp_configs));
 #endif
 
-	msm_gpiomux_install(msm8974_audio_configs,
-			ARRAY_SIZE(msm8974_audio_configs));
-
 	if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_MDM)
 		msm_gpiomux_install(mdm_configs,
 			ARRAY_SIZE(mdm_configs));
@@ -2156,7 +2081,7 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_install(msm_grip_configs, ARRAY_SIZE(msm_grip_configs));
 	msm_gpiomux_install(msm_sensors_configs, ARRAY_SIZE(msm_sensors_configs));
 
-#if defined(CONFIG_MACH_LT03_VZW) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
+#if defined(CONFIG_MACH_LT03_VZW)
 	msm_gpiomux_install(ext_buck_configs, ARRAY_SIZE(ext_buck_configs));
 #endif
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2014, Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2013, Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -822,7 +822,7 @@ static int __devinit msm_bus_fabric_probe(struct platform_device *pdev)
 				MSM_BUS_ERR("Couldn't get clock %s\n",
 					pdata->fabclk[ctx]);
 				ret = -EINVAL;
-				goto err_dev_unregister;
+				goto err;
 			}
 			fabric->info.nodeclk[ctx].enable = false;
 			fabric->info.nodeclk[ctx].dirty = false;
@@ -834,7 +834,7 @@ static int __devinit msm_bus_fabric_probe(struct platform_device *pdev)
 	if (ret) {
 		MSM_BUS_ERR("Could not register fabric %d info, ret: %d\n",
 			fabric->fabdev.id, ret);
-		goto err_dev_unregister;
+		goto err;
 	}
 	if (!fabric->ahb) {
 		/* Allocate memory for commit data */
@@ -845,7 +845,7 @@ static int __devinit msm_bus_fabric_probe(struct platform_device *pdev)
 				MSM_BUS_ERR("Failed to alloc commit data for "
 					"fab: %d, ret = %d\n",
 					fabric->fabdev.id, ret);
-				goto err_dev_unregister;
+				goto err;
 			}
 		}
 	}
@@ -854,10 +854,6 @@ static int __devinit msm_bus_fabric_probe(struct platform_device *pdev)
 		pr_warn("Coresight support absent for bus: %d\n", pdata->id);
 
 	return ret;
-
-err_dev_unregister:
-	msm_bus_fabric_device_unregister(&fabric->fabdev);
-
 err:
 	kfree(fabric->info.node_info);
 	kfree(fabric);
@@ -908,17 +904,9 @@ static struct platform_driver msm_bus_fabric_driver = {
 	},
 };
 
-int __init msm_bus_fabric_init_driver(void)
+static int __init msm_bus_fabric_init_driver(void)
 {
-	static bool initialized;
-
-	if (initialized)
-		return 0;
-	else
-		initialized = true;
-
 	MSM_BUS_ERR("msm_bus_fabric_init_driver\n");
 	return platform_driver_register(&msm_bus_fabric_driver);
 }
-EXPORT_SYMBOL(msm_bus_fabric_init_driver);
 subsys_initcall(msm_bus_fabric_init_driver);

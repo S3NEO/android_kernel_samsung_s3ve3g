@@ -11,23 +11,12 @@
  *
  */
 
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-#include <linux/gpio.h>
-#endif
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <mach/board.h>
 #include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/socinfo.h>
-
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-#define WLAN_CLK	27
-#define WLAN_SET	26
-#define WLAN_DATA0	25
-#define WLAN_DATA1	24
-#define WLAN_DATA2	23
-#endif
 
 /*static struct gpiomux_setting gpio_spi_config = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -52,26 +41,11 @@ static struct gpiomux_setting gpio_spi_config[]  = {
 	},
 };
 //zyk for 86
-#if defined (CONFIG_MACH_CS02_SWA) || defined(CONFIG_MACH_CS02VE_ZC) || defined(CONFIG_MACH_CS02VE_ZM)
 static struct gpiomux_setting gpio_i2c_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv  = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
-#else
-static struct gpiomux_setting sensor_i2c_qup_cfg = {
-	.func = GPIOMUX_FUNC_3,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-};
-
-static struct gpiomux_setting sensor_i2c_qup_suspend_cfg = {
-	.func = GPIOMUX_FUNC_3,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_IN,
-};
-#endif
 //zyk for 10,11
 /*static struct gpiomux_setting gpio_cam_i2c_config = {
 	.func = GPIOMUX_FUNC_1,
@@ -164,20 +138,6 @@ static struct gpiomux_setting wcnss_5wire_active_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-static struct gpiomux_setting wcnss_5gpio_suspend_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv  = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-};
-
-static struct gpiomux_setting wcnss_5gpio_active_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv  = GPIOMUX_DRV_6MA,
-	.pull = GPIOMUX_PULL_DOWN,
-};
-#endif
-
 static struct gpiomux_setting lcd_en_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -263,6 +223,13 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 		},
 	},
 	{
+		.gpio = 7,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &lcd_en_act_cfg,
+			[GPIOMUX_SUSPENDED] = &lcd_en_sus_cfg,
+		},
+	},
+	{
 		.gpio = 78,
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &lcd_te_act_config,
@@ -276,13 +243,6 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &lcd_en_sus_cfg,
 		},
 	},
-};
-
-static struct gpiomux_setting gpio_hall_ic_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_IN,
 };
 
 static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
@@ -325,23 +285,23 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 	{
 		.gpio      = 10,	/* BLSP1 QUP3 I2C_SDA */
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &sensor_i2c_qup_cfg,
-			[GPIOMUX_SUSPENDED] = &sensor_i2c_qup_suspend_cfg,//zyk for 10,11
+			[GPIOMUX_ACTIVE]    = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,//zyk for 10,11
 		},
 	},
 	{
 		.gpio      = 11,	/* BLSP1 QUP3 I2C_SCL */
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &sensor_i2c_qup_cfg,
-			[GPIOMUX_SUSPENDED] = &sensor_i2c_qup_suspend_cfg,
+			[GPIOMUX_ACTIVE]    = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
 #endif
 	{
 		.gpio      = 76,	/* HALL IC */
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &gpio_hall_ic_cfg,
-			[GPIOMUX_SUSPENDED] = &gpio_hall_ic_cfg,
+			[GPIOMUX_ACTIVE]    = &atmel_int_act_cfg,
+			[GPIOMUX_SUSPENDED] = &atmel_int_sus_cfg,
 		},
 	},
 	//{
@@ -350,30 +310,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		//	[GPIOMUX_SUSPENDED] = &gpio_cam_i2c_config,
 		//},
 	//},
-};
-
-static struct gpiomux_setting nfc_i2c_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_IN,
-};
-
-static struct msm_gpiomux_config nfc_i2c_gpio_config[] __initdata = {
-	{
-		.gpio = 6,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &nfc_i2c_config,
-			[GPIOMUX_SUSPENDED] = &nfc_i2c_config,
-		},
-	},
-	{
-		.gpio = 7,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &nfc_i2c_config,
-			[GPIOMUX_SUSPENDED] = &nfc_i2c_config,
-		},
-	},
 };
 
 static struct msm_gpiomux_config msm_atmel_configs[] __initdata = {
@@ -499,45 +435,6 @@ static struct msm_gpiomux_config wcnss_5wire_interface[] = {
 	},
 };
 
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-static struct msm_gpiomux_config wcnss_5gpio_interface[] = {
-	{
-		.gpio = 23,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &wcnss_5gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &wcnss_5gpio_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 24,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &wcnss_5gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &wcnss_5gpio_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 25,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &wcnss_5gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &wcnss_5gpio_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 26,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &wcnss_5gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &wcnss_5gpio_suspend_cfg,
-		},
-	},
-	{
-		.gpio = 27,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &wcnss_5gpio_active_cfg,
-			[GPIOMUX_SUSPENDED] = &wcnss_5gpio_suspend_cfg,
-		},
-	},
-};
-#endif
 
 static struct gpiomux_setting cam_settings[] = {
 	{
@@ -591,6 +488,13 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &gpio_nc_act_cfg,
 			[GPIOMUX_SUSPENDED] = &gpio_nc_sus_cfg, //zyk for 14
+		},
+	},
+	{
+		.gpio = 7, /* rev02 nc*/
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_nc_act_cfg,
+			[GPIOMUX_SUSPENDED] = &gpio_nc_sus_cfg, //zyk for 7
 		},
 	},
 	{
@@ -775,6 +679,83 @@ static struct msm_gpiomux_config mot_en[] __initdata = {
 	},
 };//zyk for 85
 
+#if defined(CONFIG_NFC_PN547)
+static struct gpiomux_setting nfc_gpio_i2c_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	//.func = GPIOMUX_FUNC_4,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting nfc_ven_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+	.dir = GPIOMUX_OUT_LOW,
+};
+
+static struct gpiomux_setting nfc_irq_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+	.dir = GPIOMUX_IN,
+};
+
+static struct gpiomux_setting nfc_firmware_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_LOW,
+};
+
+static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
+
+
+	{					/*  NFC   */
+		.gpio      = 89,		/* BLSP1 QUP3 I2C_CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_gpio_i2c_config,
+			[GPIOMUX_SUSPENDED] = &nfc_gpio_i2c_config,
+		},
+	},
+
+	{					/*  NFC   */
+		.gpio      = 88,		/* BLSP1 QUP3 I2C_DAT */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_gpio_i2c_config,
+			[GPIOMUX_SUSPENDED] = &nfc_gpio_i2c_config,
+		},
+	},
+
+	{
+		.gpio		= 90,		/* NFC VEN */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_ven_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_ven_cfg,
+		},
+	},
+
+	{
+		.gpio      = 80,		/* NFC IRQ */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_irq_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_irq_cfg,
+		},
+	},
+
+	{
+		.gpio		= 62,		/* NFC FIRMWARE */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_firmware_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_firmware_cfg,
+		},
+	},
+
+
+};
+
+#endif
+
 
 void __init msm8610_init_gpiomux(void)
 {
@@ -806,114 +787,9 @@ void __init msm8610_init_gpiomux(void)
 	msm_gpiomux_install(msm_gpio_int_configs,
 			ARRAY_SIZE(msm_gpio_int_configs));
 	msm_gpiomux_install(muic_gpio_config, ARRAY_SIZE(muic_gpio_config));
-    msm_gpiomux_install(nfc_i2c_gpio_config, ARRAY_SIZE(nfc_i2c_gpio_config));
 
-}
-
-#ifdef CONFIG_WCNSS_IRIS_REGISTER_DUMP
-static void wcnss_switch_to_gpio(void)
-{
-	/* Switch MUX to GPIO */
-	msm_gpiomux_install(wcnss_5gpio_interface,
-			ARRAY_SIZE(wcnss_5gpio_interface));
-
-	/* Ensure GPIO config */
-	gpio_direction_input(WLAN_DATA2);
-	gpio_direction_input(WLAN_DATA1);
-	gpio_direction_input(WLAN_DATA0);
-	gpio_direction_output(WLAN_SET, 0);
-	gpio_direction_output(WLAN_CLK, 0);
-}
-
-static void wcnss_switch_to_5wire(void)
-{
-	msm_gpiomux_install(wcnss_5wire_interface,
-			ARRAY_SIZE(wcnss_5wire_interface));
-}
-
-u32 wcnss_rf_read_reg(u32 rf_reg_addr)
-{
-	int count = 0;
-	u32 rf_cmd_and_addr = 0;
-	u32 rf_data_received = 0;
-	u32 rf_bit = 0;
-
-	wcnss_switch_to_gpio();
-
-	/* Reset the signal if it is already being used. */
-	gpio_set_value(WLAN_SET, 0);
-	gpio_set_value(WLAN_CLK, 0);
-
-	/* We start with cmd_set high WLAN_SET = 1. */
-	gpio_set_value(WLAN_SET, 1);
-
-	gpio_direction_output(WLAN_DATA0, 1);
-	gpio_direction_output(WLAN_DATA1, 1);
-	gpio_direction_output(WLAN_DATA2, 1);
-
-	gpio_set_value(WLAN_DATA0, 0);
-	gpio_set_value(WLAN_DATA1, 0);
-	gpio_set_value(WLAN_DATA2, 0);
-
-	/* Prepare command and RF register address that need to sent out.
-	 * Make sure that we send only 14 bits from LSB.
-	 */
-	rf_cmd_and_addr  = (((WLAN_RF_READ_REG_CMD) |
-		(rf_reg_addr << WLAN_RF_REG_ADDR_START_OFFSET)) &
-		WLAN_RF_READ_CMD_MASK);
-
-	for (count = 0; count < 5; count++) {
-		gpio_set_value(WLAN_CLK, 0);
-
-		rf_bit = (rf_cmd_and_addr & 0x1);
-		gpio_set_value(WLAN_DATA0, rf_bit ? 1 : 0);
-		rf_cmd_and_addr = (rf_cmd_and_addr >> 1);
-
-		rf_bit = (rf_cmd_and_addr & 0x1);
-		gpio_set_value(WLAN_DATA1, rf_bit ? 1 : 0);
-		rf_cmd_and_addr = (rf_cmd_and_addr >> 1);
-
-		rf_bit = (rf_cmd_and_addr & 0x1);
-		gpio_set_value(WLAN_DATA2, rf_bit ? 1 : 0);
-		rf_cmd_and_addr = (rf_cmd_and_addr >> 1);
-
-		/* Send the data out WLAN_CLK = 1 */
-		gpio_set_value(WLAN_CLK, 1);
-	}
-
-	/* Pull down the clock signal */
-	gpio_set_value(WLAN_CLK, 0);
-
-	/* Configure data pins to input IO pins */
-	gpio_direction_input(WLAN_DATA0);
-	gpio_direction_input(WLAN_DATA1);
-	gpio_direction_input(WLAN_DATA2);
-
-	for (count = 0; count < 2; count++) {
-		gpio_set_value(WLAN_CLK, 1);
-		gpio_set_value(WLAN_CLK, 0);
-	}
-
-	rf_bit = 0;
-	for (count = 0; count < 6; count++) {
-		gpio_set_value(WLAN_CLK, 1);
-		gpio_set_value(WLAN_CLK, 0);
-
-		rf_bit = gpio_get_value(WLAN_DATA0);
-		rf_data_received |= (rf_bit << (count * 3 + 0));
-
-		if (count != 5) {
-			rf_bit = gpio_get_value(WLAN_DATA1);
-			rf_data_received |= (rf_bit << (count * 3 + 1));
-
-			rf_bit = gpio_get_value(WLAN_DATA2);
-			rf_data_received |= (rf_bit << (count * 3 + 2));
-		}
-	}
-
-	gpio_set_value(WLAN_SET, 0);
-	wcnss_switch_to_5wire();
-
-	return rf_data_received;
-}
+#if defined(CONFIG_NFC_PN547)
+		msm_gpiomux_install(msm_nfc_configs, ARRAY_SIZE(msm_nfc_configs));
 #endif
+
+}

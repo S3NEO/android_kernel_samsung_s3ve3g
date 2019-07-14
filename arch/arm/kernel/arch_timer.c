@@ -15,7 +15,6 @@
 #include <linux/device.h>
 #include <linux/smp.h>
 #include <linux/cpu.h>
-#include <linux/cpu_pm.h>
 #include <linux/jiffies.h>
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
@@ -25,12 +24,12 @@
 #include <linux/irq.h>
 #include <linux/export.h>
 #include <linux/slab.h>
-#include <linux/sched_clock.h>
 
 #include <asm/cputype.h>
 #include <asm/delay.h>
 #include <asm/localtimer.h>
 #include <asm/arch_timer.h>
+#include <asm/sched_clock.h>
 #include <asm/hardware/gic.h>
 #include <asm/system_info.h>
 
@@ -260,8 +259,6 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
 	if (arch_timer_ppi2)
 		enable_percpu_irq(arch_timer_ppi2, 0);
 
-	arch_counter_set_user_access();
-
 	return 0;
 }
 
@@ -377,7 +374,7 @@ static u32 arch_counter_get_cntvct32(void)
 	return (u32)(cntvct & (u32)~0);
 }
 
-static u64 notrace arch_timer_update_sched_clock(void)
+static u32 notrace arch_timer_update_sched_clock(void)
 {
 	return arch_counter_get_cntvct32();
 }
@@ -403,40 +400,13 @@ static void __init arch_timer_counter_init(void)
 {
 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
 
-	sched_clock_register(arch_timer_update_sched_clock, 32, arch_timer_rate);
+	setup_sched_clock(arch_timer_update_sched_clock, 32, arch_timer_rate);
 
 	/* Use the architected timer for the delay loop. */
 	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
 	arch_delay_timer.freq = arch_timer_rate;
 	register_current_timer_delay(&arch_delay_timer);
 }
-
-#ifdef CONFIG_CPU_PM
-static unsigned int saved_cntkctl;
-static int arch_timer_cpu_pm_notify(struct notifier_block *self,
-				unsigned long action, void *hcpu)
-{
-	if (action == CPU_PM_ENTER)
-		saved_cntkctl = arch_timer_get_cntkctl();
-	else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT)
-		arch_timer_set_cntkctl(saved_cntkctl);
-	return NOTIFY_OK;
-}
-
-static struct notifier_block arch_timer_cpu_pm_notifier = {
-	.notifier_call = arch_timer_cpu_pm_notify,
-};
-
-static int __init arch_timer_cpu_pm_init(void)
-{
-	return cpu_pm_register_notifier(&arch_timer_cpu_pm_notifier);
-}
-#else
-static int __init arch_timer_cpu_pm_init(void)
-{
-	return 0;
-}
-#endif
 
 static int __init arch_timer_common_register(void)
 {
@@ -473,10 +443,6 @@ static int __init arch_timer_common_register(void)
 		}
 	}
 
-	err = arch_timer_cpu_pm_init();
-	if (err)
-		goto out_free_irq;
-
 	err = local_timer_register(&arch_timer_ops);
 	if (err) {
 		/*
@@ -490,12 +456,10 @@ static int __init arch_timer_common_register(void)
 	}
 
 	if (err)
-		goto out_unreg_notify;
+		goto out_free_irq;
 
 	return 0;
 
-out_unreg_notify:
-	cpu_pm_unregister_notifier(&arch_timer_cpu_pm_notifier);
 out_free_irq:
 	free_percpu_irq(arch_timer_ppi, arch_timer_evt);
 	if (arch_timer_ppi2)
@@ -528,8 +492,10 @@ static int __init arch_timer_mem_register(void)
 
 	clockevents_config_and_register(clk, arch_timer_rate,
 					0xf, 0x7fffffff);
-	err = request_irq(arch_timer_spi, arch_timer_handler_mem,
-			IRQF_TIMER, "arch_timer", clk);
+
+	err = request_irq(arch_timer_spi, arch_timer_handler_mem, 0,
+		"arch_timer", clk);
+
 	return err;
 }
 

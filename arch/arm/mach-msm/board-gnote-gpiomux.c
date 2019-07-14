@@ -218,6 +218,13 @@ static struct gpiomux_setting nfc_firmware_cfg = {
 	.dir = GPIOMUX_OUT_LOW,
 };
 
+static struct gpiomux_setting nfc_clk_req_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+
 static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
 	{
 		.gpio		= 20,		/* NFC EN */
@@ -238,6 +245,13 @@ static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &nfc_firmware_cfg,
 			[GPIOMUX_SUSPENDED] = &nfc_firmware_cfg,
+		},
+	},
+	{
+		.gpio		= 67,		/* NFC CLK REQ */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &nfc_clk_req_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_clk_req_cfg,
 		},
 	},
 };
@@ -304,7 +318,14 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 		},
 	},
 	{
-		.gpio =63,	/* LCD Enable */
+		.gpio =16,	/* LCD Enable */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &lcd_enable_act_cfg,
+			[GPIOMUX_SUSPENDED] = &lcd_enable_sus_cfg,
+		},
+	},
+	{
+		.gpio =56,	/* LCD Enable */
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &lcd_enable_act_cfg,
 			[GPIOMUX_SUSPENDED] = &lcd_enable_sus_cfg,
@@ -498,6 +519,14 @@ static struct msm_gpiomux_config msm_csensor_configs[] __initdata = {
 		},
 	},
 	{
+		.gpio = 27, /* CAM_MCLK1 */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[9],
+			[GPIOMUX_SUSPENDED] = &cam_settings[10],
+		},
+
+	},
+	{
 		.gpio = 29, /* CCI_I2C_SDA0 */
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &cam_settings[0],
@@ -547,7 +576,7 @@ static struct msm_gpiomux_config msm_csensor_configs[] __initdata = {
 		},
 	},
 	{
-		.gpio = 33, /* AF_SCL */
+		.gpio = 36, /* AF_SCL */
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &cam_settings[3],
 			[GPIOMUX_SUSPENDED] = &cam_settings[4],
@@ -558,6 +587,20 @@ static struct msm_gpiomux_config msm_csensor_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &cam_settings[3],
 			[GPIOMUX_SUSPENDED] = &cam_settings[4],
+		},
+	},
+	{
+		.gpio = 38, /* VT_CAM_STBY */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cam_settings[3],
+			[GPIOMUX_SUSPENDED] = &cam_settings[4],
+		},
+	},
+	{
+		.gpio = 36, /* AF_SCL */
+		.settings = {
+			/*[GPIOMUX_ACTIVE] = &gpio_i2c_config,*/
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
 		},
 	},
 };
@@ -575,6 +618,12 @@ static struct gpiomux_setting cypress_int_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+static struct gpiomux_setting gpio_i2c_gpio_config = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
 static struct msm_gpiomux_config msm_cypress_configs[] __initdata = {
 	{
 		.gpio = 17,
@@ -585,31 +634,26 @@ static struct msm_gpiomux_config msm_cypress_configs[] __initdata = {
 	},
 };
 
-
-static struct gpiomux_setting gpio_i2c_tkey_active_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-};
-static struct gpiomux_setting gpio_i2c_tkey_suspend_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-};
-
-static struct msm_gpiomux_config msm_keyboad_abov_configs[] __initdata = {
+static struct msm_gpiomux_config msm_keyboad_cypress_configs[] __initdata = {
 	{
-		.gpio      = 22,		/* BLSP1 QUP1 SPI_DATA_MOSI */
+		.gpio      = 49,		/* 2_TOUCH_INT */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_i2c_tkey_active_config,
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_tkey_suspend_config,
+			[GPIOMUX_ACTIVE] = &cypress_int_act_cfg,
+			[GPIOMUX_SUSPENDED] = &cypress_int_sus_cfg,
 		},
 	},
 	{
-		.gpio      = 23,		/* BLSP1 QUP1 SPI_DATA_MISO */
+		.gpio      = 23,		/* 2_TOUCH_I2C_SCL */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_i2c_tkey_active_config,
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_tkey_suspend_config,
+			[GPIOMUX_ACTIVE] = &gpio_i2c_gpio_config,
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[2],
+		},
+	},
+	{
+		.gpio      = 22,		/* 2_TOUCH_I2C_SDA */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_gpio_config,
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[2],
 		},
 	},
 };
@@ -790,37 +834,28 @@ static struct gpiomux_setting nc_suspend_cfg = {
 	.dir = GPIOMUX_IN,
 };
 
-static struct msm_gpiomux_config nc_gpio_cfgs[] __initdata = {
+/* BERLUTI 3G NC configs */
+static struct msm_gpiomux_config berluti3g_nc_gpio_cfgs[] __initdata = {
+	NC_GPIO_CONFIG(53),
+	NC_GPIO_CONFIG(55),
+#if defined (CONFIG_MACH_BERLUTI3G_EUR)
+	NC_GPIO_CONFIG(45),
+#else
 	NC_GPIO_CONFIG(60),
-	NC_GPIO_CONFIG(75),
-	NC_GPIO_CONFIG(76),
-	NC_GPIO_CONFIG(77),
-	NC_GPIO_CONFIG(78),
-	NC_GPIO_CONFIG(79),
+#endif
 	NC_GPIO_CONFIG(80),
-	NC_GPIO_CONFIG(81),
-	NC_GPIO_CONFIG(82),
-	NC_GPIO_CONFIG(83),
-	NC_GPIO_CONFIG(84),
-	NC_GPIO_CONFIG(85),
-	NC_GPIO_CONFIG(86),
-	NC_GPIO_CONFIG(88),
 	NC_GPIO_CONFIG(89),
 	NC_GPIO_CONFIG(90),
 	NC_GPIO_CONFIG(91),
 	NC_GPIO_CONFIG(92),
-	NC_GPIO_CONFIG(93),
-	NC_GPIO_CONFIG(94),
 	NC_GPIO_CONFIG(97),
 	NC_GPIO_CONFIG(98),
-	NC_GPIO_CONFIG(103),
 	NC_GPIO_CONFIG(104),
+	NC_GPIO_CONFIG(107),
 	NC_GPIO_CONFIG(110),
+	NC_GPIO_CONFIG(113),
 	NC_GPIO_CONFIG(115),
-	NC_GPIO_CONFIG(116),
-	NC_GPIO_CONFIG(117),
-	NC_GPIO_CONFIG(119),
-	NC_GPIO_CONFIG(120),
+	NC_GPIO_CONFIG(116),	
 };
 
 void __init msm8226_init_gpiomux(void)
@@ -866,8 +901,8 @@ void __init msm8226_init_gpiomux(void)
 		ARRAY_SIZE(msm_cypress_configs));
 
 	/* Touch Key */
-	msm_gpiomux_install(msm_keyboad_abov_configs,
-		ARRAY_SIZE(msm_keyboad_abov_configs));
+	msm_gpiomux_install(msm_keyboad_cypress_configs,
+		ARRAY_SIZE(msm_keyboad_cypress_configs));
 
 	/* NFC */
 	msm_gpiomux_install(msm_nfc_configs,
@@ -889,6 +924,6 @@ void __init msm8226_init_gpiomux(void)
  		ARRAY_SIZE(muic_configs));
 
 	/* NC */
-	msm_gpiomux_install(nc_gpio_cfgs, ARRAY_SIZE(nc_gpio_cfgs));
+	msm_gpiomux_install(berluti3g_nc_gpio_cfgs, ARRAY_SIZE(berluti3g_nc_gpio_cfgs));
 }
 

@@ -54,7 +54,6 @@ extern void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 extern int sec_debug_is_enabled(void);
 extern int sec_debug_is_enabled_for_ssr(void);
 extern int silent_log_panic_handler(void);
-extern void sec_debug_secure_app_addr_size(uint32_t addr,uint32_t size);
 #else
 static inline int sec_debug_init(void)
 {
@@ -327,9 +326,8 @@ static inline void sec_debug_fuelgauge_log(unsigned int voltage,
 extern bool kernel_sec_set_normal_pwroff(int value);
 extern int kernel_sec_get_normal_pwroff(void);
 #endif
-#ifdef CONFIG_RESTART_REASON_SEC_PARAM
-extern void sec_param_restart_reason(const char *cmd);
-#endif
+
+
 extern bool kernel_sec_set_debug_level(int level);
 extern int kernel_sec_get_debug_level(void);
 extern int ssr_panic_handler_for_sec_dbg(void);
@@ -558,8 +556,6 @@ struct sec_debug_subsys {
 	struct sec_debug_subsys_data_modem *modem;
 	struct sec_debug_subsys_data *dsps;
 
-	int secure_app_start_addr;
-	int secure_app_size;
 	struct sec_debug_subsys_private priv;
 };
 

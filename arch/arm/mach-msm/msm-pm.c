@@ -42,7 +42,6 @@
 #include "scm-boot.h"
 #include "spm.h"
 #include "pm-boot.h"
-#include "clock.h"
 #ifdef CONFIG_SEC_DEBUG
 #include <mach/sec_debug.h>
 #endif
@@ -60,7 +59,7 @@
 
 #define MAX_BUF_SIZE  512
 
-static int msm_pm_debug_mask __refdata = 1;
+static int msm_pm_debug_mask = 1;
 module_param_named(
 	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
 );
@@ -117,17 +116,18 @@ static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
 		"standalone_power_collapse",
 };
 
-static bool msm_pm_ldo_retention_enabled __refdata = true;
+static bool msm_pm_ldo_retention_enabled = true;
 static bool msm_no_ramp_down_pc;
 static struct msm_pm_sleep_status_data *msm_pm_slp_sts;
 DEFINE_PER_CPU(struct clk *, cpu_clks);
 static struct clk *l2_clk;
 
+#if defined(CONFIG_ARCH_MSM8974PRO)
 static int cpu_count;
-static __refdata DEFINE_SPINLOCK(cpu_cnt_lock);
+static DEFINE_SPINLOCK(cpu_cnt_lock);
 #define SCM_HANDOFF_LOCK_ID "S:7"
-static bool need_scm_handoff_lock;
 static remote_spinlock_t scm_handoff_lock;
+#endif
 
 static void (*msm_pm_disable_l2_fn)(void);
 static void (*msm_pm_enable_l2_fn)(void);
@@ -138,7 +138,7 @@ static void __iomem *msm_pc_debug_counters;
  * Default the l2 flush flag to OFF so the caches are flushed during power
  * collapse unless the explicitly voted by lpm driver.
  */
-static enum msm_pm_l2_scm_flag msm_pm_flush_l2_flag __refdata = MSM_SCM_L2_OFF;
+static enum msm_pm_l2_scm_flag msm_pm_flush_l2_flag = MSM_SCM_L2_OFF;
 
 void msm_pm_set_l2_flush_flag(enum msm_pm_l2_scm_flag flag)
 {
@@ -152,7 +152,7 @@ static enum msm_pm_l2_scm_flag msm_pm_get_l2_flush_flag(void)
 }
 
 static cpumask_t retention_cpus;
-static __refdata DEFINE_SPINLOCK(retention_lock);
+static DEFINE_SPINLOCK(retention_lock);
 
 static int msm_pm_get_pc_mode(struct device_node *node,
 		const char *key, uint32_t *pc_mode_val)
@@ -465,8 +465,8 @@ static inline void msm_pc_inc_debug_count(uint32_t cpu,
 	if (!msm_pc_debug_counters)
 		return;
 
-	cnt = readl_relaxed(msm_pc_debug_counters + cpu * 4 * MSM_PC_NUM_COUNTERS + offset * 4);
-	writel_relaxed(++cnt, msm_pc_debug_counters + cpu * 4 * MSM_PC_NUM_COUNTERS + offset * 4);
+	cnt = readl_relaxed(msm_pc_debug_counters + cpu * 4 + offset * 4);
+	writel_relaxed(++cnt, msm_pc_debug_counters + cpu * 4 + offset * 4);
 	mb();
 }
 
@@ -490,6 +490,7 @@ static bool msm_pm_pc_hotplug(void)
 static int msm_pm_collapse(unsigned long unused)
 {
 	uint32_t cpu = smp_processor_id();
+#if defined(CONFIG_ARCH_MSM8974PRO)
 	enum msm_pm_l2_scm_flag flag = MSM_SCM_L2_ON;
 
 	spin_lock(&cpu_cnt_lock);
@@ -508,12 +509,15 @@ static int msm_pm_collapse(unsigned long unused)
 	 *
 	 * It must be acquired before releasing cpu_cnt_lock.
 	 */
-	if (need_scm_handoff_lock)
-		remote_spin_lock_rlock_id(&scm_handoff_lock,
-					  REMOTE_SPINLOCK_TID_START + cpu);
+	remote_spin_lock_rlock_id(&scm_handoff_lock,
+				  REMOTE_SPINLOCK_TID_START + cpu);
 	spin_unlock(&cpu_cnt_lock);
 
-	if (flag == MSM_SCM_L2_OFF) {
+	if (flag == MSM_SCM_L2_OFF)
+#else
+	if (msm_pm_get_l2_flush_flag() == MSM_SCM_L2_OFF)
+#endif
+	{
 		flush_cache_all();
 		if (msm_pm_flush_l2_fn)
 			msm_pm_flush_l2_fn();
@@ -525,7 +529,12 @@ static int msm_pm_collapse(unsigned long unused)
 
 	msm_pc_inc_debug_count(cpu, MSM_PC_ENTRY_COUNTER);
 
+#if defined(CONFIG_ARCH_MSM8974PRO)	
 	scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
+#else
+	scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC,
+				msm_pm_get_l2_flush_flag());
+#endif
 
 	msm_pc_inc_debug_count(cpu, MSM_PC_FALLTHRU_COUNTER);
 
@@ -575,7 +584,6 @@ static bool __ref msm_pm_spm_power_collapse(
 	collapsed = save_cpu_regs ?
 		!cpu_suspend(0, msm_pm_collapse) : msm_pm_pc_hotplug();
 
-
 #ifdef CONFIG_SEC_PM_DEBUG
 	if(from_idle == false && cpu == 0 && sec_debug_is_enabled()){
 		sec_print_masters_stats();
@@ -586,12 +594,14 @@ static bool __ref msm_pm_spm_power_collapse(
 	secdbg_sched_msg("-pc(%d)", collapsed);
 #endif
 
+#if defined(CONFIG_ARCH_MSM8974PRO)
 	if (save_cpu_regs) {
 		spin_lock(&cpu_cnt_lock);
 		cpu_count--;
 		BUG_ON(cpu_count > num_online_cpus());
 		spin_unlock(&cpu_cnt_lock);
 	}
+#endif
 	msm_jtag_restore_state();
 
 	if (collapsed) {
@@ -699,14 +709,6 @@ static enum msm_pm_time_stats_id msm_pm_power_collapse(bool from_idle)
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
 		pr_info("CPU%u: %s: pre power down\n", cpu, __func__);
-
-	/* This spews a lot of messages when a core is hotplugged. This
-	 * information is most useful from last core going down during
-	 * power collapse
-	 */
-	if ((!from_idle && cpu_online(cpu))
-			|| (MSM_PM_DEBUG_IDLE_CLK & msm_pm_debug_mask))
-		clock_debug_print_enabled();
 
 	avsdscr = avs_get_avsdscr();
 	avscsr = avs_get_avscsr();
@@ -822,19 +824,17 @@ int msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode, bool from_idle)
 		pr_info("CPU%u: %s mode:%d\n",
 			smp_processor_id(), __func__, mode);
 
-	if (from_idle)
-		time = sched_clock();
-
+	time = sched_clock();
 	if (execute[mode])
 		exit_stat = execute[mode](from_idle);
-
-	if (from_idle) {
-		time = sched_clock() - time;
+	time = sched_clock() - time;
+	if (from_idle)
 		msm_pm_ftrace_lpm_exit(smp_processor_id(), mode, collapsed);
-		if (exit_stat >= 0)
-			msm_pm_add_stat(exit_stat, time);
-	}
-
+	else
+		exit_stat = MSM_PM_STAT_SUSPEND;
+	if (exit_stat >= 0)
+		msm_pm_add_stat(exit_stat, time);
+	do_div(time, 1000);
 	return collapsed;
 }
 
@@ -1023,7 +1023,7 @@ static int msm_cpu_status_probe(struct platform_device *pdev)
 	return 0;
 };
 
-static struct of_device_id msm_slp_sts_match_tbl[] __initdata= {
+static struct of_device_id msm_slp_sts_match_tbl[] = {
 	{.compatible = "qcom,cpu-sleep-status"},
 	{},
 };
@@ -1037,7 +1037,7 @@ static struct platform_driver msm_cpu_status_driver = {
 	},
 };
 
-static struct of_device_id msm_snoc_clnt_match_tbl[] __initdata = {
+static struct of_device_id msm_snoc_clnt_match_tbl[] = {
 	{.compatible = "qcom,pm-snoc-client"},
 	{},
 };
@@ -1235,7 +1235,6 @@ static int msm_cpu_pm_probe(struct platform_device *pdev)
 	struct resource *res = NULL;
 	int i;
 	struct msm_pm_init_data_type pdata_local;
-	struct device_node *lpm_node;
 	int ret = 0;
 
 	memset(&pdata_local, 0, sizeof(struct msm_pm_init_data_type));
@@ -1262,22 +1261,14 @@ static int msm_cpu_pm_probe(struct platform_device *pdev)
 		msm_pc_debug_counters_phys = 0;
 	}
 
-	lpm_node = of_parse_phandle(pdev->dev.of_node, "qcom,lpm-levels", 0);
-	if (!lpm_node) {
-		pr_warn("Could not get qcom,lpm-levels handle\n");
-		return -EINVAL;
+#if defined(CONFIG_ARCH_MSM8974PRO)
+	ret = remote_spin_lock_init(&scm_handoff_lock, SCM_HANDOFF_LOCK_ID);
+	if (ret) {
+		pr_err("%s: Failed initializing scm_handoff_lock (%d)\n",
+			__func__, ret);
+		return ret;
 	}
-	need_scm_handoff_lock = of_property_read_bool(lpm_node,
-						      "qcom,allow-synced-levels");
-	if (need_scm_handoff_lock) {
-		ret = remote_spin_lock_init(&scm_handoff_lock,
-					    SCM_HANDOFF_LOCK_ID);
-		if (ret) {
-			pr_err("%s: Failed initializing scm_handoff_lock (%d)\n",
-				__func__, ret);
-			return ret;
-		}
-	}
+#endif
 
 	if (pdev->dev.of_node) {
 		enum msm_pm_pc_mode_type pc_mode;
@@ -1304,7 +1295,7 @@ static int msm_cpu_pm_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static struct of_device_id msm_cpu_pm_table[] __initdata = {
+static struct of_device_id msm_cpu_pm_table[] = {
 	{.compatible = "qcom,pm-8x60"},
 	{},
 };

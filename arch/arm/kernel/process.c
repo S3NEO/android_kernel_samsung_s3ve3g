@@ -14,7 +14,6 @@
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/vmalloc.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/user.h>
@@ -362,16 +361,6 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 	if (addr < PAGE_OFFSET || addr > -256UL)
 		return;
 
-	if (is_vmalloc_addr((void *)addr))
-	{
-		struct vm_struct *area = find_vm_area((void *)addr);
-		if (area && area->flags & VM_IOREMAP)
-		{
-			pr_err("%s: not dumping ioremapped address\n",__func__);
-			return;
-		}
-	}
-
 	printk("\n%s: %#lx:\n", name, addr);
 
 	/*
@@ -391,12 +380,7 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 		printk("%04lx ", (unsigned long)p & 0xffff);
 		for (j = 0; j < 8; j++) {
 			u32	data;
-			/*
-			 * vmalloc addresses may point to
-			 * memory-mapped peripherals
-			 */
-			if (is_vmalloc_addr(p) ||
-			    probe_kernel_address(p, data)) {
+			if (probe_kernel_address(p, data)) {
 				printk(" ********");
 			} else {
 				printk(" %08x", data);

@@ -41,7 +41,6 @@ static struct apr_client client[APR_DEST_MAX][APR_CLIENT_MAX];
 
 static wait_queue_head_t dsp_wait;
 static wait_queue_head_t modem_wait;
-int is_modem_up = 0;
 /* Subsystem restart: QDSP6 data, functions */
 static struct workqueue_struct *apr_reset_workqueue;
 static void apr_reset_deregister(struct work_struct *work);
@@ -341,7 +340,7 @@ void apr_cb_func(void *buf, int len, void *priv)
 	pr_debug("\n*****************\n");
 
 	if (!buf || len <= APR_HDR_SIZE) {
-		pr_err("APR: Improper apr pkt received:%pK %d\n", buf, len);
+		pr_err("APR: Improper apr pkt received:%p %d\n", buf, len);
 		return;
 	}
 	hdr = buf;
@@ -425,7 +424,7 @@ void apr_cb_func(void *buf, int len, void *priv)
 		return;
 	}
 	pr_debug("svc_idx = %d\n", i);
-	pr_debug("%x %x %x %pK %pK\n", c_svc->id, c_svc->dest_id,
+	pr_debug("%x %x %x %p %p\n", c_svc->id, c_svc->dest_id,
 		 c_svc->client_id, c_svc->fn, c_svc->priv);
 	data.payload_size = hdr->pkt_size - hdr_size;
 	data.opcode = hdr->opcode;
@@ -437,10 +436,9 @@ void apr_cb_func(void *buf, int len, void *priv)
 	if (data.payload_size > 0)
 		data.payload = (char *)hdr + hdr_size;
 
-	temp_port = ((data.dest_port >> 8) * 8) + (data.dest_port & 0xFF);
+	temp_port = ((data.src_port >> 8) * 8) + (data.src_port & 0xFF);
 	pr_debug("port = %d t_port = %d\n", data.src_port, temp_port);
-	if (((temp_port >= 0) && (temp_port < APR_MAX_PORTS))
-		&& (c_svc->port_cnt && c_svc->port_fn[temp_port]))
+	if (c_svc->port_cnt && c_svc->port_fn[temp_port])
 		c_svc->port_fn[temp_port](&data,  c_svc->port_priv[temp_port]);
 	else if (c_svc->fn)
 		c_svc->fn(&data, c_svc->priv);
@@ -490,7 +488,7 @@ static void apr_reset_deregister(struct work_struct *work)
 			container_of(work, struct apr_reset_work, work);
 
 	handle = apr_reset->handle;
-	pr_debug("%s:handle[%pK]\n", __func__, handle);
+	pr_debug("%s:handle[%p]\n", __func__, handle);
 	apr_deregister(handle);
 	kfree(apr_reset);
 }
@@ -523,7 +521,7 @@ int apr_deregister(void *handle)
 		client[dest_id][client_id].svc_cnt--;
 		if (!client[dest_id][client_id].svc_cnt) {
 			svc->need_reset = 0x0;
-			pr_debug("%s: service is reset %pK\n", __func__, svc);
+			pr_debug("%s: service is reset %p\n", __func__, svc);
 		}
 	}
 
@@ -551,7 +549,7 @@ void apr_reset(void *handle)
 
 	if (!handle)
 		return;
-	pr_debug("%s: handle[%pK]\n", __func__, handle);
+	pr_debug("%s: handle[%p]\n", __func__, handle);
 
 	if (apr_reset_workqueue == NULL) {
 		pr_err("%s: apr_reset_workqueue is NULL\n", __func__);
@@ -648,7 +646,6 @@ static int modem_notifier_cb(struct notifier_block *this, unsigned long code,
 		if (apr_cmpxchg_modem_state(APR_SUBSYS_DOWN, APR_SUBSYS_UP) ==
 						APR_SUBSYS_DOWN)
 			wake_up(&modem_wait);
-                is_modem_up = 1;
 		pr_debug("M-Notify: Bootup Completed\n");
 		break;
 	default:

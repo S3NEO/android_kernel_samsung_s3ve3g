@@ -70,13 +70,6 @@
 #define CURRENT_MODE_INIT AUTO_MODE;
 #endif
 
-#if defined(CONFIG_THUMB2_KERNEL) || \
-		defined(CONFIG_ARCH_MSM8974) || \
-		defined(CONFIG_ARCH_MSM8610) || \
-		defined(CONFIG_ARCH_MSM8226)
-#define SWP_OFF
-#endif
-
 static int current_mode = CURRENT_MODE_INIT;
 
 static int is_hw_lock_type;
@@ -88,8 +81,10 @@ struct spinlock_ops {
 	int (*trylock)(raw_remote_spinlock_t *lock);
 	int (*release)(raw_remote_spinlock_t *lock, uint32_t pid);
 	int (*owner)(raw_remote_spinlock_t *lock);
+#if defined(CONFIG_ARCH_MSM8974PRO)
 	void (*lock_rlock_id)(raw_remote_spinlock_t *lock, uint32_t tid);
 	void (*unlock_rlock)(raw_remote_spinlock_t *lock);
+#endif
 };
 
 static struct spinlock_ops current_ops;
@@ -153,7 +148,7 @@ static int __raw_remote_dek_spin_owner(raw_remote_spinlock_t *lock)
 }
 /* end dekkers implementation ----------------------------------------------- */
 
-#ifndef SWP_OFF
+#ifndef CONFIG_THUMB2_KERNEL
 /* swp implementation ------------------------------------------------------- */
 static void __raw_remote_swp_spin_lock(raw_remote_spinlock_t *lock)
 {
@@ -374,6 +369,7 @@ static void __raw_remote_sfpb_spin_unlock(raw_remote_spinlock_t *lock)
 	smp_mb();
 }
 
+#if defined(CONFIG_ARCH_MSM8974PRO)
 static void __raw_remote_sfpb_spin_lock_rlock_id(raw_remote_spinlock_t *lock,
 						 uint32_t tid)
 {
@@ -393,6 +389,7 @@ static void __raw_remote_sfpb_spin_unlock_rlock(raw_remote_spinlock_t *lock)
 	writel_relaxed(0, lock);
 	smp_mb();
 }
+#endif
 
 /* end sfpb implementation -------------------------------------------------- */
 
@@ -464,7 +461,7 @@ static void initialize_ops(void)
 		current_ops.owner = __raw_remote_dek_spin_owner;
 		is_hw_lock_type = 0;
 		break;
-#ifndef SWP_OFF
+#ifndef CONFIG_THUMB2_KERNEL
 	case SWP_MODE:
 		current_ops.lock = __raw_remote_swp_spin_lock;
 		current_ops.unlock = __raw_remote_swp_spin_unlock;
@@ -488,9 +485,11 @@ static void initialize_ops(void)
 		current_ops.trylock = __raw_remote_sfpb_spin_trylock;
 		current_ops.release = __raw_remote_gen_spin_release;
 		current_ops.owner = __raw_remote_gen_spin_owner;
+#if defined(CONFIG_ARCH_MSM8974PRO)
 		current_ops.lock_rlock_id =
 				__raw_remote_sfpb_spin_lock_rlock_id;
 		current_ops.unlock_rlock = __raw_remote_sfpb_spin_unlock_rlock;
+#endif
 		is_hw_lock_type = 1;
 		break;
 	case AUTO_MODE:
@@ -507,10 +506,12 @@ static void initialize_ops(void)
 			current_ops.trylock = __raw_remote_sfpb_spin_trylock;
 			current_ops.release = __raw_remote_gen_spin_release;
 			current_ops.owner = __raw_remote_gen_spin_owner;
+#if defined(CONFIG_ARCH_MSM8974PRO)
 			current_ops.lock_rlock_id =
 					__raw_remote_sfpb_spin_lock_rlock_id;
 			current_ops.unlock_rlock =
 					__raw_remote_sfpb_spin_unlock_rlock;
+#endif
 			is_hw_lock_type = 1;
 			break;
 		}
@@ -554,10 +555,12 @@ static void remote_spin_release_all_locks(uint32_t pid, int count)
 	int n;
 	 _remote_spinlock_t lock;
 
-	if (pid >= REMOTE_SPINLOCK_NUM_PID) {
+#if defined(CONFIG_ARCH_MSM8974PRO)
+ 	 if (pid >= REMOTE_SPINLOCK_NUM_PID) {
 		pr_err("%s: unsupported PID %d\n", __func__, pid);
 		return;
 	}
+#endif
 
 	for (n = 0; n < count; ++n) {
 		if (remote_spinlock_init_address(n, &lock) == 0)
@@ -714,6 +717,7 @@ int _remote_spin_owner(_remote_spinlock_t *lock)
 }
 EXPORT_SYMBOL(_remote_spin_owner);
 
+#if defined(CONFIG_ARCH_MSM8974PRO)
 void _remote_spin_lock_rlock_id(_remote_spinlock_t *lock, uint32_t tid)
 {
 	if (unlikely(!current_ops.lock_rlock_id))
@@ -729,6 +733,7 @@ void _remote_spin_unlock_rlock(_remote_spinlock_t *lock)
 	current_ops.unlock_rlock((raw_remote_spinlock_t *)(*lock));
 }
 EXPORT_SYMBOL(_remote_spin_unlock_rlock);
+#endif
 
 /* end common spinlock API -------------------------------------------------- */
 

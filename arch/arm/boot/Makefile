@@ -11,7 +11,7 @@
 # Copyright (C) 1995-2002 Russell King
 #
 
-ifeq ($(CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK),y)
+ifeq ($(CONFIG_CRYPTO_FIPS),y)
 MKFIPS          := $(srctree)/scripts/mk_fipsbinary.sh
 endif
 ifneq ($(MACHINE),)
@@ -64,7 +64,7 @@ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
 
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
-ifeq ($(CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK),y)
+ifeq ($(CONFIG_CRYPTO_FIPS),y)
 	$(MKFIPS) $(obj)/zImage
 endif
 	@echo '  Kernel: $@ is ready'
@@ -81,18 +81,6 @@ targets += $(DTB_LIST)
 $(obj)/%.dtb: $(src)/dts/%.dts FORCE
 	$(call if_changed_dep,dtc)
 
-ifeq ($(CONFIG_ARCH_MSM8610),y)
-$(obj)/%.dtb: $(src)/dts/msm8610/%.dts FORCE
-	$(call if_changed_dep,dtc)
-endif
-
-ifeq ($(CONFIG_ARCH_MSM8974PRO),y)
-$(obj)/%.dtb: $(src)/dts/msm8974pro/%.dts FORCE
-	$(call if_changed_dep,dtc)
-else
-     $(obj)/%.dtb: $(src)/dts/msm8974/%.dts FORCE
-	$(call if_changed_dep,dtc)
-endif
 $(obj)/dtbs: $(DTB_OBJS)
 
 clean-files := *.dtb
