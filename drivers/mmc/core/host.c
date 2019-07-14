@@ -722,6 +722,7 @@ int mmc_add_host(struct mmc_host *host)
 	if (err)
 		return err;
 
+	device_enable_async_suspend(&host->class_dev);
 	led_trigger_register_simple(dev_name(&host->class_dev), &host->led);
 
 #ifdef CONFIG_DEBUG_FS
@@ -794,7 +795,7 @@ void mmc_free_host(struct mmc_host *host)
 	idr_remove(&mmc_host_idr, host->index);
 	spin_unlock(&mmc_host_lock);
 	wake_lock_destroy(&host->detect_wake_lock);
-
+	kfree(host->wlock_name);
 	put_device(&host->class_dev);
 }
 

@@ -76,8 +76,10 @@ enum sec_battery_adc_channel {
 	SEC_BAT_ADC_CHANNEL_BAT_CHECK,
 	SEC_BAT_ADC_CHANNEL_TEMP,
 	SEC_BAT_ADC_CHANNEL_TEMP_AMBIENT,
+	SEC_BAT_ADC_CHANNEL_CHG_TEMP,
 	SEC_BAT_ADC_CHANNEL_FULL_CHECK,
 	SEC_BAT_ADC_CHANNEL_VOLTAGE_NOW,
+	SEC_BAT_ADC_CHANNEL_INBAT_VOLTAGE,
 	SEC_BAT_ADC_CHANNEL_NUM
 };
 
@@ -369,7 +371,6 @@ struct sec_charging_current {
 struct sec_battery_platform_data {
 	/* NO NEED TO BE CHANGED */
 	/* callback functions */
-	void (*initial_check)(void);
 	void (*monitor_additional_check)(void);
 	bool (*bat_gpio_init)(void);
 	bool (*fg_gpio_init)(void);
@@ -432,8 +433,38 @@ struct sec_battery_platform_data {
 	bool use_LED;				/* use charging LED */
 
 	bool event_check;
+	bool use_wireless_to_pogo;
+	bool chg_temp_check;
+	unsigned int chg_high_temp;
+	unsigned int chg_high_temp_recovery;
+	unsigned int chg_charging_limit_current;
 	/* sustaining event after deactivated (second) */
 	unsigned int event_waiting_time;
+
+	/* battery swelling */
+	int swelling_high_temp_block;
+	int swelling_high_temp_recov;
+	int swelling_low_temp_block_1st;
+	int swelling_low_temp_recov_1st;
+	int swelling_low_temp_block_2nd;
+	int swelling_low_temp_recov_2nd;
+	unsigned int swelling_low_temp_current;
+	unsigned int swelling_low_temp_topoff;
+	unsigned int swelling_high_temp_current;
+	unsigned int swelling_high_temp_topoff;
+	unsigned int swelling_wc_high_temp_current;
+	unsigned int swelling_wc_low_temp_current;
+
+	unsigned int swelling_normal_float_voltage;
+	unsigned int swelling_drop_float_voltage;
+	unsigned int swelling_high_rechg_voltage;
+	unsigned int swelling_low_rechg_voltage;
+	unsigned int swelling_drop_voltage_condition;
+
+	int swelling_low_temp_block;
+	int swelling_low_temp_recov;
+	unsigned int swelling_high_chg_current;
+	unsigned int swelling_low_chg_current;
 
 	/* Monitor setting */
 	sec_battery_monitor_polling_t polling_type;
@@ -457,15 +488,20 @@ struct sec_battery_platform_data {
 #ifdef CONFIG_OF
 	sec_bat_adc_table_data_t *temp_adc_table;
 	sec_bat_adc_table_data_t *temp_amb_adc_table;
+	sec_bat_adc_table_data_t *chg_temp_adc_table;
+	sec_bat_adc_table_data_t *inbat_adc_table;
 #else
 	const sec_bat_adc_table_data_t *temp_adc_table;
 	const sec_bat_adc_table_data_t *temp_amb_adc_table;
 #endif
 	unsigned int temp_adc_table_size;
 	unsigned int temp_amb_adc_table_size;
+	unsigned int chg_temp_adc_table_size;
+	unsigned int inbat_adc_table_size;
 
 	sec_battery_temp_check_t temp_check_type;
 	unsigned int temp_check_count;
+	unsigned int inbat_voltage;
 	/*
 	 * limit can be ADC value or Temperature
 	 * depending on temp_check_type
@@ -533,8 +569,11 @@ struct sec_battery_platform_data {
 	 * only for scaling
 	 */
 	int capacity_max;
+	int capacity_max_hv;
 	int capacity_max_margin;
 	int capacity_min;
+	int rcomp0;
+	int rcomp_charging;
 
 	/* charger */
 	char *charger_name;
@@ -553,10 +592,19 @@ struct sec_battery_platform_data {
 	unsigned long chg_irq_attr;
 	/* float voltage (mV) */
 	int chg_float_voltage;
+	int chg_min_system_voltage;
 	sec_charger_functions_t chg_functions_setting;
+
+	int siop_level;
+	bool siop_activated;
+
+	unsigned int expired_time;
+	unsigned int recharging_expired_time;
+	int standard_curr;
 
 	/* ADC setting */
 	unsigned int adc_check_count;
+
 	/* ADC type for each channel */
 	unsigned int adc_type[];
 };

@@ -70,8 +70,10 @@
 
 #define	CFG_A_REG			0x0A
 #define	DCIN_ADAPTER_MASK		SMB135X_MASK(7, 5)
+#define DCIN_9VONLY			0x60
 #define DCIN_5VTO9V			0x40
 #define DCIN_5VOR9V			0x20
+#define DCIN_5VONLY			0x00
 #define	DCIN_INPUT_MASK			SMB135X_MASK(4, 0)
 
 #define	CFG_B_REG			0x0B
@@ -85,6 +87,10 @@
 #define USBIN_AICL_BIT		BIT(2)
 
 #define CFG_E_REG			0x0E
+#define	HVDCP_ADAPTER_MASK		SMB135X_MASK(5, 4)
+#define HVDCP_ADAPTER_5V		0x00
+#define HVDCP_ADAPTER_9V		BIT(4)
+#define HVDCP_ENABLE_BIT		BIT(3)
 #define POLARITY_100_500_BIT		BIT(2)
 #define USB_CTRL_BY_PIN_BIT		BIT(1)
 #define USB_DUAL_STATE_BIT		BIT(0)
@@ -159,6 +165,7 @@
 
 #define IRQ3_CFG_REG			0x09
 #define IRQ3_SRC_DETECT_BIT		BIT(2)
+#define IRQ3_DCIN_OV_BIT		BIT(1)
 #define IRQ3_DCIN_UV_BIT		BIT(0)
 
 /* Command Registers */
@@ -171,9 +178,9 @@
 #define DC_SHUTDOWN_BIT			BIT(5)
 #define USE_REGISTER_FOR_CURRENT	BIT(2)
 #define USB_100_500_AC_MASK		SMB135X_MASK(1, 0)
-#define USB_100_VAL			0x01
 #define USB_500_VAL			0x00
-#define USB_AC_VAL			0x02
+#define USB_100_VAL			0x02
+#define USB_AC_VAL			0x01
 
 #define CMD_CHG_REG			0x42
 #define CMD_CHG_EN_MASK			BIT(1)
@@ -225,10 +232,10 @@
 #define HVDCP_SEL_5V_BIT	BIT(0)
 
 #define STATUS_8_REG			0x4E
-#define USBIN_9V			BIT(5)
+#define USBIN_HV			BIT(5)
 #define USBIN_UNREG			BIT(4)
 #define USBIN_LV			BIT(3)
-#define DCIN_9V				BIT(2)
+#define DCIN_HV				BIT(2)
 #define DCIN_UNREG			BIT(1)
 #define DCIN_LV				BIT(0)
 
@@ -280,6 +287,12 @@ enum {
 };
 
 enum {
+	DCIN_NONE = 0,
+	DCIN_5V = 5,
+	DCIN_9V = 9,
+};
+
+enum {
 	REV_1 = 1,	/* Rev v1.0 */
 	REV_1_1,	/* Rev v1.1 */
 	REV_1_2,	/* Rev v1.2 */
@@ -316,6 +329,9 @@ ssize_t chg_therm_store_attrs(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
+ssize_t chg_therm_adc_show_attrs(struct device *dev,
+				struct device_attribute *attr, char *buf);
+
 ssize_t chg_current_show_attrs(struct device *dev,
 				struct device_attribute *attr, char *buf);
 
@@ -349,6 +365,13 @@ ssize_t chg_current_store_attrs(struct device *dev,
 	.attr = {.name = #_name, .mode = 0664},	\
 	.show = chg_therm_show_attrs,			\
 	.store = chg_therm_store_attrs,			\
+}
+
+#define CHG_THERM_ADC_ATTR(_name)				\
+{							\
+	.attr = {.name = #_name, .mode = 0444},	\
+	.show = chg_therm_adc_show_attrs,			\
+	.store = NULL,			\
 }
 
 #define CHG_CURRENT_ATTR(_name)				\

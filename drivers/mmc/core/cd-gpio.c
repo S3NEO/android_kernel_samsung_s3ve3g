@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2011, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
  *
- * This program is free software; you can redistribute it and/or modifys
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
@@ -19,8 +19,8 @@
 
 struct mmc_cd_gpio {
 	unsigned int gpio;
-	char label[0];
 	bool status;
+	char label[0];
 };
 
 static int mmc_cd_get_status(struct mmc_host *host)
@@ -116,7 +116,7 @@ void mmc_cd_gpio_free(struct mmc_host *host)
 {
 	struct mmc_cd_gpio *cd = host->hotplug.handler_priv;
 
-	if (!cd)
+	if (!cd || !gpio_is_valid(cd->gpio))
 		return;
 
 	free_irq(host->hotplug.irq, host);

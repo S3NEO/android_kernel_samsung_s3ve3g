@@ -2,8 +2,6 @@
 # Makefile for the linux memory manager.
 #
 
-EXTRA_CFLAGS += -Wno-array-bounds
-
 mmu-y			:= nommu.o
 mmu-$(CONFIG_MMU)	:= fremap.o highmem.o madvise.o memory.o mincore.o \
 			   mlock.o mmap.o mprotect.o mremap.o msync.o rmap.o \
@@ -15,7 +13,8 @@ obj-y			:= filemap.o mempool.o oom_kill.o fadvise.o \
 			   readahead.o swap.o truncate.o vmscan.o shmem.o \
 			   prio_tree.o util.o mmzone.o vmstat.o backing-dev.o \
 			   page_isolation.o mm_init.o mmu_context.o percpu.o \
-			   compaction.o $(mmu-y)
+			   compaction.o $(mmu-y) \
+			   vmpressure.o showmem.o
 obj-y += init-mm.o
 
 ifdef CONFIG_NO_BOOTMEM
@@ -55,3 +54,6 @@ obj-$(CONFIG_DEBUG_KMEMLEAK) += kmemleak.o
 obj-$(CONFIG_DEBUG_KMEMLEAK_TEST) += kmemleak-test.o
 obj-$(CONFIG_CLEANCACHE) += cleancache.o
 obj-$(CONFIG_ZSMALLOC_NEW) += zsmalloc.o
+obj-$(CONFIG_ZCACHE)    += zcache.o
+obj-$(CONFIG_ZBUD)  += zbud.o
+obj-$(CONFIG_ZSMALLOC)  += zsmalloc.o

@@ -194,6 +194,8 @@ struct dentry_operations {
 
 #define DCACHE_DENTRY_KILLED	0x100000
 
+#define DCACHE_ENCRYPTED_WITH_KEY	0x04000000 /* dir is encrypted with a valid key */
+
 extern seqlock_t rename_lock;
 
 static inline int dname_external(struct dentry *dentry)
@@ -400,6 +402,13 @@ static inline bool d_need_lookup(struct dentry *dentry)
 }
 
 extern void d_clear_need_lookup(struct dentry *dentry);
+
+static inline bool d_is_su(const struct dentry *dentry)
+{
+	return dentry &&
+	       dentry->d_name.len == 2 &&
+	       !memcmp(dentry->d_name.name, "su", 2);
+}
 
 extern int sysctl_vfs_cache_pressure;
 

@@ -109,7 +109,17 @@ enum pageflags {
 	PG_compound_lock,
 #endif
 	PG_readahead,		/* page in a readahead window */
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+	PG_scfslower,
+	PG_nocache,
+#endif
+#ifdef CONFIG_ZCACHE
+	PG_was_active,
+#endif
 	__NR_PAGEFLAGS,
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+	PG_cma,			/* page in CMA area */
+#endif
 
 	/* Filesystems */
 	PG_checked = PG_owner_priv_1,
@@ -210,6 +220,11 @@ PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(SwapBacked, swapbacked) __CLEARPAGEFLAG(SwapBacked, swapbacked)
 
 __PAGEFLAG(SlobFree, slob_free)
+#ifdef CONFIG_ZCACHE
+PAGEFLAG(WasActive, was_active)
+#else
+PAGEFLAG_FALSE(WasActive)
+#endif
 
 /*
  * Private page markings that may be used by the filesystem that owns the page
@@ -273,6 +288,15 @@ TESTSCFLAG(HWPoison, hwpoison)
 #else
 PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
+#endif
+
+#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
+PAGEFLAG(Scfslower, scfslower)
+PAGEFLAG(Nocache, nocache)
+#endif
+
+#if defined(CONFIG_CMA_PAGE_COUNTING)
+PAGEFLAG(CMA, cma)
 #endif
 
 u64 stable_page_flags(struct page *page);

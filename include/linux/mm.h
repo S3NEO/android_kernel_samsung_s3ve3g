@@ -347,6 +347,8 @@ static inline int is_vmalloc_or_module_addr(const void *x)
 }
 #endif
 
+extern void kvfree(const void *addr);
+
 static inline void compound_lock(struct page *page)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -813,18 +815,7 @@ void page_address_init(void);
 #define PAGE_MAPPING_KSM	2
 #define PAGE_MAPPING_FLAGS	(PAGE_MAPPING_ANON | PAGE_MAPPING_KSM)
 
-extern struct address_space swapper_space;
-static inline struct address_space *page_mapping(struct page *page)
-{
-	struct address_space *mapping = page->mapping;
-
-	VM_BUG_ON(PageSlab(page));
-	if (unlikely(PageSwapCache(page)))
-		mapping = &swapper_space;
-	else if ((unsigned long)mapping & PAGE_MAPPING_ANON)
-		mapping = NULL;
-	return mapping;
-}
+extern struct address_space *page_mapping(struct page *page);
 
 /* Neutral page->mapping pointer to address_space or anon_vma or other */
 static inline void *page_rmapping(struct page *page)
@@ -1070,37 +1061,15 @@ void account_page_writeback(struct page *page);
 int set_page_dirty(struct page *page);
 int set_page_dirty_lock(struct page *page);
 int clear_page_dirty_for_io(struct page *page);
-
-/* Is the vma a continuation of the stack vma above it? */
-static inline int vma_growsdown(struct vm_area_struct *vma, unsigned long addr)
-{
-	return vma && (vma->vm_end == addr) && (vma->vm_flags & VM_GROWSDOWN);
-}
-
-static inline int stack_guard_page_start(struct vm_area_struct *vma,
-					     unsigned long addr)
-{
-	return (vma->vm_flags & VM_GROWSDOWN) &&
-		(vma->vm_start == addr) &&
-		!vma_growsdown(vma->vm_prev, addr);
-}
-
-/* Is the vma a continuation of the stack vma below it? */
-static inline int vma_growsup(struct vm_area_struct *vma, unsigned long addr)
-{
-	return vma && (vma->vm_start == addr) && (vma->vm_flags & VM_GROWSUP);
-}
-
-static inline int stack_guard_page_end(struct vm_area_struct *vma,
-					   unsigned long addr)
-{
-	return (vma->vm_flags & VM_GROWSUP) &&
-		(vma->vm_end == addr) &&
-		!vma_growsup(vma->vm_next, addr);
-}
+int get_cmdline(struct task_struct *task, char *buffer, int buflen);
 
 extern pid_t
 vm_is_stack(struct task_struct *task, struct vm_area_struct *vma, int in_group);
+
+static inline bool vma_is_anonymous(struct vm_area_struct *vma)
+{
+	return !vma->vm_ops;
+}
 
 extern unsigned long move_page_tables(struct vm_area_struct *vma,
 		unsigned long old_addr, struct vm_area_struct *new_vma,
@@ -1484,8 +1453,8 @@ int write_one_page(struct page *page, int wait);
 void task_dirty_inc(struct task_struct *tsk);
 
 /* readahead.c */
-#define VM_MAX_READAHEAD	512	/* kbytes */
-#define VM_MIN_READAHEAD	32	/* kbytes (includes current page) */
+#define VM_MAX_READAHEAD	128	/* kbytes */
+#define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
 
 int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			pgoff_t offset, unsigned long nr_to_read);
@@ -1508,6 +1477,7 @@ unsigned long ra_submit(struct file_ra_state *ra,
 			struct address_space *mapping,
 			struct file *filp);
 
+extern unsigned long stack_guard_gap;
 /* Generic expand stack which grows the stack according to GROWS{UP,DOWN} */
 extern int expand_stack(struct vm_area_struct *vma, unsigned long address);
 
@@ -1534,6 +1504,30 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 	if (vma && end_addr <= vma->vm_start)
 		vma = NULL;
 	return vma;
+}
+
+static inline unsigned long vm_start_gap(struct vm_area_struct *vma)
+{
+	unsigned long vm_start = vma->vm_start;
+
+	if (vma->vm_flags & VM_GROWSDOWN) {
+		vm_start -= stack_guard_gap;
+		if (vm_start > vma->vm_start)
+			vm_start = 0;
+	}
+	return vm_start;
+}
+
+static inline unsigned long vm_end_gap(struct vm_area_struct *vma)
+{
+	unsigned long vm_end = vma->vm_end;
+
+	if (vma->vm_flags & VM_GROWSUP) {
+		vm_end += stack_guard_gap;
+		if (vm_end < vma->vm_end)
+			vm_end = -PAGE_SIZE;
+	}
+	return vm_end;
 }
 
 static inline unsigned long vma_pages(struct vm_area_struct *vma)
@@ -1586,6 +1580,7 @@ struct page *follow_page(struct vm_area_struct *, unsigned long address,
 #define FOLL_SPLIT	0x80	/* don't return transhuge pages, split them */
 #define FOLL_HWPOISON	0x100	/* check page is hwpoisoned */
 #define FOLL_COW	0x4000	/* internal GUP flag */
+#define FOLL_CMA	0x80000	/* migrate if the page is from cma pageblock */
 
 typedef int (*pte_fn_t)(pte_t *pte, pgtable_t token, unsigned long addr,
 			void *data);

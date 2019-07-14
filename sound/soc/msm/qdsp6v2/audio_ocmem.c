@@ -31,7 +31,7 @@
 #include <mach/subsystem_restart.h>
 #include <mach/msm_memtypes.h>
 #include <mach/ramdump.h>
-#include "q6core.h"
+#include <sound/q6core.h>
 #include "audio_ocmem.h"
 
 
@@ -79,7 +79,7 @@
 #define clear_bit_pos(x, y)  (atomic_set(&x, (atomic_read(&x) & (~(1 << y)))))
 #define test_bit_pos(x, y) ((atomic_read(&x)) & (1 << y))
 
-static int enable_ocmem_audio_voice = 1;
+static int enable_ocmem_audio_voice;
 module_param(enable_ocmem_audio_voice, int,
 			S_IRUGO | S_IWUSR | S_IWGRP);
 MODULE_PARM_DESC(enable_ocmem_audio_voice, "control OCMEM usage for audio/voice");
@@ -374,26 +374,25 @@ int audio_ocmem_enable(int cid)
 				if (ret) {
 					pr_err("%s: ocmem_unmap failed, state[%d]\n",
 					__func__,
-					atomic_read(&audio_ocmem_lcl.
-					audio_state));
+					atomic_read(&audio_ocmem_lcl.audio_state));
 					goto fail_cmd1;
 				}
 
-				wait_event_interruptible(audio_ocmem_lcl.
-				audio_wait, (atomic_read(&audio_ocmem_lcl.
-				audio_state) & _UNMAP_RESPONSE_BIT_MASK_) != 0);
+				wait_event_interruptible(audio_ocmem_lcl.audio_wait,
+					(atomic_read(&audio_ocmem_lcl.audio_state) &
+						     _UNMAP_RESPONSE_BIT_MASK_)
+						     != 0);
 				ret = ocmem_shrink(cid, audio_ocmem_lcl.buf, 0);
 				if (ret) {
 					pr_err("%s: ocmem_shrink failed, state[%d]\n",
 					__func__,
-					atomic_read(&audio_ocmem_lcl.
-					audio_state));
+					atomic_read(&audio_ocmem_lcl.audio_state));
 					goto fail_cmd1;
 				}
 				atomic_set(&audio_ocmem_lcl.audio_cond, 1);
 				clear_bit_pos(audio_ocmem_lcl.audio_state,
 					OCMEM_STATE_SHRINK);
-			}
+                        }
 			pr_debug("%s:shrink process complete\n", __func__);
 			break;
 		case OCMEM_STATE_GROW:
@@ -411,13 +410,12 @@ int audio_ocmem_enable(int cid)
 				if (ret) {
 					pr_err("%s: ocmem_map failed, state[%d]\n",
 					__func__,
-					atomic_read(&audio_ocmem_lcl.
-					audio_state));
+					atomic_read(&audio_ocmem_lcl.audio_state));
 					goto fail_cmd1;
 				}
-				wait_event_interruptible(audio_ocmem_lcl.
-				audio_wait, (atomic_read(&audio_ocmem_lcl.
-				audio_state) & _MAP_RESPONSE_BIT_MASK_) != 0);
+				wait_event_interruptible(audio_ocmem_lcl.audio_wait,
+					(atomic_read(&audio_ocmem_lcl.audio_state) &
+							_MAP_RESPONSE_BIT_MASK_) != 0);
 
 				clear_bit_pos(audio_ocmem_lcl.audio_state,
 						OCMEM_STATE_GROW);
@@ -544,6 +542,7 @@ fail_cmd2:
 	mutex_unlock(&audio_ocmem_lcl.state_process_lock);
 fail_cmd:
 	pr_debug("%s: exit\n", __func__);
+	audio_ocmem_lcl.buf = NULL;
 	audio_ocmem_lcl.audio_ocmem_running = false;
 	return ret;
 }
@@ -842,6 +841,7 @@ static void process_ocmem_dump(void)
 	ret = ocmem_free(OCMEM_LP_AUDIO, audio_ocmem_lcl.buf);
 	if (ret)
 		pr_err("%s: ocmem_free failed\n", __func__);
+	audio_ocmem_lcl.buf = NULL;
 }
 
 static int lpass_notifier_cb(struct notifier_block *this, unsigned long code,

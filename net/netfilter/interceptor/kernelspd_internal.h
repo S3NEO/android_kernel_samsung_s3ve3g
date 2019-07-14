@@ -1,6 +1,6 @@
 /**
    @copyright
-   Copyright (c) 2013, INSIDE Secure Oy. All rights reserved.
+   Copyright (c) 2013 - 2015, INSIDE Secure Oy. All rights reserved.
 */
 
 
@@ -11,7 +11,7 @@
 
 #include "kernelspd_command.h"
 #include "ip_selector_db.h"
-#include "spd_util.h"
+#include "ipsec_boundary.h"
 
 #include <linux/uidgid.h>
 #include <linux/version.h>
@@ -35,6 +35,10 @@ spd_proc_init(
 void
 spd_proc_uninit(
         void);
+
+void
+spd_proc_new_bypass_packet(
+        const struct IPSelectorFields *fields);
 
 extern struct IPSelectorDb spd;
 

@@ -157,6 +157,13 @@ flags_out:
 		if (!inode_owner_or_capable(inode))
 			return -EPERM;
 
+		if (EXT4_HAS_RO_COMPAT_FEATURE(inode->i_sb,
+				EXT4_FEATURE_RO_COMPAT_METADATA_CSUM)) {
+			ext4_warning(sb, "Setting inode version is not "
+				     "supported with metadata_csum enabled.");
+			return -ENOTTY;
+		}
+
 		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
@@ -438,6 +445,11 @@ resizefs_out:
 			return -EFAULT;
 
 		return 0;
+	}
+
+	case FS_IOC_INVAL_MAPPING:
+	{
+		return invalidate_mapping_pages(inode->i_mapping, 0, -1);
 	}
 
 	default:

@@ -186,6 +186,7 @@ static struct mount *alloc_vfsmnt(const char *name)
 		mnt->mnt_count = 1;
 		mnt->mnt_writers = 0;
 #endif
+		mnt->mnt.data = NULL;
 
 		INIT_LIST_HEAD(&mnt->mnt_hash);
 		INIT_LIST_HEAD(&mnt->mnt_child);
@@ -636,20 +637,6 @@ static void attach_mnt(struct mount *mnt, struct path *path)
 	list_add_tail(&mnt->mnt_child, &real_mount(path->mnt)->mnt_mounts);
 }
 
-static inline void __mnt_make_longterm(struct mount *mnt)
-{
-#ifdef CONFIG_SMP
-	atomic_inc(&mnt->mnt_longterm);
-#endif
-}
-
-/* needs vfsmount lock for write */
-static inline void __mnt_make_shortterm(struct mount *mnt)
-{
-#ifdef CONFIG_SMP
-	atomic_dec(&mnt->mnt_longterm);
-#endif
-}
 /*
  * vfsmount lock must be held for write
  */
@@ -713,7 +700,6 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
 
-	mnt->mnt.data = NULL;
 	if (type->alloc_mnt_data) {
 		mnt->mnt.data = type->alloc_mnt_data();
 		if (!mnt->mnt.data) {
@@ -727,7 +713,6 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 
 	root = mount_fs(type, flags, name, &mnt->mnt, data);
 	if (IS_ERR(root)) {
-		kfree(mnt->mnt.data);
 		free_vfsmnt(mnt);
 		return ERR_CAST(root);
 	}
@@ -782,8 +767,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	list_add_tail(&mnt->mnt_instance, &sb->s_mounts);
 	br_write_unlock(&vfsmount_lock);
 
-	if ((flag & CL_SLAVE) ||
-	    ((flag & CL_SHARED_TO_SLAVE) && IS_MNT_SHARED(old))) {
+	if (flag & CL_SLAVE) {
 		list_add(&mnt->mnt_slave, &old->mnt_slave_list);
 		mnt->mnt_master = old;
 		CLEAR_MNT_SHARED(mnt);
@@ -807,7 +791,6 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	return mnt;
 
  out_free:
-	kfree(mnt->mnt.data);
 	free_vfsmnt(mnt);
 	return ERR_PTR(err);
 }
@@ -1113,8 +1096,6 @@ void umount_tree(struct mount *mnt, int propagate, struct list_head *kill)
 		list_del_init(&p->mnt_expire);
 		list_del_init(&p->mnt_list);
 		__touch_mnt_namespace(p->mnt_ns);
-		if (p->mnt_ns)
-			__mnt_make_shortterm(p);
 		p->mnt_ns = NULL;
 		if (mnt_has_parent(p)) {
 			p->mnt_parent->mnt_ghosts++;
@@ -1371,8 +1352,11 @@ struct vfsmount *collect_mounts(struct path *path)
 {
 	struct mount *tree;
 	down_write(&namespace_sem);
-	tree = copy_tree(real_mount(path->mnt), path->dentry,
-			 CL_COPY_ALL | CL_PRIVATE);
+	if (!check_mnt(real_mount(path->mnt)))
+		tree = ERR_PTR(-EINVAL);
+	else
+		tree = copy_tree(real_mount(path->mnt), path->dentry,
+				CL_COPY_ALL | CL_PRIVATE);
 	up_write(&namespace_sem);
 	if (IS_ERR(tree))
 		return NULL;
@@ -2285,6 +2269,7 @@ dput_out:
 	return retval;
 }
 
+
 static void free_mnt_ns(struct mnt_namespace *ns)
 {
 	proc_free_inum(ns->proc_inum);
@@ -2391,7 +2376,7 @@ static struct mnt_namespace *dup_mnt_ns(struct mnt_namespace *mnt_ns,
 }
 
 struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
-		struct user_namespace *user_ns, struct fs_struct *new_fs)
+		 struct user_namespace *user_ns, struct fs_struct *new_fs)
 {
 	struct mnt_namespace *new_ns;
 
@@ -2770,7 +2755,7 @@ static int mntns_install(struct nsproxy *nsproxy, void *ns)
 	struct path root;
 
 	if (!ns_capable(mnt_ns->user_ns, CAP_SYS_ADMIN) ||
-	    !nsown_capable(CAP_SYS_CHROOT))
+		!nsown_capable(CAP_SYS_CHROOT))
 		return -EINVAL;
 
 	if (fs->users != 1)

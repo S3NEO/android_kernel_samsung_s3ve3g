@@ -44,8 +44,7 @@ static void vunmap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
 	pte = pte_offset_kernel(pmd, addr);
 	
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
-		do_lazy_mmu = 1;
+	do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
 		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
@@ -132,8 +131,7 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 		return -ENOMEM;
 
 #ifdef CONFIG_TIMA_RKP_LAZY_MMU
-	if (tima_is_pg_protected((unsigned long)pte) == 1)
-		do_lazy_mmu = 1;
+	do_lazy_mmu = 1;
 	if (do_lazy_mmu) {
 		spin_lock(&init_mm.page_table_lock);
 		tima_send_cmd2((unsigned int)pmd, TIMA_LAZY_MMU_START, TIMA_LAZY_MMU_CMDID);
@@ -477,12 +475,12 @@ nocache:
 		addr = ALIGN(first->va_end, align);
 		if (addr < vstart)
 			goto nocache;
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 	} else {
 		addr = ALIGN(vstart, align);
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 		n = vmap_area_root.rb_node;
@@ -509,7 +507,7 @@ nocache:
 		if (addr + cached_hole_size < first->va_start)
 			cached_hole_size = first->va_start - addr;
 		addr = ALIGN(first->va_end, align);
-		if (addr + size - 1 < addr)
+		if (addr + size < addr)
 			goto overflow;
 
 		n = rb_next(&first->rb_node);

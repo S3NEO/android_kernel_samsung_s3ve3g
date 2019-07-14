@@ -39,6 +39,10 @@ enum max77888_pmic_rev {
 	MAX77888_REV_PASS3	= 0x02,
 };
 
+#if defined(CONFIG_LEDS_MAX77888)
+extern int max77888_muic_set_jigset(int reg_value);
+#endif
+
 /* Slave addr = 0xCC: Charger, Flash LED, Haptic */
 enum max77888_pmic_reg {
 	MAX77888_LED_REG_IFLASH				= 0x00,
@@ -339,6 +343,7 @@ struct max77888_dev {
 	struct i2c_client *i2c; /* 0xCC; Charger, Flash LED */
 	struct i2c_client *muic; /* 0x4A; MUIC */
 	struct i2c_client *haptic; /* 0x90; Haptic */
+	struct i2c_client *test; /* 0xCE; Test */
 	struct mutex iolock;
 
 	int type;
@@ -432,6 +437,8 @@ enum cable_type_muic {
 	CABLE_TYPE_INCOMPATIBLE_MUIC,
 	CABLE_TYPE_CDP_MUIC,
 	CABLE_TYPE_LANHUB_MUIC,
+	CABLE_TYPE_CHARGING_CABLE_MUIC,
+	CABLE_TYPE_MMDOCK_MUIC,
 #if defined(CONFIG_MUIC_DET_JACK)
 	CABLE_TYPE_EARJACK_MUIC,
 #endif

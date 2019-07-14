@@ -19,25 +19,28 @@
 
 #include <trace/events/sched.h>
 
-#include "smpboot.h"
-
 #ifdef CONFIG_SMP
 /* Serializes the updates to cpu_online_mask, cpu_present_mask */
 static DEFINE_MUTEX(cpu_add_remove_lock);
 
 /*
- * The following two API's must be used when attempting
- * to serialize the updates to cpu_online_mask, cpu_present_mask.
+ * The following two APIs (cpu_maps_update_begin/done) must be used when
+ * attempting to serialize the updates to cpu_online_mask & cpu_present_mask.
+ * The APIs cpu_notifier_register_begin/done() must be used to protect CPU
+ * hotplug callback (un)registration performed using __register_cpu_notifier()
+ * or __unregister_cpu_notifier().
  */
 void cpu_maps_update_begin(void)
 {
 	mutex_lock(&cpu_add_remove_lock);
 }
+EXPORT_SYMBOL(cpu_notifier_register_begin);
 
 void cpu_maps_update_done(void)
 {
 	mutex_unlock(&cpu_add_remove_lock);
 }
+EXPORT_SYMBOL(cpu_notifier_register_done);
 
 static RAW_NOTIFIER_HEAD(cpu_chain);
 
@@ -168,6 +171,11 @@ int __ref register_cpu_notifier(struct notifier_block *nb)
 	return ret;
 }
 
+int __ref __register_cpu_notifier(struct notifier_block *nb)
+{
+	return raw_notifier_chain_register(&cpu_chain, nb);
+}
+
 static int __cpu_notify(unsigned long val, void *v, int nr_to_call,
 			int *nr_calls)
 {
@@ -191,6 +199,7 @@ static void cpu_notify_nofail(unsigned long val, void *v)
 	BUG_ON(cpu_notify(val, v));
 }
 EXPORT_SYMBOL(register_cpu_notifier);
+EXPORT_SYMBOL(__register_cpu_notifier);
 
 void __ref unregister_cpu_notifier(struct notifier_block *nb)
 {
@@ -199,6 +208,12 @@ void __ref unregister_cpu_notifier(struct notifier_block *nb)
 	cpu_maps_update_done();
 }
 EXPORT_SYMBOL(unregister_cpu_notifier);
+
+void __ref __unregister_cpu_notifier(struct notifier_block *nb)
+{
+	raw_notifier_chain_unregister(&cpu_chain, nb);
+}
+EXPORT_SYMBOL(__unregister_cpu_notifier);
 
 static inline void check_for_tasks(int cpu)
 {
@@ -233,8 +248,6 @@ static int __ref take_cpu_down(void *_param)
 		return err;
 
 	cpu_notify(CPU_DYING | param->mod, param->hcpu);
-	/* Park the stopper thread */
-	kthread_park(current);
 	return 0;
 }
 
@@ -265,13 +278,12 @@ static int __ref _cpu_down(unsigned int cpu, int tasks_frozen)
 				__func__, cpu);
 		goto out_release;
 	}
-	smpboot_park_threads(cpu);
 
 	err = __stop_machine(take_cpu_down, &tcd_param, cpumask_of(cpu));
 	if (err) {
 		/* CPU didn't die: tell everyone.  Can't complain. */
-		smpboot_unpark_threads(cpu);
 		cpu_notify_nofail(CPU_DOWN_FAILED | mod, hcpu);
+
 		goto out_release;
 	}
 	BUG_ON(cpu_online(cpu));
@@ -328,23 +340,11 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
 	int ret, nr_calls = 0;
 	void *hcpu = (void *)(long)cpu;
 	unsigned long mod = tasks_frozen ? CPU_TASKS_FROZEN : 0;
-	struct task_struct *idle;
 
 	if (cpu_online(cpu) || !cpu_present(cpu))
 		return -EINVAL;
 
 	cpu_hotplug_begin();
-
-	idle = idle_thread_get(cpu);
-	if (IS_ERR(idle)) {
-		ret = PTR_ERR(idle);
-		goto out;
-	}
-
-	ret = smpboot_create_threads(cpu);
-	if (ret)
-		goto out;
-
 	ret = __cpu_notify(CPU_UP_PREPARE | mod, hcpu, -1, &nr_calls);
 	if (ret) {
 		nr_calls--;
@@ -359,16 +359,12 @@ static int __cpuinit _cpu_up(unsigned int cpu, int tasks_frozen)
 		goto out_notify;
 	BUG_ON(!cpu_online(cpu));
 
-	/* Wake the per cpu threads */
-	smpboot_unpark_threads(cpu);
-
 	/* Now call notifier in preparation. */
 	cpu_notify(CPU_ONLINE | mod, hcpu);
 
 out_notify:
 	if (ret != 0)
 		__cpu_notify(CPU_UP_CANCELED | mod, hcpu, nr_calls, NULL);
-out:
 	cpu_hotplug_done();
 	trace_sched_cpu_hotplug(cpu, ret, 1);
 

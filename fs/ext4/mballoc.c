@@ -736,7 +736,15 @@ void ext4_mb_generate_buddy(struct super_block *sb,
 	grp->bb_fragments = fragments;
 
 	if (free != grp->bb_free) {
-		print_block_data(sb, 0, bitmap, 0, EXT4_BLOCK_SIZE(sb));
+		/* for more specific debugging, sangwoo2.lee */
+		struct ext4_group_desc *desc;
+		ext4_fsblk_t bitmap_blk;
+
+		desc = ext4_get_group_desc(sb, group, NULL);
+		bitmap_blk = ext4_block_bitmap(sb, desc);
+
+		print_block_data(sb, bitmap_blk, bitmap, 0, EXT4_BLOCK_SIZE(sb));
+		/* for more specific debugging */
 
 		ext4_grp_locked_error(sb, group, 0, 0,
 				      "%u clusters in bitmap, %u in gd",
@@ -1267,6 +1275,8 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 	void *buddy2;
 	struct super_block *sb = e4b->bd_sb;
 
+	if (WARN_ON(count == 0))
+		return;
 	BUG_ON(first + count > (sb->s_blocksize << 3));
 	assert_spin_locked(ext4_group_lock_ptr(sb, e4b->bd_group));
 	mb_check_buddy(e4b);
@@ -1292,11 +1302,17 @@ static void mb_free_blocks(struct inode *inode, struct ext4_buddy *e4b,
 		order = 0;
 
 		if (!mb_test_bit(block, e4b->bd_bitmap)) {
-			ext4_fsblk_t blocknr;
+			/* for debugging, sangwoo2.lee */
+			struct ext4_group_desc *desc;
+			ext4_fsblk_t blocknr, bitmap_blk;
+
+			desc = ext4_get_group_desc(sb, e4b->bd_group, NULL);
+			bitmap_blk = ext4_block_bitmap(sb, desc);
 
 			blocknr = ext4_group_first_block_no(sb, e4b->bd_group);
 			blocknr += EXT4_C2B(EXT4_SB(sb), block);
-			print_block_data(sb, blocknr, e4b->bd_bitmap, 0
+
+			print_block_data(sb, bitmap_blk, e4b->bd_bitmap, 0
 				, EXT4_BLOCK_SIZE(sb));
 			ext4_grp_locked_error(sb, e4b->bd_group,
 					      inode ? inode->i_ino : 0,
@@ -2210,7 +2226,8 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 	 * initialize bb_free to be able to skip
 	 * empty groups without initialization
 	 */
-	if (desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
+	if (ext4_has_group_desc_csum(sb) &&
+	    (desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))) {
 		meta_group_info[i]->bb_free =
 			ext4_free_clusters_after_init(sb, group, desc);
 	} else {
@@ -2799,7 +2816,8 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 #endif
 	ext4_set_bits(bitmap_bh->b_data, ac->ac_b_ex.fe_start,
 		      ac->ac_b_ex.fe_len);
-	if (gdp->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
+	if (ext4_has_group_desc_csum(sb) &&
+	    (gdp->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT))) {
 		gdp->bg_flags &= cpu_to_le16(~EXT4_BG_BLOCK_UNINIT);
 		ext4_free_group_clusters_set(sb, gdp,
 					     ext4_free_clusters_after_init(sb,
@@ -3081,9 +3099,31 @@ static void ext4_mb_collect_stats(struct ext4_allocation_context *ac)
 static void ext4_discard_allocated_blocks(struct ext4_allocation_context *ac)
 {
 	struct ext4_prealloc_space *pa = ac->ac_pa;
+	struct ext4_buddy e4b;
+	int err;
 	int len;
 
-	if (pa && pa->pa_type == MB_INODE_PA) {
+	if (pa == NULL) {
+		if (ac->ac_f_ex.fe_len == 0)
+			return;
+		err = ext4_mb_load_buddy(ac->ac_sb, ac->ac_f_ex.fe_group, &e4b);
+		if (err) {
+			/*
+			 * This should never happen since we pin the
+			 * pages in the ext4_allocation_context so
+			 * ext4_mb_load_buddy() should never fail.
+			 */
+			WARN(1, "mb_load_buddy failed (%d)", err);
+			return;
+		}
+		ext4_lock_group(ac->ac_sb, ac->ac_f_ex.fe_group);
+		mb_free_blocks(ac->ac_inode, &e4b, ac->ac_f_ex.fe_start,
+			       ac->ac_f_ex.fe_len);
+		ext4_unlock_group(ac->ac_sb, ac->ac_f_ex.fe_group);
+		ext4_mb_unload_buddy(&e4b);
+		return;
+	}
+	if (pa->pa_type == MB_INODE_PA) {
 		len = ac->ac_b_ex.fe_len;
 		pa->pa_free += len;
 	}

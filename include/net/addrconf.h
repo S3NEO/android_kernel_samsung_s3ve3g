@@ -172,6 +172,9 @@ extern void ipv6_ac_destroy_dev(struct inet6_dev *idev);
 
 u32 addrconf_rt_table(const struct net_device *dev, u32 default_table);
 
+u32 addrconf_rt_table(const struct net_device *dev, u32 default_table);
+extern void ipv6_ac_destroy_dev(struct inet6_dev *idev);
+
 
 /* Device notifier */
 extern int register_inet6addr_notifier(struct notifier_block *nb);

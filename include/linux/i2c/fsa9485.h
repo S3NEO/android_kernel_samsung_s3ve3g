@@ -72,6 +72,9 @@
 #define DEV_T1_CHARGER_MASK	(DEV_DEDICATED_CHG | DEV_CAR_KIT)
 
 /* Device Type 2 */
+#define DEV_MMDOCK		(1<<12)
+#define DEV_INCOMPATIBLE	(1 << 11)
+#define DEV_CHARGING_CABLE	(1 << 10)
 #ifdef CONFIG_MUIC_FSA9485_SUPPORT_LANHUB
 #define DEV_LANHUB		(1 << 9)
 #endif
@@ -125,6 +128,8 @@
 #ifdef CONFIG_MUIC_FSA9485_SUPPORT_LANHUB
 #define ADC_LANHUB		0x13
 #endif
+#define ADC_CHARGING_CABLE	0x14
+#define ADC_MMDOCK		0x15
 #define	ADC_CEA936ATYPE1_CHG	0x17
 #define	ADC_JIG_USB_OFF		0x18
 #define	ADC_JIG_USB_ON		0x19
@@ -151,12 +156,14 @@ enum cable_type_t {
 	CABLE_TYPE_CDP,
 	CABLE_TYPE_SMART_DOCK,
 	CABLE_TYPE_OTG,
+	CABLE_TYPE_CHARGING_CABLE,
 	CABLE_TYPE_AUDIO_DOCK,
 #ifdef CONFIG_WIRELESS_CHARGING
 	CABLE_TYPE_WPC,
 #endif
 	CABLE_TYPE_INCOMPATIBLE,
 	CABLE_TYPE_DESK_DOCK,
+	CABLE_TYPE_MM_DOCK,
 };
 
 
@@ -183,9 +190,14 @@ enum {
 };
 
 enum {
+	FSA9485_MMDOCK_ATTACHED = 2
+};
+
+enum {
 	FSA9485_DETACHED_DOCK = 0,
 	FSA9485_ATTACHED_DESK_DOCK,
 	FSA9485_ATTACHED_CAR_DOCK,
+	FSA9485_ATTACHED_DESK_DOCK_NO_VBUS,
 };
 
 #define UART_SEL_SW	    58
@@ -200,12 +212,13 @@ struct fsa9485_platform_data {
 
 	void (*cfg_gpio) (void);
 	void (*otg_cb) (bool attached);
+	void (*charge_cb) (bool attached);
 	void (*usb_cb) (bool attached);
 	void (*uart_cb) (bool attached);
 	void (*charger_cb) (bool attached);
 	void (*in_charger_cb) (bool attached);
 	void (*jig_cb) (bool attached);
-	void (*mhl_cb) (bool attached);
+	void (*mhl_cb) (int attached);
 	void (*reset_cb) (void);
 	void (*set_init_flag) (void);
 	void (*mhl_sel) (bool onoff);
@@ -218,6 +231,7 @@ struct fsa9485_platform_data {
 #endif
 	void (*smartdock_cb) (bool attached);
 	void (*audio_dock_cb) (bool attached);
+	void (*mmdock_cb) (bool attached);
 };
 
 enum {
@@ -238,6 +252,7 @@ extern void fsa9485_checkandhookaudiodockfornoise(int value);
 extern struct class *sec_class;
 extern struct fsa9485_platform_data fsa9485_pdata;
 extern int check_jig_state(void);
+extern int check_mmdock_connect(void);
 extern int poweroff_charging;
 
 #endif /* _FSA9485_H_ */
