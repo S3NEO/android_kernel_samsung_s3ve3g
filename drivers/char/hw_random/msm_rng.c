@@ -28,6 +28,7 @@
 #include <linux/qrng.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
+#include <linux/fips_status.h>
 
 #include <linux/platform_data/qcom_crypto_device.h>
 
