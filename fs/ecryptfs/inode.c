@@ -36,6 +36,34 @@
 #include <asm/unaligned.h>
 #include "ecryptfs_kernel.h"
 
+/* Do not directly use this function. Use ECRYPTFS_OVERRIDE_CRED() instead. */
+const struct cred * ecryptfs_override_fsids(uid_t fsuid, gid_t fsgid)
+{
+	struct cred * cred; 
+	const struct cred * old_cred; 
+
+	cred = prepare_creds(); 
+	if (!cred) 
+		return NULL; 
+
+	cred->fsuid = fsuid;
+	cred->fsgid = fsgid;
+
+	old_cred = override_creds(cred); 
+
+	return old_cred; 
+}
+
+/* Do not directly use this function, use REVERT_CRED() instead. */
+void ecryptfs_revert_fsids(const struct cred * old_cred)
+{
+	const struct cred * cur_cred; 
+
+	cur_cred = current->cred; 
+	revert_creds(old_cred); 
+	put_cred(cur_cred); 
+}
+
 static struct dentry *lock_parent(struct dentry *dentry)
 {
 	struct dentry *dir;
@@ -138,7 +166,10 @@ static int ecryptfs_interpose(struct dentry *lower_dentry,
 
 	if (IS_ERR(inode))
 		return PTR_ERR(inode);
+
 	d_instantiate(dentry, inode);
+	if(d_unhashed(dentry))
+		d_rehash(dentry);
 
 	return 0;
 }
@@ -297,7 +328,7 @@ out:
  * Returns zero on success
  */
 int ecryptfs_initialize_file(struct dentry *ecryptfs_dentry,
-			     struct inode *ecryptfs_inode)
+				    struct inode *ecryptfs_inode)
 {
 	struct ecryptfs_crypt_stat *crypt_stat =
 		&ecryptfs_inode_to_private(ecryptfs_inode)->crypt_stat;
@@ -425,6 +456,8 @@ ecryptfs_create(struct inode *directory_inode, struct dentry *ecryptfs_dentry,
 		goto out;
 	}
 	d_instantiate(ecryptfs_dentry, ecryptfs_inode);
+	if(d_unhashed(ecryptfs_dentry))
+		d_rehash(ecryptfs_dentry);
 	unlock_new_inode(ecryptfs_inode);
 out:
 	return rc;
@@ -492,8 +525,6 @@ static int ecryptfs_lookup_interpose(struct dentry *dentry,
 	ecryptfs_set_dentry_lower_mnt(dentry, lower_mnt);
 
 	if (!lower_dentry->d_inode) {
-		/* We want to add because we couldn't find in lower */
-		d_add(dentry, NULL);
 		return 0;
 	}
 	inode = __ecryptfs_get_inode(lower_inode, dir_inode->i_sb);
@@ -573,6 +604,7 @@ static struct dentry *ecryptfs_lookup(struct inode *ecryptfs_dir_inode,
 		goto out_d_drop;
 	}
 	mutex_lock(&lower_dir_dentry->d_inode->i_mutex);
+
 	lower_dentry = lookup_one_len(encrypted_and_encoded_name,
 				      lower_dir_dentry,
 				      encrypted_and_encoded_name_size);
@@ -682,6 +714,7 @@ static int ecryptfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 
 	lower_dentry = ecryptfs_dentry_to_lower(dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
+
 	rc = vfs_mkdir(lower_dir_dentry->d_inode, lower_dentry, mode);
 	if (rc || !lower_dentry->d_inode)
 		goto out;
@@ -785,12 +818,14 @@ ecryptfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	fsstack_copy_attr_all(new_dir, lower_new_dir_dentry->d_inode);
 	if (new_dir != old_dir)
 		fsstack_copy_attr_all(old_dir, lower_old_dir_dentry->d_inode);
+
 out_lock:
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	dput(lower_new_dir_dentry);
 	dput(lower_old_dir_dentry);
 	dput(lower_new_dentry);
 	dput(lower_old_dentry);
+
 	return rc;
 }
 
@@ -1231,7 +1266,9 @@ ecryptfs_getxattr_lower(struct dentry *lower_dentry, const char *name,
 	int rc = 0;
 
 	if (!lower_dentry->d_inode->i_op->getxattr) {
+#ifndef ECRYPT_FS_VIRTUAL_FAT_XATTR
 		rc = -EOPNOTSUPP;
+#endif
 		goto out;
 	}
 	mutex_lock(&lower_dentry->d_inode->i_mutex);
@@ -1278,6 +1315,7 @@ static int ecryptfs_removexattr(struct dentry *dentry, const char *name)
 		rc = -EOPNOTSUPP;
 		goto out;
 	}
+
 	mutex_lock(&lower_dentry->d_inode->i_mutex);
 	rc = lower_dentry->d_inode->i_op->removexattr(lower_dentry, name);
 	mutex_unlock(&lower_dentry->d_inode->i_mutex);

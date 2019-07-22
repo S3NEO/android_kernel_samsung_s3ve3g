@@ -691,6 +691,10 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 		return f;
 	}
 
+	if (S_ISREG(inode->i_mode))
+		f->f_mode |= FMODE_SPLICE_WRITE | FMODE_SPLICE_READ;
+
+
 	f->f_op = fops_get(inode->i_fop);
 
 	error = security_dentry_open(f, cred);
@@ -1066,6 +1070,7 @@ int filp_close(struct file *filp, fl_owner_t id)
 		dnotify_flush(filp, id);
 		locks_remove_posix(filp, id);
 	}
+	security_file_close(filp);
 	fput(filp);
 	return retval;
 }

@@ -55,7 +55,6 @@ static int __devinit ram_console_probe(struct platform_device *pdev)
 	struct ram_console_platform_data *pdata = pdev->dev.platform_data;
 	struct persistent_ram_zone *prz;
 
-	pdev->dev.init_name = "ram_console";
 	prz = persistent_ram_init_ringbuffer(&pdev->dev, true);
 	if (IS_ERR(prz))
 		return PTR_ERR(prz);
@@ -75,15 +74,9 @@ static int __devinit ram_console_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static struct of_device_id msm_match_table[] = {
-	{.compatible = "ram_console"},
-	{},
-};
-
 static struct platform_driver ram_console_driver = {
 	.driver		= {
 		.name	= "ram_console",
-		.of_match_table = msm_match_table,
 	},
 	.probe = ram_console_probe,
 };
@@ -107,9 +100,6 @@ static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 	const char *old_log = persistent_ram_old(prz);
 	char *str;
 	int ret;
-
-	if (dmesg_restrict && !capable(CAP_SYSLOG))
-		return -EPERM;
 
 	/* Main last_kmsg log */
 	if (pos < old_log_size) {

@@ -52,7 +52,7 @@ struct fuse_file *fuse_file_alloc(struct fuse_conn *fc)
 {
 	struct fuse_file *ff;
 
-	ff = kmalloc(sizeof(struct fuse_file), GFP_KERNEL);
+	ff = kzalloc(sizeof(struct fuse_file), GFP_KERNEL);
 	if (unlikely(!ff))
 		return NULL;
 
@@ -692,6 +692,8 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 		 */
 		lock_page(newpage);
 		put_page(newpage);
+
+		lru_cache_add_file(newpage);
 
 		/* finally release the old page and swap pointers */
 		unlock_page(oldpage);
