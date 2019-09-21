@@ -178,6 +178,8 @@
 			interrupt-parent = <&msmgpio>;
 			interrupts = <64 0>;
 			bma255-i2c,i2c-pull-up = <1>;
+			bma255-i2c,scl = <&msmgpio 7 0>;
+			bma255-i2c,sda = <&msmgpio 6 0>;
 			bma255-i2c,vdd-supply = <&pm8226_l19>;
 			bma255-i2c,vdd-io-supply = <&pm8226_lvs1>;
 			bma255-i2c,acc_int1-gpio = <&msmgpio 64 0x1>;
@@ -214,15 +216,67 @@
 		compatible = "qcom,i2c-qup";
 		qcom,scl-gpio = <&msmgpio 19 0>;
 		qcom,sda-gpio = <&msmgpio 18 0>;
-		qcom,i2c-bus-freq = <400000>;			
+		qcom,i2c-bus-freq = <400000>;
 				cyttsp4-tma445@24 {
-				compatible = "tsp,afyon-ts";
-				reg = <0x24>; /*slave address*/
-				interrupt-parent = <&msmgpio>;
-				interrupts = <17 0>; /* Touch int gpio */
-				tsp,tsppwr_en = <&msmgpio 31 0x01>; /*Touch En 1 gpio*/
-				tsp,irq-gpio = <&msmgpio 17 0x00>; /*TSP IRQ GPIO */
+				compatible = "cy,cyttsp4_i2c_adapter";
+		reg = <0x24>;
+		/* GPIO 38, high-to-low edge triggered */
+		interrupts = <17 0>;
+		interrupt-parent = <&msmgpio>;
+		cy,adapter_id = "cyttsp4_i2c_adapter";
+
+		cy,core {
+			cy,name = "cyttsp4_core";
+			cy,id = "main_ttsp_core";
+
+			cy,irq_gpio = <17>;
+			tsp,tsppwr_en = <&msmgpio 31 0x01>; /*Touch En 1 gpio*/
+			tsp,irq-gpio = <&msmgpio 17 0x00>; /*TSP IRQ GPIO */
+			/*cy,rst_gpio = <37>;*/
+
+			/* Enable cy,max_xfer_len to limit max I2C/SPI transfer length */
+			/* cy,max_xfer_len = <0x100>; */
+
+			/* CY_CORE_FLAG_POWEROFF_ON_SLEEP */
+			cy,flags = <2>;
+			cy,pname = "SM-G386T";
+			cy,btn_keys = <
+				       254 /* KEY_MENU -> KEY_RECENT */
+				       158 /* KEY_BACK */
+				       >;
+			cy,btn_keys-tag = <0>;
+
+			cy,mt {
+				cy,name = "cyttsp4_mt";
+
+				cy,inp_dev_name = "sec_touchscreen";
+				/* CY_MT_FLAG_FLIP | CY_MT_FLAG_INV_Y */
+				/*cy,flags = <0x28>;*/
+				cy,abs =
+					/* ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0 */
+					<0x35 0 540 0 0
+					/* ABS_MT_POSITION_Y, CY_ABS_MIN_Y, CY_ABS_MAX_Y, 0, 0 */
+					0x36 0 960 0 0
+					/* ABS_MT_PRESSURE, CY_ABS_MIN_P, CY_ABS_MAX_P, 0, 0 */
+					0x3a 0 255 0 0
+					/* CY_IGNORE_VALUE, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0 */
+					0xffff 0 255 0 0
+					/* ABS_MT_TRACKING_ID, CY_ABS_MIN_T, CY_ABS_MAX_T, 0, 0 */
+					0x39 0 15 0 0
+					/* ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0 */
+					0x30 0 255 0 0
+					/* ABS_MT_TOUCH_MINOR, 0, 255, 0, 0 */
+					0x31 0 255 0 0
+					/* ABS_MT_ORIENTATION, -128, 127, 0, 0 */
+					0x34 0xfffffed7 127 0 0>;
+				};
+				cy,btn {
+				cy,name = "cyttsp4_btn";
+
+				cy,inp_dev_name = "cyttsp4_btn";
+				};
 			};
+		};
 
 	};
 	gpio_keys {
@@ -400,7 +454,7 @@
 	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&pm8226_chg_otg>;
 	qcom,hsusb-otg-phy-init-seq =
-			<0x44 0x80 0x3A 0x81 0xB 0x82 0x13 0x83 0xffffffff>;
+			<0x44 0x80 0x6A 0x81 0xB 0x82 0x13 0x83 0xffffffff>;
 };
 
 &sdcc1 {
@@ -537,7 +591,7 @@
 				linux,default-trigger = "none";
 				qcom,default-state = "off";
 				qcom,max-current = <40>;
-				qcom,current-setting = <40>;
+				qcom,current-setting = <30>;
 				qcom,id = <6>;
 				qcom,mode = "pwm";
 				qcom,pwm-us = <1000>;

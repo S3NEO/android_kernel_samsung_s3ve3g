@@ -45,7 +45,17 @@
 		gpios = <&msmgpio 20 0
 			&msmgpio 21 0>;*/
 
-		bcm2079x-i2c@77 {
+		pn547@2B {
+			compatible = "pn547";
+			reg = <0x2B>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <21 0>;
+			pn547,irq-gpio = <&msmgpio 21 0x00>;
+			pn547,ven-gpio = <&msmgpio 20 0x1>;
+			pn547,firm-gpio = <&msmgpio 62 0x00>;
+		};
+
+	bcm2079x-i2c@77 {
 			compatible = "bcm2079x-i2c";
 			reg = <0x77>;
 			interrupt-parent = <&msmgpio>;
@@ -74,9 +84,9 @@
 			interrupts = <67 0>;
 			bma254-i2c,i2c-pull-up = <1>;
 			bma254-i2c,reg_vdd = "8226_l19";
-			bma254,irq-gpioo = <&msmgpio 67 0x1>;
+			bma254,irq-gpio = <&msmgpio 67 0x1>;
 			bma254-i2c,used_chip = "BMA25X_ENABLED";
-			bma254,position = <7>;
+			bma254,position = <5>;
 		};
 		taos@39 {
 			compatible = "taos,tmd27723";
@@ -87,6 +97,20 @@
 			taos,en = <&msmgpio 34 0>;
 			taos,prox_cal_path = "/efs/prox_cal";
 			taos,vdd_2p85 = "8226_l19";
+			taos,prox_thresh_hi = <400>;
+			taos,prox_thresh_low = <270>;
+			taos,prox_th_hi_cal = <530>;
+			taos,prox_th_low_cal = <400>;
+			taos,als_time = <0xED>;
+			taos,intr_filter = <0x33>;
+			taos,prox_pulsecnt = <0x14>;
+			taos,prox_gain = <0x28>;
+			toas,coef_atime = <50>;
+			taos,ga = <97>;
+			taos,coef_a = <1000>;
+			taos,coef_b = <1880>;
+			taos,coef_c = <642>;
+			taos,coef_d = <1140>;
 		};
 	};
 	i2c@20 {
@@ -160,8 +184,8 @@
 			"MIC BIAS1 External", "Handset Mic",
 			"AMIC2", "MIC BIAS2 External",
 			"MIC BIAS2 External", "Headset Mic",
-			"AMIC3", "MIC BIAS3 External",
-			"MIC BIAS3 External", "Sub Mic",
+			"AMIC3", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Sub Mic",
 			"AMIC4", "MIC BIAS2 External",
 			"MIC BIAS2 External", "ANCRight Headset Mic",
 			"AMIC5", "MIC BIAS2 External",
@@ -179,7 +203,7 @@
 		status = "okay";
 		compatible = "samsung,sec-battery";
 		battery,vendor = "SDI SDI";
-		battery,charger_name = "smb358";
+		battery,charger_name = "qpnp-chg";
 		battery,fuelgauge_name = "bms";
 		battery,technology = <2>; /* POWER_SUPPLY_TECHNOLOGY_LION */
 
@@ -190,40 +214,22 @@
 
 		battery,adc_check_count = <5>;
 
-		battery,cable_check_type = <5>; /* SEC_BATTERY_CABLE_CHECK_PSY */
-		battery,cable_source_type = <1>; /* SEC_BATTERY_CABLE_SOURCE_EXTERNAL */
-		battery,event_check;
+		battery,cable_check_type = <4>; /* SEC_BATTERY_CABLE_CHECK_PSY */
+		battery,cable_source_type = <3>; /* SEC_BATTERY_CABLE_SOURCE_EXTERNAL */
 		battery,event_waiting_time = <600>;
 		battery,polling_type = <1>; /* SEC_BATTERY_MONITOR_ALARM */
 		battery,monitor_initial_count = <3>;
 
-		battery,battery_check_type = <0>; /* SEC_BATTERY_CHECK_NONE */
+		battery,battery_check_type = <5>; /* SEC_BATTERY_CHECK_CHARGER */
 		battery,check_count = <0>;
 		battery,check_adc_max = <1440>;
 		battery,check_adc_min = <0>;
 
 		battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 
-		battery,thermal_source = <4>; /* NONE */
-
-		battery,temp_table_adc = <27281 27669 28178 28724 29342 30101 30912 31807 32823 33858 34950 36049 37054
-			38025 38219 38448 38626 38795 38989 39229 39540 39687 39822 40523 41123 41619>;
-		battery,temp_table_data = <700 650 600 550 500 450 400 350 300 250 200 150 100
-			50 40 30 20 10 0 (-10) (-30) (-40) (-50) (-100) (-150) (-200)>;
-		battery,temp_check_type = <0>; /* SEC_BATTERY_TEMP_CHECK_NONE */
+		battery,thermal_source = <2>; /* SEC_BATTERY_THERMAL_SOURCE_ADC */
+		battery,temp_check_type = <2>; /* SEC_BATTERY_TEMP_CHECK_TEMP */
 		battery,temp_check_count = <1>;
-		battery,temp_high_threshold_event = <600>;
-		battery,temp_high_recovery_event = <450>;
-		battery,temp_low_threshold_event = <(-50)>;
-		battery,temp_low_recovery_event = <0>;
-		battery,temp_high_threshold_normal = <600>;
-		battery,temp_high_recovery_normal = <450>;
-		battery,temp_low_threshold_normal = <(-50)>;
-		battery,temp_low_recovery_normal = <0>;
-		battery,temp_high_threshold_lpm = <600>;
-		battery,temp_high_recovery_lpm = <450>;
-		battery,temp_low_threshold_lpm = <(-50)>;
-		battery,temp_low_recovery_lpm = <0>;
 		battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
 		battery,full_check_count = <1>;
@@ -235,32 +241,27 @@
 		   SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
 		battery,full_condition_soc = <97>;
-		battery,full_condition_vcell = <4300>;
+		battery,full_condition_vcell = <4250>;
 
 		battery,recharge_check_count = <1>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
 		battery,recharge_condition_soc = <98>;
 		battery,recharge_condition_vcell = <4300>;
 
-		battery,charging_total_time = <36000>;
+		battery,charging_total_time = <21600>;
 		battery,recharging_total_time = <5400>;
 		battery,charging_reset_time = <0>;
 
 		charger{
 			status = "disable";
 			/* Charger */
-			battery,charger_name = "smb358";
-			battery,chg_gpio_en = <0>;
-			battery,chg_polarity_en = <0>;
-			battery,chg_gpio_status = <0>;
-			battery,chg_polarity_status = <0>;
-			battery,chg_float_voltage = <4350>;
+			battery,charger_name = "qpnp-chg";
 			battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 			battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 
-			battery,input_current_limit = <1000 460 460 1000 460 900 1000 460 460 1000 650 1000 1000 460 1300 300 700 1300 300 1000 1000 460 460>;
-			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
-			battery,full_check_current_1st = <250 0 250 250 250 250 250 250 0 250 250 250 250 0 250 250 250 250 250 250 250 0 0>;
+			battery,input_current_limit = <700 500 500 700 500 700 700 500 500 700 650 700 700 500 500 300 700 700 300 700 700 500 500>;
+			battery,fast_charging_current = <700 0 500 700 500 700 700 500 0 700 750 700 700 (-1) 500 300 700 700 300 700 700 0 0>;
+			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 200 0 0>;
 			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
 		};
 	};
@@ -280,7 +281,7 @@
 	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&pm8226_chg_otg>;
 	qcom,hsusb-otg-phy-init-seq =
-			<0x44 0x80 0x6F 0x81 0x24 0x82 0x13 0x83 0xffffffff>;
+			<0x44 0x80 0x5A 0x81 0x24 0x82 0x13 0x83 0xffffffff>;
 };
 
 &sdcc1 {
@@ -395,7 +396,7 @@
 &spmi_bus {
 	qcom,pm8226@0 {
 		qcom,leds@a100 {
-			status = "okay";
+			status = "disabled";
 			qcom,led_mpp_2 {
 				label = "mpp";
 				linux,name = "button-backlight";
@@ -411,7 +412,7 @@
 		};
 
 		qcom,leds@a300 {
-			status = "okay";
+			status = "disabled";
 			qcom,led_mpp_4 {
 				label = "mpp";
 				linux,name = "green";
@@ -687,6 +688,7 @@
 
 &pm8226_bms {
 	status = "ok";
+	qcom,r-sense-uohm = <10200>;
 	qcom,enable-fcc-learning;
 	qcom,min-fcc-learning-soc = <20>;
 	qcom,min-fcc-ocv-pc = <30>;
@@ -696,16 +698,16 @@
 };
 
 &pm8226_chg {
-	qcom,charging-disabled;
+	status = "ok";
 	qcom,battery-data = <&mtp_batterydata>;
 };
 
 &slim_msm {
 	tapan_codec {
 		qcom,cdc-micbias1-ext-cap;
-		qcom,cdc-micbias-cfilt1-mv = <2800>;
+		qcom,cdc-micbias-cfilt1-mv = <1800>;
 		qcom,cdc-micbias-cfilt2-mv = <2800>;
-		qcom,cdc-micbias-cfilt3-mv = <2800>;
+		qcom,cdc-micbias-cfilt3-mv = <1800>;
 	};
 };
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,7 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 
-		qcom,revid@100 {
+		pm8110_revid: qcom,revid@100 {
 			compatible = "qcom,qpnp-revid";
 			reg = <0x100 0x100>;
 		};
@@ -93,10 +93,10 @@
 			sec,capacity-max = <1000>;
 			sec,capacity-max-margin = <50>;
 			sec,capacity-min = <0>;
-			sec,ui-full-soc = <99>;
-			sec,ui-full-current = <150>;
+			sec,ui-full-soc = <97>;
+			sec,ui-full-current = <170>;
+			sec,ui-full-voltage = <4250>;
 			sec,ui-full-count = <2>;
-			sec,en-charging-term-time = <0>;
 			sec,charging-term-time = <40>;
 			sec,recharging-voltage = <4300>;
 			sec,poweroff-check-soc = <1>;
@@ -251,6 +251,7 @@
 			qcom,adc-bit-resolution = <15>;
 			qcom,adc-vdd-reference = <1800>;
 			qcom,vadc-poll-eoc;
+			qcom,pmic-revid = <&pm8110_revid>;
 
 			chan@8 {
 				label = "die_temp";
@@ -288,7 +289,9 @@
 
 		pm8110_iadc: iadc@3600 {
 			compatible = "qcom,qpnp-iadc";
-			reg = <0x3600 0x100>;
+			reg = <0x3600 0x100>,
+			      <0x12f1 0x1>;
+			reg-names = "iadc-base", "batt-id-trim-cnst-rds";
 			#address-cells = <1>;
 			#size-cells = <0>;
 			interrupts = <0x0 0x36 0x0>;
@@ -297,6 +300,8 @@
 			qcom,adc-vdd-reference = <1800>;
 			qcom,iadc-vadc = <&pm8110_vadc>;
 			qcom,iadc-poll-eoc;
+			qcom,use-default-rds-trim = <1>;
+			qcom,pmic-revid = <&pm8110_revid>;
 
 			chan@0 {
 				label = "internal_rsense";
@@ -344,7 +349,7 @@
 			status = "disabled";
 
 			qcom,r-sense-uohm = <10000>;
-			qcom,v-cutoff-uv = <3350000>;
+			qcom,v-cutoff-uv = <3400000>;
 			qcom,max-voltage-uv = <4350000>;
 			qcom,r-conn-mohm = <0>;
 			qcom,shutdown-soc-valid-limit = <100>;
@@ -365,6 +370,10 @@
 			qcom,bms-vadc = <&pm8110_vadc>;
 			qcom,bms-iadc = <&pm8110_iadc>;
 			qcom,bms-adc_tm = <&pm8110_adc_tm>;
+
+			qcom,batt-pres-status@1208 {
+				reg = <0x1208 0x1>;
+			};
 
 			qcom,bms-iadc@3800 {
 				reg = <0x3800 0x100>;

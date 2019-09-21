@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/bug.h>
 
 #include <linux/atomic.h>
 #include <asm/cacheflush.h>
@@ -35,10 +36,7 @@
 #include <asm/tls.h>
 #include <asm/system_misc.h>
 
-#include "signal.h"
-#ifdef CONFIG_SEC_DEBUG
 #include <mach/sec_debug.h>
-#endif
 
 #include <trace/events/exception.h>
 
@@ -436,6 +434,8 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 	if (call_undef_hook(regs, instr) == 0)
 		return;
 
+	trace_undef_instr(regs, (void *)pc);
+
 die_sig:
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_UNDEFINED) {
@@ -794,6 +794,7 @@ void __pgd_error(const char *file, int line, pgd_t pgd)
 asmlinkage void __div0(void)
 {
 	printk("Division by zero in kernel.\n");
+	BUG_ON(PANIC_CORRUPTION);
 	dump_stack();
 }
 EXPORT_SYMBOL(__div0);

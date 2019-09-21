@@ -69,7 +69,9 @@
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #endif
-
+#if defined (CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_ATLANTICLTE_ATT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN)
+#include <asm/hardware/gic.h>
+#endif
 #include <linux/vmalloc.h>
 
 #ifdef CONFIG_SEC_DEBUG_VERBOSE_SUMMARY_HTML
@@ -225,6 +227,8 @@ static unsigned pm8841_rev = 0;
 unsigned int sec_dbg_level;
 
 uint runtime_debug_val;
+static uint32_t tzapps_start_addr;
+static uint32_t tzapps_size;
 
 module_param_named(enable, enable, uint, 0644);
 module_param_named(enable_user, enable_user, uint, 0644);
@@ -732,7 +736,11 @@ void *restart_reason;
 #ifdef CONFIG_RESTART_REASON_DDR
 void *restart_reason_ddr_address = NULL;
 /* Using bottom of sec_dbg DDR address range for writting restart reason */
+#ifdef CONFIG_SEC_LPDDR_6G
+#define  RESTART_REASON_DDR_ADDR 0x2FFFE000
+#else
 #define  RESTART_REASON_DDR_ADDR 0x3FFFE000
+#endif
 #endif
 
 DEFINE_PER_CPU(struct sec_debug_core_t, sec_debug_core_reg);
@@ -971,6 +979,7 @@ static int force_error(const char *val, struct kernel_param *kp)
 		int *ptr = kmalloc(sizeof(int), GFP_KERNEL);
 		*ptr++ = 4;
 		*ptr = 2;
+
 		panic("MEMORY CORRUPTION");
 #ifdef CONFIG_SEC_DEBUG_SEC_WDOG_BITE
 	}else if (!strncmp(val, "secdogbite", 10)) {
@@ -1454,24 +1463,32 @@ static int sec_debug_normal_reboot_handler(struct notifier_block *nb,
 
 static void sec_debug_set_upload_cause(enum sec_debug_upload_cause_t type)
 {
+#ifdef CONFIG_RESTART_REASON_DDR
+	void *upload_cause_ddr_address = restart_reason_ddr_address + 0x10;
+#endif
 	void * upload_cause = MSM_IMEM_BASE + 0x66C;
 	per_cpu(sec_debug_upload_cause, smp_processor_id()) = type;
 	__raw_writel(type, upload_cause);
 
-	pr_emerg("(%s) %x\n", __func__, type);
+	pr_emerg("(%s) type = 0x%x\n", __func__, type);
 
 #ifdef CONFIG_RESTART_REASON_DDR
-	if(type == UPLOAD_CAUSE_POWER_LONG_PRESS) {
-		if(restart_reason_ddr_address) {
-			void * upload_cause_ddr_address = restart_reason_ddr_address + 0x10;
+	if(restart_reason_ddr_address) {
+		if(type == UPLOAD_CAUSE_POWER_LONG_PRESS) {
 			/* UPLOAD_CAUSE_POWER_LONG_PRESS magic number to DDR restart reason address */
 			__raw_writel(UPLOAD_CAUSE_POWER_LONG_PRESS, upload_cause_ddr_address);
 			pr_info("%s: Write UPLOAD_CAUSE_POWER_LONG_PRESS to DDR : 0x%x \n",
 					__func__,__raw_readl(upload_cause_ddr_address));
 		}
+		/* if power key is released after pressing, clear the DDR */
+		if(type == UPLOAD_CAUSE_INIT &&
+				(UPLOAD_CAUSE_POWER_LONG_PRESS == __raw_readl(upload_cause_ddr_address))) {
+			__raw_writel(0x0, upload_cause_ddr_address);
+			pr_info("%s: Clear UPLOAD_CAUSE_POWER_LONG_PRESS to DDR : 0x%x \n",
+					__func__, __raw_readl(upload_cause_ddr_address));
+		}
 	}
 #endif
-
 }
 
 extern struct uts_namespace init_uts_ns;
@@ -1597,9 +1614,18 @@ EXPORT_SYMBOL(sec_debug_dump_stack);
 extern void dump_tsp_log(void);
 #endif
 
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+extern void tsp_start_read_rawdata(void);
+extern void tsp_stop_read_rawdata(void);
+#endif
+
 void sec_debug_check_crash_key(unsigned int code, int value)
 {
 	static enum { NONE, STEP1, STEP2, STEP3} state = NONE;
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+	static enum { S0, S1, S2, S3 } state_tsp = S0;
+	static bool isCatchRd = true;
+#endif
 #ifdef CONFIG_TOUCHSCREEN_MMS252
         static enum { NO, T1, T2, T3} state_tsp = NO;
 #endif
@@ -1651,6 +1677,41 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 	if (!enable)
 		return;
 
+#if defined(CONFIG_TOUCHSCREEN_IST30XX)
+	switch(state_tsp) {
+		case S0:
+			if(code == KEY_VOLUMEUP && value)
+				state_tsp = S1;
+			else
+				state_tsp = S0;
+			break;
+		case S1:
+			if (code == KEY_VOLUMEDOWN && value)
+				state_tsp = S2;
+			else
+				state_tsp = S0;
+			break;
+		case S2:
+			if (code == KEY_HOMEPAGE&& value)
+				state_tsp = S3;
+			else
+				state_tsp = S0;
+			break;
+		case S3:
+			if (code == KEY_HOMEPAGE && !value) {
+				if(isCatchRd){
+					isCatchRd = !isCatchRd;
+					tsp_start_read_rawdata();
+				} else {
+					isCatchRd = !isCatchRd;
+					tsp_stop_read_rawdata();
+				}
+			} else {
+				state_tsp = S0;
+			}
+	}
+#endif
+
 	switch (state) {
 	case NONE:
 		if (code == KEY_VOLUMEDOWN && value)
@@ -1675,6 +1736,9 @@ void sec_debug_check_crash_key(unsigned int code, int value)
 			emerg_pet_watchdog();
 			dump_all_task_info();
 			dump_cpu_stat();
+#if defined (CONFIG_MACH_AFYONLTE_TMO) || defined(CONFIG_MACH_ATLANTICLTE_ATT) || defined(CONFIG_MACH_ATLANTIC3GEUR_OPEN)
+			gic_dump_register_set();
+#endif
 			panic("Crash Key");
 		} else {
 			state = NONE;
@@ -1871,6 +1935,12 @@ void sec_debug_save_cpu_freq_voltage(int cpu, int flag, unsigned long value)
 {
 }
 #endif
+void sec_debug_secure_app_addr_size(uint32_t addr,uint32_t size)
+{
+	tzapps_start_addr = addr;
+	tzapps_size =  size;
+}
+
 int sec_debug_subsys_init(void)
 {
 #ifdef CONFIG_SEC_DEBUG_VERBOSE_SUMMARY_HTML
@@ -1898,6 +1968,9 @@ int sec_debug_subsys_init(void)
 	}
 
 	memset(secdbg_subsys, 0, sizeof(secdbg_subsys));
+	
+	secdbg_subsys->secure_app_start_addr = tzapps_start_addr;
+	secdbg_subsys->secure_app_size = tzapps_size;
 
 	secdbg_krait = &secdbg_subsys->priv.krait;
 
@@ -2792,6 +2865,85 @@ static int __init sec_debug_user_fault_init(void)
 	return 0;
 }
 device_initcall(sec_debug_user_fault_init);
+
+#ifdef CONFIG_RESTART_REASON_SEC_PARAM
+void sec_param_restart_reason(const char *cmd)
+{
+	unsigned long value;
+	unsigned int param_restart_reason;
+
+	if (cmd != NULL) {
+		printk(KERN_NOTICE " Reboot cmd=%s\n",cmd);
+		if (!strncmp(cmd, "bootloader", 10)) {
+			param_restart_reason = 0x77665500;
+		} else if (!strncmp(cmd, "recovery", 8)) {
+			param_restart_reason = 0x77665502;
+		} else if (!strcmp(cmd, "rtc")) {
+			param_restart_reason = 0x77665503;
+		} else if (!strncmp(cmd, "oem-", 4)) {
+			unsigned long code;
+			int ret;
+			ret = kstrtoul(cmd + 4, 16, &code);
+			if (!ret)
+				param_restart_reason = (0x6f656d00 | (code & 0xff));
+#ifdef CONFIG_SEC_DEBUG
+		} else if (!strncmp(cmd, "sec_debug_hw_reset", 18)) {
+			param_restart_reason = 0x776655ee;
+#endif
+        } else if (!strncmp(cmd, "download", 8)) {
+		    param_restart_reason = 0x12345671;
+		} else if (!strncmp(cmd, "nvbackup", 8)) {
+				param_restart_reason = 0x77665511;
+		} else if (!strncmp(cmd, "nvrestore", 9)) {
+				param_restart_reason = 0x77665512;
+		} else if (!strncmp(cmd, "nverase", 7)) {
+				param_restart_reason = 0x77665514;
+		} else if (!strncmp(cmd, "nvrecovery", 10)) {
+				param_restart_reason = 0x77665515;
+		} else if (!strncmp(cmd, "sud", 3)) {
+				param_restart_reason = (0xabcf0000 | (cmd[3] - '0'));
+		} else if (!strncmp(cmd, "debug", 5)
+						&& !kstrtoul(cmd + 5, 0, &value)) {
+				param_restart_reason =(0xabcd0000 | value);
+		} else if (!strncmp(cmd, "cpdebug", 7) /*  set cp debug level */
+						&& !kstrtoul(cmd + 7, 0, &value)) {
+				param_restart_reason = (0xfedc0000 | value);
+#if defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
+		} else if (!strncmp(cmd, "swsel", 5) /* set switch value */
+		&& !kstrtoul(cmd + 5, 0, &value)) {
+		param_restart_reason = (0xabce0000 | value);
+#endif
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		} else if (!strncmp(cmd, "edl", 3)) {
+			param_restart_reason = 0x0; // Hack. Fix it later
+#endif
+		} else if (strlen(cmd) == 0) {
+		    printk(KERN_NOTICE "%s : value of cmd is NULL.\n", __func__);
+		        param_restart_reason = 0x12345678;
+#ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
+		} else if (!strncmp(cmd, "peripheral_hw_reset", 19)) {
+			param_restart_reason = 0x77665507;
+#endif
+		} else if (!strncmp(cmd, "diag", 4)
+				&& !kstrtoul(cmd + 4, 0, &value)) {
+			param_restart_reason = (0xabcc0000 | value);
+		} else {
+			param_restart_reason = 0x77665501;
+		}
+	}
+#ifdef CONFIG_SEC_DEBUG
+	else {
+		param_restart_reason = 0x0; // Hack. Fix it later
+	}
+#endif
+	printk(KERN_NOTICE "%s : param_restart_reason = 0x%x\n",
+			__func__,param_restart_reason);
+	/* In case of Hard reset IMEM contents are lost, hence writing param_restart_reason to param partition */
+	printk(KERN_NOTICE "%s: Write PARAM_RESTART_REASON 0x%x to param \n",__func__,param_restart_reason);
+	sec_set_param(param_index_restart_reason, &param_restart_reason);
+}
+EXPORT_SYMBOL(sec_param_restart_reason);
+#endif
 
 #ifdef CONFIG_USER_RESET_DEBUG
 static int set_reset_reason_proc_show(struct seq_file *m, void *v)

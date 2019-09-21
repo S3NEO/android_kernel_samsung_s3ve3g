@@ -25,7 +25,8 @@
 / {
 	model = "[BERLUTI-LTE-OPEN] Rev-00-MTP-v1";
 	compatible = "qcom,msm8226-mtp", "qcom,msm8226", "qcom,mtp";
-	qcom,msm-id = <0xE008FF01 0 0x10001>;
+	qcom,msm-id = <0xE008FF01 0 0x10001>,
+			<0xC808FF01 0 0x10001>;
 };
 
 &soc {

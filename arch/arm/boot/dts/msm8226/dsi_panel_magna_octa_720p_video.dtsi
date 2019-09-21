@@ -81,11 +81,11 @@
 					05 01 00 00 78 00 02 11 00
 					39 01 00 00 00 00 03 F1 A5 A5
 					05 01 00 00 00 00 02 29 00];
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-off-cmds = [
 					05 01 00 00 32 00 02 28 00
 					05 01 00 00 78 00 02 10 00];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 			samsung,panel-nv-mtp-read-cmds = [ 06 01 00 00 00 00 01 c8 21 00];
 			samsung,panel-nv-mtp-read-hbm-cmds = [ 06 01 00 00 00 00 01 c8 06 21];	/* read C8 34~39th , 33=0x21*/

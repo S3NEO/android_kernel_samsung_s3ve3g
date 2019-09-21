@@ -11,7 +11,7 @@
  */
 
 /include/ "dsi_panel_boe_wxga_video.dtsi"
-/include/ "msm8226-camera-sensor-mtp-millet_eur-r02.dtsi"
+/include/ "msm8926-camera-sensor-mtp-degas-r00.dtsi"
 /include/ "msm8226-mc96irda.dtsi"
 
 &soc {
@@ -110,7 +110,7 @@
 		sec-fuelgauge@36 {
 			compatible = "sec-fuelgauge,i2c";
 			reg = <0x36>;
-			fuelgauge,fuel_int = <&msmgpio 46 0x1>;
+			fuelgauge,fuel_int = <&msmgpio 49 0x1>;
 			fuelgauge,capacity_max = <1000>;
 			fuelgauge,capacity_max_margin = <50>;
 			fuelgauge,capacity_min = <0>;
@@ -166,11 +166,11 @@
 			stm,irq_gpio = <&msmgpio 54 0x00>;
 			stm,reg_vdd = "8226_l19";
 			stm,reg_vio = "8226_lvs1";
-			stm,axis_map_x = <1>;
-			stm,axis_map_y = <0>;
+			stm,axis_map_x = <0>;
+			stm,axis_map_y = <1>;
 			stm,axis_map_z = <2>;
 			stm,negate_x = <1>;
-			stm,negate_y = <0>;
+			stm,negate_y = <1>;
 			stm,negate_z = <1>;
 			stm,poll_interval = <100>;
 			stm,min_interval = <2>;
@@ -219,6 +219,7 @@
 				zinitix,orientation = <0>;
 				vddo-supply = <&pm8226_lvs1>;
 				zinitix,tsp_vdd_supply_type = <0>;
+                                zinitix,pname = "SM-T237P";
 			};
 	};
 
@@ -294,8 +295,8 @@
 			"MIC BIAS1 External", "Handset Mic",
 			"AMIC2", "MIC BIAS2 External",
 			"MIC BIAS2 External", "Headset Mic",
-			"AMIC3", "MIC BIAS3 External",
-			"MIC BIAS3 External", "Sub Mic",
+			"AMIC3", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Sub Mic",
 			"AMIC4", "MIC BIAS2 External",
 			"MIC BIAS2 External", "ANCRight Headset Mic",
 			"AMIC5", "MIC BIAS2 External",
@@ -345,18 +346,18 @@
 			50 40 30 20 10 0 (-10) (-30) (-40) (-50) (-100) (-150) (-200)>;
 		battery,temp_check_type = <2>; /* SEC_BATTERY_TEMP_CHECK_TEMP */
 		battery,temp_check_count = <1>;
-		battery,temp_high_threshold_event = <600>;
-		battery,temp_high_recovery_event = <450>;
+		battery,temp_high_threshold_event = <620>;
+		battery,temp_high_recovery_event = <480>;
 		battery,temp_low_threshold_event = <(-50)>;
 		battery,temp_low_recovery_event = <0>;
-		battery,temp_high_threshold_normal = <600>;
-		battery,temp_high_recovery_normal = <450>;
+		battery,temp_high_threshold_normal = <520>;
+		battery,temp_high_recovery_normal = <460>;
 		battery,temp_low_threshold_normal = <(-50)>;
 		battery,temp_low_recovery_normal = <0>;
-		battery,temp_high_threshold_lpm = <600>;
-		battery,temp_high_recovery_lpm = <450>;
-		battery,temp_low_threshold_lpm = <(-50)>;
-		battery,temp_low_recovery_lpm = <0>;
+		battery,temp_high_threshold_lpm = <500>;
+		battery,temp_high_recovery_lpm = <495>;
+		battery,temp_low_threshold_lpm = <(-30)>;
+		battery,temp_low_recovery_lpm = <20>;
 		battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
 		battery,full_check_count = <1>;
@@ -370,10 +371,10 @@
 		battery,full_condition_soc = <95>;
 		battery,full_condition_vcell = <4300>;
 
-		battery,recharge_check_count = <1>;
+		battery,recharge_check_count = <3>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
 		battery,recharge_condition_soc = <98>;
-		battery,recharge_condition_vcell = <4300>;
+		battery,recharge_condition_vcell = <4310>;
 
 		battery,charging_total_time = <21600>;
 		battery,recharging_total_time = <5400>;
@@ -392,9 +393,9 @@
 			battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 			battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 
-			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1300 300 700 1300 300 1000 1800 460 460>;
-			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 (-1) 1300 300 700 1300 300 1000 2100 0 0>;
-			battery,full_check_current_1st = <250 0 250 250 250 250 250 250 0 250 250 250 250 0 250 250 250 250 250 250 250 0 0>;
+			battery,input_current_limit = <1000 460 460 1000 460 900 1000 460 460 1000 650 1000 1000 460 1300 300 700 1300 300 1000 1000 460 460>;
+			battery,fast_charging_current = <1300 0 460 1300 460 1200 1000 460 0 1200 750 1300 1300 (-1) 1300 300 700 1300 300 1000 1300 0 0>;
+			battery,full_check_current_1st = <330 0 330 330 330 330 330 330 0 330 330 330 330 0 330 330 330 330 330 330 330 0 0>;
 			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
 		};
 	};
@@ -414,7 +415,7 @@
 	qcom,hsusb-otg-mode = <3>;
 	vbus_otg-supply = <&pm8226_chg_otg>;
 	qcom,hsusb-otg-phy-init-seq =
-			<0x44 0x80 0x4F 0x81 0x24 0x82 0x13 0x83 0xffffffff>;
+			<0x44 0x80 0x68 0x81 0x2B 0x82 0x13 0x83 0xffffffff>;
 };
 
 &sdcc1 {
@@ -507,7 +508,7 @@
 
 	qcom,pad-pull-on = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
 	qcom,pad-pull-off = <0x0 0x3 0x3>; /* no-pull, pull-up, pull-up */
-	qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
+	qcom,pad-drv-on = <0x5 0x4 0x4>; /* 12mA, 10mA, 10mA */
 	qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
 	qcom,clk-rates = <400000 25000000 50000000 100000000 200000000>;
@@ -725,7 +726,7 @@
 
 &slim_msm {
 	tapan_codec {
-		qcom,cdc-micbias1-ext-cap;
+		/*qcom,cdc-micbias1-ext-cap;*/
 		qcom,cdc-micbias-cfilt1-mv = <2800>;
 		qcom,cdc-micbias-cfilt2-mv = <2800>;
 		qcom,cdc-micbias-cfilt3-mv = <2800>;

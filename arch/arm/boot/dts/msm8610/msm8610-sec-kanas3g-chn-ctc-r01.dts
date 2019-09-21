@@ -19,6 +19,7 @@
 /include/ "msm8610-camera-sensor-kanas3g-chn-ctc-r00.dtsi"
 /include/ "msm8610-regulator-kanas3g-chn-ctc.dtsi"
 /include/ "dsi-panel-nt35502-wvga-video-kanas3g-ctc.dtsi"
+/include/ "msm8610-rt8973-kanas3g-chn-ctc-r00.dtsi"
 
 / {
 	model = "SAMSUNG KANAS3G CTC Project REV01 ";

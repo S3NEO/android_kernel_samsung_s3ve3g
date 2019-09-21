@@ -470,14 +470,12 @@
 		SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
 		battery,full_condition_soc = <95>;
-		battery,full_condition_vcell = <4300>;
-		battery,recharge_check_count = <2>;
-		/* SEC_BATTERY_RECHARGE_CONDITION_VCELL |
-		SEC_BATTERY_RECHARGE_CONDITION_AVGVCELL */
-		battery,recharge_condition_type = <6>;
+		battery,full_condition_vcell = <4250>;
+		battery,recharge_check_count = <1>;
+		battery,recharge_condition_type = <4>;		/* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
 		battery,recharge_condition_soc = <98>;
 		battery,recharge_condition_avgvcell = <4150>;
-		battery,recharge_condition_vcell = <4250>;
+		battery,recharge_condition_vcell = <4300>;
 		battery,charging_total_time = <36000>;
 		battery,recharging_total_time = <5400>;
 		battery,charging_reset_time = <0>;
@@ -495,10 +493,10 @@
 			battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 			battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 
-			battery,input_current_limit = <1800 0 460 1800 460 460 1000 460 1800 1800 0 1800 1800 0 1000 400 700 1300 300 1000 1800 460 460>;
-			battery,fast_charging_current = <2000 0 460 2000 460 460 1000 460 2000 2000 0 2000 2000 (-1) 1300 400 700 1300 200 1000 2100 0 0>;
-			battery,full_check_current_1st = <300 0 300 300 300 300 300 300 300 300 0 300 300 0 300 300 300 300 300 300 300 0 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 2400 2400 0 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
+			battery,input_current_limit = <1800 0 460 1800 460 460 1000 460 1800 1800 0 1800 1800 0 1000 400 700 1300 300 1200 1800 460 460 0 1800 80 460 460 460 1500 500>;
+			battery,fast_charging_current = <2000 0 460 2000 460 460 1000 460 2000 2000 0 2000 2000 (-1) 1300 400 700 1300 200 1300 2100 0 0 0 1800 80 0 0 0 1500 500>;
+			battery,full_check_current_1st = <300 0 300 300 300 300 300 300 300 300 0 300 300 0 300 300 300 300 300 300 300 0 0 0 300 0 0 0 0 300 300>;
+			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 2400 2400 0 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0 0 2400 2400 0 0 0 2400 2400>;
 		};
 	};
 
@@ -1187,5 +1185,19 @@
 		qcom,cdc-vdd-spkdrv-current = <0>;
 
 		qcom,cdc-on-demand-supplies = "cdc-vdd-spkdrv";
+	};
+};
+
+&pm8941_lsid0 {
+	qcom,power-on@800 {
+		qcom,pon_1 {
+			qcom,pon-type = <0>;
+			qcom,support-reset = <1>;
+			qcom,s1-timer = <6720>;
+			qcom,s2-timer = <1000>;
+			qcom,s2-type = <1>;
+			qcom,pull-up = <1>;
+			linux,code = <116>;
+		};
 	};
 };

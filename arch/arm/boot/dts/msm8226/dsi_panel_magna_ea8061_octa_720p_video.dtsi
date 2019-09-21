@@ -128,12 +128,12 @@
 			06 01 00 00 00 00 01 DC 01 00
 		];
 
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "dsi_hs_mode";
 		qcom,panel-off-cmds = [
 			05 01 00 00 22 00 02 28 00
 			05 01 00 00 78 00 02 10 00
 		];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 		samsung,panel-acl-off-cmds = [39 01 00 00 72 00 02 55 00];
 		/*
 		the last byte in read commands  represent READ LENGH,
@@ -479,7 +479,10 @@
 		compatible = "qcom,mdss-dsi-ctrl";
 		label = "MDSS DSI CTRL->0";
 		cell-index = <0>;
-		reg = <0xfd922800 0x600>;
+		reg = 	<0xfd922800 0x1f8>,
+			<0xfd922b00 0x2b0>,
+			<0xfd828000 0x108>;
+		reg-names = "dsi_ctrl", "dsi_phy", "mmss_misc_phys";
 		qcom,platform-reset-gpio = <&msmgpio 25 0>;
 		vddio-supply = <&pm8226_l4>;
 		vdda-supply = <&pm8226_l8>;
@@ -489,7 +492,7 @@
 		qcom,platform-te-gpio = <&msmgpio 12 0>;
 		qcom,platform-strength-ctrl = [ff 06];
 		qcom,platform-bist-ctrl = [00 00 b1 ff 00 00];
-		qcom,platform-regulator-settings = [07 09 03 00 20 00 01];
+		qcom,platform-regulator-settings = [07 08 07 00 20 07 01];
 		qcom,platform-lane-config = [
 			00 c2 45 00 00 00 00 01 75 /* lane0 config */
 			00 c2 45 00 00 00 00 01 75 /* lane1 config */

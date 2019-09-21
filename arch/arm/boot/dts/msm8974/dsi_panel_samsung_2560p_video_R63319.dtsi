@@ -95,13 +95,13 @@
 					05 01 00 00 00 00 02 29 00
 					15 01 00 00 00 00 02 51 15];
 
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "dsi_hs_mode";
 
 		qcom,panel-off-cmds = [
 			05 01 00 00 00 00 02 00 00
 			05 01 00 00 00 00 02 00 00];
 
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 		samsung,panel-ce-on-cmds = [05 01 00 00 00 00 02 00 00];
 		samsung,panel-ce-off-cmds =[05 01 00 00 00 00 02 00 00];
@@ -201,13 +201,13 @@
 					15 01 00 00 00 00 02 51 15
 					];
 
-		qcom,on-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,on-cmds-dsi-state = "dsi_hs_mode";
 
 		qcom,panel-off-cmds = [
 					05 01 00 00 14 00 02 28 00
 					05 01 00 00 32 00 02 10 00
 					];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 		/* CE tuning value for debug */
 		samsung,panel-ce-on-cmds = [29 01 00 00 00 00 21

@@ -199,10 +199,8 @@ static void convert_debug_level_int(unsigned int val, char *str)
 static ssize_t debug_level_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
-	char buffer[7];
-	convert_debug_level_int(kernel_sec_get_debug_level(), buffer);
-
-	return snprintf(buf, sizeof(buffer)+1, "%s\n", buffer);
+	// HAACKS
+	return (ssize_t)0;
 
 }
 
@@ -214,7 +212,7 @@ static ssize_t debug_level_store(struct device *dev,
 	if (sec_debug_level == 0)
 		return -EINVAL;
 
-	kernel_sec_set_debug_level(sec_debug_level);
+	//kernel_sec_set_debug_level(sec_debug_level);
 
 	return size;
 

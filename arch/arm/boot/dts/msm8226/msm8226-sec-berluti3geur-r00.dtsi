@@ -71,17 +71,22 @@
 	};
 
 	i2c@f9924000 { /* BLSP1 QUP2 */
-		mpu6500_input@68 {
-			compatible = "invensense,mpu_6500";
+		mpu9250@68 {
+			compatible = "mpu6515";
 			reg = <0x68>;
 			interrupt-parent = <&msmgpio>;
-			interrupts = <64 0>;
-			invensense,i2c_pull-up = <1>;
-			invensense,irq-gpio= <&msmgpio 64 0x1>;
-			invensense,scl-gpio = <&msmgpio 7 0x00>;
-			invensense,sda-gpio = <&msmgpio 6 0x00>;
-			invensense,acc_cal_path = "/efs/calibration_data";
-			invensense,gyro_cal_path = "/efs/gyro_cal_data";
+			mpu9250,device_rev = <0>;
+			mpu9250,irq_gpio = <&msmgpio 64 0x0>;
+			mpu9250,int_config = <0>;
+			mpu9250,level_shifter = <0>;
+			mpu9250,sec_slave_type = <0>;
+			mpu9250,sec_slave_id = <0>;
+			mpu9250,orientation = <1 2 1 2 1 1 1 1 0>;
+			mpu9250,key = <211 22 205 7
+				217 186 151 55
+				206 254 35 144
+				225 102 47 50>;
+			mpu9250-lvs1-supply = <&pm8226_lvs1>;
 		};
 		ak09911c-i2c@0c {
 			compatible = "ak09911c-i2c";
@@ -198,15 +203,6 @@
 			gpios = <&msmgpio 108 0x1>;
 			linux,input-type = <1>;
 			linux,code = <172>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-		};
-
-		vol_down {
-			label = "volume_down";
-			gpios = <&msmgpio 107 0>;
-			linux,input-type = <1>;
-			linux,code = <114>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};

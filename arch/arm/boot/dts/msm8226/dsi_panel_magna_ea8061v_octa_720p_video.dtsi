@@ -25,7 +25,7 @@
 		qcom,mdss-pan-bpp = <24>;
 		qcom,mdss-pan-dest = "display_1";
 		qcom,mdss-clk-rate=<500000000>;
-		qcom,mdss-pan-porch-values = <128 96 128 8 2 10>; /* <HBP> <HPW> <HFP> <VBP> <VPW> <VFP> */
+		qcom,mdss-pan-porch-values = <128 96 128 8 2 14>; /* <HBP> <HPW> <HFP> <VBP> <VPW> <VFP> */
 		qcom,mdss-pan-underflow-clr = <0xff>;
 		qcom,mdss-pan-bl-ctrl = "bl_ctrl_dcs_cmds";
 		qcom,mdss-pan-bl-levels = <1 255>;
@@ -48,8 +48,8 @@
 		qcom,mdss-pan-dsi-frame-rate = <60>;
 		qcom,panel-phy-regulatorSettings = [07 09 03 00  /* Regualotor settings */
 						    20 00 01];
-		qcom,panel-phy-timingSettings = [2C 20 14 00 46 90
-						    1A 22 18 03 04 00];
+		qcom,panel-phy-timingSettings = [80 27 20 00 3C 3A 21 29 18 03 04 00];
+
 		qcom,panel-phy-strengthCtrl = [ff 06];		/*!!!! */
 		qcom,panel-phy-bistCtrl = [00 00 b1 ff           /*!!!! BIST Ctrl settings */
 					   00 00];
@@ -64,28 +64,38 @@
 					39 01 00 00 00 00 03 F0 5A 5A
 					39 01 00 00 00 00 03 F1 5A 5A
 
-					39 01 00 00 00 00 03 B8 00 10
-					39 01 00 00 00 00 02 BA 26
+					/* 1.common setting */
+					39 01 00 00 00 00 03 B8 19 10
+					39 01 00 00 00 00 02 BA 57
+					39 01 00 00 00 00 03 FC 5A 5A
+					39 01 00 00 00 00 02 B0 0B
+					39 01 00 00 00 00 03 D2 00 85
+					39 01 00 00 00 00 02 B0 05
+					39 01 00 00 00 00 02 FE 0C
+					39 01 00 00 00 00 02 CB 70
+					39 01 00 00 00 00 03 FC A5 A5
 
+					/* 2.brightness control */
 					39 01 00 00 00 00 22
 						CA 01 00 01 00 01 00 80
 						80 80 80 80 80 80 80 80
 						80 80 80 80 80 80 80 80
 						80 80 80 80 80 80 80 00
 						00 00
-					39 01 00 00 00 00 05 B2 00 06 00 10
-					39 01 00 00 00 00 02 F7 01
+					39 01 00 00 00 00 05 B2 00 06 00 08
 					39 01 00 00 00 00 03 B6 48 8A
+					39 01 00 00 00 00 02 F7 01
 					39 01 00 00 00 00 02 55 02
 					39 01 00 00 00 00 02 F7 01
+
 					05 01 00 00 78 00 02 11 00
 					39 01 00 00 00 00 03 F1 A5 A5
 					05 01 00 00 00 00 02 29 00];
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-off-cmds = [
 					05 01 00 00 32 00 02 28 00
 					05 01 00 00 78 00 02 10 00];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 
 			samsung,panel-nv-mtp-read-cmds = [ 06 01 00 00 00 00 01 c8 21 00];
 			samsung,panel-nv-mtp-read-hbm-cmds = [ 06 01 00 00 00 00 01 c8 06 21];	/* read C8 34~39th , 33=0x21*/

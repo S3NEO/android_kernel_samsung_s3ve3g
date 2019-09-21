@@ -124,7 +124,7 @@ static bool get_dload_mode(void)
 }
 #endif
 
-#if 0
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 static void enable_emergency_dload_mode(void)
 {
 	if (emergency_dload_mode_addr) {
@@ -136,6 +136,10 @@ static void enable_emergency_dload_mode(void)
 		__raw_writel(EMERGENCY_DLOAD_MAGIC3,
 				emergency_dload_mode_addr +
 				(2 * sizeof(unsigned int)));
+
+		/* Need disable the pmic wdt, then the emergency dload mode
+		 * will not auto reset. */
+		qpnp_pon_wd_config(0);
 		mb();
 	}
 }
@@ -168,7 +172,7 @@ void set_dload_mode(int on)
 }
 EXPORT_SYMBOL(set_dload_mode);
 
-#if 0
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 static void enable_emergency_dload_mode(void)
 {
 	printk(KERN_ERR "dload mode is not enabled on target\n");
@@ -281,9 +285,13 @@ static irqreturn_t resout_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#if defined CONFIG_ID_BYPASS_SBL
+extern int otg_attached;
+#endif
 static void msm_restart_prepare(const char *cmd)
 {
 	unsigned long value;
+	unsigned int warm_reboot_set = 0;
 #ifdef CONFIG_RESTART_REASON_DDR
 	unsigned int save_restart_reason;
 #endif
@@ -324,28 +332,22 @@ static void msm_restart_prepare(const char *cmd)
 #endif
 #endif
 	printk(KERN_NOTICE "Going down for restart now\n");
+	warm_reboot_set = 0;
 
-	pm8xxx_reset_pwr_off(1);
-#if 0 //fixme
-	/* Hard reset the PMIC unless memory contents must be maintained. */
-	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-	else
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
-#else
-		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
-#endif
 #ifdef CONFIG_SEC_DEBUG
 		if (!restart_reason)
 			restart_reason = ioremap_nocache((unsigned long)(MSM_IMEM_BASE \
 							+ RESTART_REASON_ADDR), SZ_4K);
 #endif
-
 	if (cmd != NULL) {
+		printk(KERN_NOTICE " Reboot cmd=%s\n",cmd);
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
+			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "recovery", 8)) {
 			__raw_writel(0x77665502, restart_reason);
+		} else if (!strcmp(cmd, "rtc")) {
+			__raw_writel(0x77665503, restart_reason);
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
@@ -353,9 +355,11 @@ static void msm_restart_prepare(const char *cmd)
 #ifdef CONFIG_SEC_DEBUG
 		} else if (!strncmp(cmd, "sec_debug_hw_reset", 18)) {
 			__raw_writel(0x776655ee, restart_reason);
+			warm_reboot_set = 1;
 #endif
 		} else if (!strncmp(cmd, "download", 8)) {
 			__raw_writel(0x12345671, restart_reason);
+			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "sud", 3)) {
 			__raw_writel(0xabcf0000 | (cmd[3] - '0'),
 					restart_reason);
@@ -365,20 +369,24 @@ static void msm_restart_prepare(const char *cmd)
 		} else if (!strncmp(cmd, "cpdebug", 7) /* set cp debug level */
 				&& !kstrtoul(cmd + 7, 0, &value)) {
 			__raw_writel(0xfedc0000 | value, restart_reason);
-#if defined(CONFIG_SWITCH_DUAL_MODEM)
+#if defined(CONFIG_SWITCH_DUAL_MODEM) || defined(CONFIG_MUIC_SUPPORT_RUSTPROOF)
 		} else if (!strncmp(cmd, "swsel", 5) /* set switch value */
 				&& !kstrtoul(cmd + 5, 0, &value)) {
 			__raw_writel(0xabce0000 | value, restart_reason);
 #endif
 		} else if (!strncmp(cmd, "nvbackup", 8)) {
 			__raw_writel(0x77665511, restart_reason);
+			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "nvrestore", 9)) {
 			__raw_writel(0x77665512, restart_reason);
+			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "nverase", 7)) {
 			__raw_writel(0x77665514, restart_reason);
+			warm_reboot_set = 1;
 		} else if (!strncmp(cmd, "nvrecovery", 10)) {
 			__raw_writel(0x77665515, restart_reason);
-#if 0
+			warm_reboot_set = 1;
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 			warm_reboot_set = 1;
@@ -389,16 +397,27 @@ static void msm_restart_prepare(const char *cmd)
 #ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
 		} else if (!strncmp(cmd, "peripheral_hw_reset", 19)) {
 			__raw_writel(0x77665507, restart_reason);
+			warm_reboot_set = 1;
 #endif
 		} else {
-			__raw_writel(0x77665501, restart_reason);
+#if defined CONFIG_ID_BYPASS_SBL
+			if(otg_attached)
+			{
+				__raw_writel(0x77665509, restart_reason);
+				warm_reboot_set = 1;
+			}
+			else
+#endif
+				__raw_writel(0x77665501, restart_reason);
 		}
+
 		printk(KERN_NOTICE "%s : restart_reason = 0x%x\n",
 				__func__, __raw_readl(restart_reason));
 	}
 #ifdef CONFIG_SEC_DEBUG
 	else {
 		printk(KERN_NOTICE "%s: clear reset flag\n", __func__);
+			warm_reboot_set = 1;
 #ifdef CONFIG_USER_RESET_DEBUG
 		if(poweroff_charging) {
 			reboot_cause = MSM_IMEM_BASE + 0x66C;
@@ -408,7 +427,24 @@ static void msm_restart_prepare(const char *cmd)
 		__raw_writel(0x12345678, restart_reason);
 	}
 #endif
-
+	printk(KERN_NOTICE "%s : restart_reason = 0x%x\n",
+			__func__, __raw_readl(restart_reason));
+	printk(KERN_NOTICE "%s : warm_reboot_set = %d\n",
+			__func__, warm_reboot_set);
+#ifdef CONFIG_RESTART_REASON_SEC_PARAM
+	//fixme : Enabling Hard reset
+	/* Memory contents will be lost when when PMIC is configured for HARD RESET */
+	if (warm_reboot_set == 1) {
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+		printk(KERN_NOTICE "Configure as WARM RESET\n");
+	}
+	else {
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+		printk(KERN_NOTICE "Configure as HARD RESET\n");
+	}
+#else
+		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+#endif
 #ifdef CONFIG_RESTART_REASON_DDR
 	if(restart_reason_ddr_address) {
 		 save_restart_reason = __raw_readl(restart_reason);

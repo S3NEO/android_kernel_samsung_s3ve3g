@@ -76,6 +76,9 @@
 		status = "ok";
 	};
 
+	qcom,wcnss-wlan@fb000000 {
+		status = "disabled";
+	};
 
 	i2c@19 {
 		cell-index = <19>;
@@ -537,7 +540,7 @@
 				<85 512 40000 160000>;
         };
 
-	wlan0: qca,wlan {
+	/* wlan0: qca,wlan {
 		compatible = "qca,ar6004-hsic";
 		qcom,msm-bus,name = "wlan";
 		qcom,msm-bus,num-cases = <5>;
@@ -549,7 +552,7 @@
 				<85 512 40000 320000>,
 				<85 512 40000 480000>,
 				<85 512 40000 800000>;
-	};
+	};*/
 
 	bluetooth_hostwake{
 		compatible = "bluetooth_hostwake";
@@ -885,6 +888,10 @@
 	};
 
 	gpio@cc00 { /* GPIO 13 */
+		qcom,mode = <1>;
+		qcom,pull = <2>;
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>;
 	};
 
 	gpio@cd00 { /* GPIO 14 */
@@ -990,6 +997,10 @@
 	};
 
 	gpio@d900 { /* GPIO 26 */
+		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
 	};
 
 	gpio@da00 { /* GPIO 27 */

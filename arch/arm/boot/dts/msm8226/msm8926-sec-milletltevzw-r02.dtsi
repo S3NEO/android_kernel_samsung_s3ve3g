@@ -354,7 +354,7 @@
 		battery,temp_low_threshold_lpm = <(-50)>;
 		battery,temp_low_recovery_lpm = <0>;
 		battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */ 
-		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
+		battery,full_check_type_2nd = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 		battery,full_check_count = <1>;
 		battery,chg_gpio_full_check = <0>;
 		battery,chg_polarity_full_check = <1>;
@@ -390,8 +390,8 @@
 
 			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1300 300 700 1300 300 1000 1800 460 460>;
 			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 (-1) 1300 300 700 1300 300 1000 2100 0 0>;
-			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 200 0 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
+			battery,full_check_current_1st = <223 0 223 223 223 223 223 223 0 223 223 223 223 0 223 223 223 223 223 223 223 0 0>;
+			battery,full_check_current_2nd = <180 0 180 180 180 180 180 180 0 180 180 180 180 0 180 180 180 180 180 180 180 0 0>;
 		};
 	};
 };
@@ -523,6 +523,41 @@
 };
 
 &spmi_bus {
+	qcom,pm8226@0 {
+		qcom,power-on@800 {
+			compatible = "qcom,qpnp-power-on";
+			reg = <0x800 0x100>;
+			interrupts = <0x0 0x8 0x0>,
+				     <0x0 0x8 0x1>,
+				     <0x0 0x8 0x4>,
+				     <0x0 0x8 0x5>;
+			interrupt-names = "kpdpwr", "resin",
+					"resin-bark", "kpdpwr-resin-bark";
+			qcom,pon-dbc-delay = <15625>;
+			qcom,system-reset;
+			qcom,s3-debounce = <128>;
+
+			qcom,pon_1 {
+				qcom,pon-type = <0>;
+				qcom,pull-up = <1>;
+				linux,code = <116>;
+				qcom,support-reset = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <8>;
+			};
+
+			qcom,pon_3 {
+				qcom,pon-type = <3>;
+				qcom,support-reset = <1>;
+				qcom,pull-up = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <8>;
+				qcom,use-bark;
+			};
+		};
+	};
 	qcom,pm8226@1 {
                 qcom,leds@d300 {
                         status = "okay";

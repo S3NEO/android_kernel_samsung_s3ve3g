@@ -108,12 +108,12 @@
                 qcom,earjack-vadc = <&pm8226_vadc>;
                 qcom,earjack-micbias-gpio = <&pm8226_gpios 6 0>;
 		det-zones-list = <&det_zones 0 10000 10 0>,
-                         <&det_zones 980 10000 10 0>,
-                         <&det_zones 981 10000 10 1>,
+                         <&det_zones 835 10000 10 0>,
+                         <&det_zones 836 10000 10 1>,
                          <&det_zones 9999 10000 10 1>;
-		but-zones-list = <&but_zones 0 0 170>,
-                         <&but_zones 1 171 340>,
-                         <&but_zones 2 341 775>;
+		but-zones-list = <&but_zones 0 0 141>,
+                         <&but_zones 1 142 284>,
+                         <&but_zones 2 285 775>;
 		mpp-channel-scaling = <6 1 1>;
         };
 };

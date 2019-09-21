@@ -33,3 +33,7 @@
 				0x0cb00000 0x2b00000 /* Increase TZ apps region to 6MB (SR #0133393) + 1MB reserved for TIMA logging at 0xd100000 */
 				0x0fa00000 0x500000>; /* Address and Size of Hole */
 };
+
+&sec_8926_qseecom {
+          reg = <0x0cb00000 0x600000>;
+ };

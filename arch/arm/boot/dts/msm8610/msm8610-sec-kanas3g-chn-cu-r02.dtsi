@@ -131,6 +131,39 @@
 		};
 	};
 
+	sec_thermistor {
+		compatible = "sec,thermistor";
+		qcom,therm-vadc = <&pm8110_vadc>;
+	};
+
+	usb@f9a55000 {
+		compatible = "qcom,hsusb-otg";
+		reg = <0xf9a55000 0x400>;
+		interrupts = <0 134 0>, <0 140 0>;
+		interrupt-names = "core_irq", "async_irq";
+		hsusb_vdd_dig-supply = <&pm8110_s1_corner>;
+		HSUSB_1p8-supply = <&pm8110_l10>;
+		HSUSB_3p3-supply = <&pm8110_l20>;
+		qcom,vdd-voltage-level = <1 5 7>;
+
+		qcom,hsusb-otg-phy-init-seq =
+			<0x44 0x80 0x58 0x81 0x24 0x82 0x13 0x83 0xffffffff>;
+		qcom,hsusb-otg-phy-type = <2>;
+		qcom,hsusb-otg-mode = <1>;
+		qcom,hsusb-otg-otg-control = <2>;
+		qcom,hsusb-otg-disable-reset;
+		qcom,dp-manual-pullup;
+		qcom,ahb-async-bridge-bypass;
+		qcom,disable-retention-with-vdd-min;
+
+		qcom,msm-bus,name = "usb2";
+		qcom,msm-bus,num-cases = <2>;
+		qcom,msm-bus,active-only = <0>;
+		qcom,msm-bus,num-paths = <1>;
+		qcom,msm-bus,vectors-KBps =
+				<87 512 0 0>,
+				<87 512 60000 960000>;
+	};
 };
 
 &i2c_cdc  {
@@ -331,6 +364,23 @@
 
 &pm8110_chg {
 	status = "ok";
+
+	sec,imax-ta = <1000>;
+	sec,imax-usb = <500>;
+	sec,temp-high-block-event = <600>;
+	sec,temp-high-recover-event = <460>;
+	sec,temp-low-block-event = <(-60)>;
+	sec,temp-low-recover-event = <0>;
+	sec,temp-high-block-normal = <600>;
+	sec,temp-high-recover-normal = <460>;
+	sec,temp-low-block-normal = <(-60)>;
+	sec,temp-low-recover-normal = <0>;
+	sec,temp-high-block-lpm = <600>;
+	sec,temp-high-recover-lpm = <460>;
+	sec,temp-low-block-lpm = <(-60)>;
+	sec,temp-low-recover-lpm = <0>;
+	sec,ui-full-current = <170>;
+	qcom,vddmax-mv = <4340>;
 
 	qcom,chgr@1000 {
 		status = "ok";

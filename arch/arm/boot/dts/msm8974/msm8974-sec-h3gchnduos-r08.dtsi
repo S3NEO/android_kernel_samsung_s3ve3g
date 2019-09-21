@@ -190,10 +190,10 @@
 			battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 			battery,full_check_type = <7>; /* SEC_BATTERY_FULLCHARGED_CHGPSY */
 
-			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 400 300 700 1300 300 1800 460 1000 460>;
-			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 400 300 700 1300 300 2100 0 1000 0>;
-			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 0 200 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 0 2400 0>;
+			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1300 300 700 1300 300 1000 1800 460 460>;
+			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
+			battery,full_check_current_1st = <200 0 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 200 0 0>;
+			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
 		};
 	};
 
@@ -277,8 +277,9 @@
 	};
 
 	/* BLSP#3 */
-	/* i2c@f9925000 {
-	}; */
+	 i2c@f9925000 {
+		status = "disabled";
+	};
 
 	/* BLSP#4 */
 	i2c@f9926000 {
@@ -866,6 +867,7 @@
 	};
 
 	gpio@c500 { /* GPIO 6 */
+		qcom,vin-sel = <2>;		/* PM8941 S3 = 1.8 V */
 	};
 
 	gpio@c600 { /* GPIO 7 */

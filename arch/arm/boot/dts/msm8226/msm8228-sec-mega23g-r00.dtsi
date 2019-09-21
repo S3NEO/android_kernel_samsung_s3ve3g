@@ -11,8 +11,8 @@
  */
 
 /include/ "msm8226-camera-sensor-mtp-mega23g_eur.dtsi"
-/include/ "dsi_panel_magna_octa_720p_video_revA.dtsi"
-/include/ "msm8226-rt8973.dtsi"
+/include/ "dsi_panel_himax_hx8394c_tft_720p_video.dtsi"
+/include/ "msm8928-w1.dtsi"
 
 &rpm_bus {
 	rpm-regulator-ldoa15 {
@@ -44,103 +44,63 @@
 			qcom,msm-dai-q6-mi2s-tert {
 			compatible = "qcom,msm-dai-q6-mi2s";
 			qcom,msm-dai-q6-mi2s-dev-id = <2>;
-			qcom,msm-mi2s-rx-lines = <2>;
-			qcom,msm-mi2s-tx-lines = <1>;
+			qcom,msm-mi2s-rx-lines = <1>;
+			qcom,msm-mi2s-tx-lines = <2>;
 		};
 	};
 
-	i2c@f9928000 {	 /*BLSP-1 QUP-6*/
+	i2c@f9925000 {	 /*BLSP-1 QUP-3*/
 		compatible = "qcom,i2c-qup";
-		qcom,scl-gpio = <&msmgpio 23 0>;
-		qcom,sda-gpio = <&msmgpio 22 0>;
-		max98504@31 {
-			compatible = "max98504";
+		qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,sda-gpio = <&msmgpio 10 0>;
+		max98505@31 {
+			compatible = "max98505";
 			reg = <0x31>;
 			vcc_i2c-supply = <&pm8226_l6>;
 			max98504,i2c-pull-up;
 		};
-	};	/*CONFIG_SND_SOC_MAX98504*/
-
-	i2c@19 {
-		cell-index = <19>;
-		compatible = "i2c-gpio";
-		gpios = <&msmgpio 14 0  /* sda */
-			&msmgpio 15 0   /* scl */
-			>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		smb358@6A {
-			compatible = "smb358,i2c";
-			reg = <0x6A>;
-		};
-		sec-fuelgauge@36 {
-			compatible = "sec-fuelgauge,i2c";
-			reg = <0x36>;
-			fuelgauge,fuel_int = <&msmgpio 66 0x1>;
-			fuelgauge,capacity_max = <1000>;
-			fuelgauge,capacity_max_margin = <50>;
-			fuelgauge,capacity_min = <0>;
-			fuelgauge,capacity_calculation_type = <0x17>;
-			fuelgauge,fuel_alert_soc = <1>;
-			/* fuelgaguge,repeated_fuelalert; */
-		};
-       };
-
-	i2c@22 { /*MC96FR332/MC96FR116 IRDA Controller IC node*/
-		 /*Drvier file: drivers/irda/ir_remote_kmini.c*/
-		 /*CONFIG_IR_REMOCON_KMINI*/
-		cell-index = <22>;
-                compatible = "i2c-gpio";
-                gpios = <&msmgpio 22 0 /* sda */
-                         &msmgpio 23 0 /* scl */
-                         >;
-                i2c-gpio,delay-us = <2>;
-                #address-cells = <1>;
-                #size-cells = <0>;
-
-		mc96fr332@50 {
-			compatible = "mc96fr332,i2c";
-                        reg = <0x50>;
-                        interrupt-parent = <&msmgpio>;
-                        vled_3.3v-supply = <&pm8226_l15>;
-                        interrupts = <56 0>;
-			mc96fr332,irda_irq_gpio = <&msmgpio 56 0x00>;
-                        mc96fr332,irda_wake = <&msmgpio 49 0x00>;
-			mc96fr332,irda_poweron = <&msmgpio 114 0x00>;
-			mc96fr332,scl-gpio = <&msmgpio 23 0x00>;
-			mc96fr332,sda-gpio = <&msmgpio 22 0x00>;
-		};
-
-		touchkey@20{
-			compatible = "abov,mc96ft16xx";
-			reg = <0x20>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <31 0>;
-			abov,sda-gpio = <&msmgpio 22 0>;
-			abov,scl-gpio = <&msmgpio 23 0>;
-			abov,irq-gpio = <&msmgpio 31 0>;
-			abov,rst-gpio = <&msmgpio 38 0>;
-			abov,tkey_en-gpio = <&msmgpio 110 0>;
-			vddo-supply = <&pm8226_l6>;
-			avdd-supply = <&pm8226_l19>;
-		};
-
 		svc_leds@30{
 			compatible = "leds,ktd2026";
 			reg = <0x30>;
 		};
+	};	/*CONFIG_SND_SOC_MAX98505*/
+
+	i2c@15{
+		cell-index = <15>;
+		compatible = "i2c-gpio";
+		gpios = <&msmgpio 4 0  /*SDA*/
+			&msmgpio 5 0  /*SCL*/
+			>;
+		i2c-gpio,delay-us = <2>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		rt8973@14{
+			compatible = "rt8973,i2c";
+			reg = <0x14>;
+			interrupt-parent = <&msmgpio>;
+			interupts= <13 0>;
+			rt8973,sda-gpio = <&msmgpio 4 0x00>;
+			rt8973,scl-gpio = <&msmgpio 5 0x00>;
+			rt8973,irq-gpio = <&msmgpio 13 0x00>;
+		};
+		SM5414@49{
+			compatible = "SM5414,i2c";
+			reg = <0x49>;
+		};
 	};
 
-	i2c@33{
-		cell-index = <33>;
+	i2c@33 { cell-index = <33>;
 		compatible = "i2c-gpio";
-		gpios = <&msmgpio 0 0
-			&msmgpio 1 0>;
-	sx9500-i2c@28 {
-			compatible = "sx9500-i2c";
-			reg = <0x28>;
-			interrupt-parent = <&msmgpio>;
-			sx9500-i2c,nirq-gpio = <&msmgpio 66 0x00>;
+		i2c-gpio,delay-us = <2>;
+		gpios = <&msmgpio 0 0 /* sda */
+		&msmgpio 1 0 /* scl */
+		>;
+
+		isl98611_backlight@29 { 
+			compatible = "isl98611,backlight-control";
+			reg = <0x29>;
+			isl98611,scl-gpio = <&msmgpio 1 0x00>;
+			isl98611,sda-gpio = <&msmgpio 0 0x00>;
 		};
 	};
 
@@ -149,22 +109,13 @@
 		qcom,scl-gpio = <&msmgpio 7 0>;
 		qcom,sda-gpio = <&msmgpio 6 0>;
 		status = "okay";
-		mpu9250@68 {
+		mpu6515@68 {
 			compatible = "mpu6515";
 			reg = <0x68>;
 			interrupt-parent = <&msmgpio>;
-			mpu9250,device_rev = <0>;
-			mpu9250,irq_gpio = <&msmgpio 64 0x0>;
-			mpu9250,int_config = <0>;
-			mpu9250,level_shifter = <0>;
-			mpu9250,sec_slave_type = <0>;
-			mpu9250,sec_slave_id = <0>;
-			mpu9250,orientation = <2 1 1 1 2 1 1 1 2>;
-			mpu9250,key = <211 22 205 7
-				217 186 151 55
-				206 254 35 144
-				225 102 47 50>;
-			mpu9250-lvs1-supply = <&pm8226_lvs1>;
+			interrupts = <64 0>;
+			inven,orientation = <1 2 1 0 1 1 1 1 2>;
+			inven,vdd-supply = <&pm8226_lvs1>;
 		};
 
 		HSCDTD008@0c {
@@ -177,39 +128,20 @@
 			HSCDTD008-i2c,reg_vio = "8226_lvs1";
 		};
 
-		taos@39 {
-			compatible = "taos,tmd27723";
-			reg = <0x39>;
+		cm36686@60 {
+			compatible = "cm36686";
+			reg = <0x60>;
 			interrupt-parent = <&msmgpio>;
 			interrupts = <65 0>;
-			taos,irq_gpio = <&msmgpio 65 0>;
-			taos,en = <&pm8226_gpios 2 0x00>;
-			taos,prox_cal_path = "/efs/prox_cal";
-			taos,vdd_2p85 = "8226_l19";
-			taos,vdd_1p8 = "8226_lvs1";
-		};
-	};
-	i2c@f9925000 {
-		compatible = "qcom,i2c-qup";
-		status = "okay";
-		adpd142@64 {
-			compatible = "adpd142";
-			reg = <0x64>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <63 0>;
-			adpd142,irq_gpio = <&msmgpio 63 0>;
-			adpd142,vdd_1p8 = "8226_l6";
-		};
-		sec-nfc@27 {
-			compatible = "sec-nfc";
-			reg = <0x27>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <21 0>;
-			vdd_nfc-supply = <&pm8226_l6>;
-			sec-nfc,firm-gpio = <&msmgpio 62 0x00>;
-			sec-nfc,ven-gpio = <&msmgpio 20 0x00>;
-			sec-nfc,irq-gpio = <&msmgpio 21 0x01>;
-			nfc_ldo-supply = <&pm8226_l22>;
+			cm36686,irq_gpio = <&msmgpio 65 0x1>;
+			cm36686,leden_gpio = <&pm8226_gpios 3 0x00>;
+			cm36686,default_hi_thd = <12>;
+			cm36686,default_low_thd = <8>;
+			cm36686,cancel_hi_thd = <12>;
+			cm36686,cancel_low_thd = <8>;
+			reg_vdd-supply = <&pm8226_l19>;
+			reg_vio-supply = <&pm8226_lvs1>;
+			status = "okay";
 		};
 	};
 
@@ -235,41 +167,26 @@
 		compatible = "qcom,i2c-qup";
 		qcom,scl-gpio = <&msmgpio 19 0>;
 		qcom,sda-gpio = <&msmgpio 18 0>;
-		cyt_tsp@24 {
-				compatible = "cy,cyttsp5_i2c_adapter";
-				reg = <0x24>; /*slave address*/
-				cy,adapter_id = "cyttsp5_i2c_adapter";
-				cy,core {
-					cy,name = "cyttsp5_core";
-					cy,irq_gpio = <17>;
-					cy,hid_desc_register = <1>;
-					tsp,avdd-gpio = <&pm8226_gpios 6 0x01>; /*Touch En 1 gpio*/
-					vddo-supply = <&pm8226_lvs1>;/*not sure if needed, just in case*/
-					cy,mt {
-						cy,name = "cyttsp5_mt";
-						cy,inp_dev_name = "sec_touchscreen";
-						cy,abs =
-							/* ABS_MT_POSITION_X, CY_ABS_MIN_X, CY_ABS_MAX_X, 0, 0 */
-							<0x35 0 720 0 0
-							/* ABS_MT_POSITION_Y, CY_ABS_MIN_Y, CY_ABS_MAX_Y, 0, 0 */
-							0x36 0 1280 0 0
-							/* ABS_MT_PRESSURE, CY_ABS_MIN_P, CY_ABS_MAX_P, 0, 0 */
-							0x3a 0 255 0 0
-							/* CY_IGNORE_VALUE, CY_ABS_MIN_W, CY_ABS_MAX_W, 0, 0 */
-							0xffff 0 255 0 0
-							/* ABS_MT_TRACKING_ID, CY_ABS_MIN_T, CY_ABS_MAX_T, 0, 0 */
-							0x39 0 15 0 0
-							/* ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0 */
-							0x30 0 255 0 0
-							/* ABS_MT_TOUCH_MINOR, 0, 255, 0, 0 */
-							0x31 0 255 0 0
-							/* ABS_MT_ORIENTATION, -128, 127, 0, 0 */
-							0x34 0xfffffed7 127 0 0
-							/* ABS_MT_TOOL_TYPE, 0, MT_TOOL_MAX, 0, 0 */
-							0x37 0 1 0 0>;
-					};
-				};
-			};
+
+		qcom,i2c-bus-freq = <400000>;		
+		bt532_ts_device@20 {
+			compatible = "zinitix,bt532_ts_device";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <17 0>;
+			vdd_en-supply = <&pm8226_l15>;
+			zinitix,irq-gpio = <&msmgpio 17 0x00>;
+			zinitix,vendor1 = <&msmgpio 22 0x00>;
+			zinitix,vendor2 = <&msmgpio 22 0x00>;			
+			zinitix,x_resolution = <720>;
+			zinitix,y_resolution = <1280>;
+			zinitix,page_size = <128>;
+			zinitix,orientation = <0>;
+			vddo-supply = <&pm8226_l6>;
+			zinitix,tsp_vdd_supply_type = <1>;
+			keyled_gpio=<&msmgpio 110 0x00>;
+			zinitix,pname = "SM-G750H";
+		};
 	};
 
 	gpio_keys {
@@ -288,6 +205,7 @@
 			debounce-interval = <15>;
 		};
 
+/* hard reset with power_key+vol_down
 		vol_down {
 			label = "volume_down";
 			gpios = <&msmgpio 107 0x1>;
@@ -296,7 +214,7 @@
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
-
+*/
 		vol_up {
 			label = "volume_up";
 			gpios = <&msmgpio 106 0x1>;
@@ -308,10 +226,10 @@
 
 		hall_flip {
 			interrupt-parent = <&msmgpio>;
-			interrupts = <50 0>;
+			interrupts = <21 0>;
 
 			label = "hall_flip";
-			gpios = <&msmgpio 50 0>;
+			gpios = <&msmgpio 21 0>;
 			linux,input-type = <1>;
 			linux,code = <0x15>;
 			gpio-key,wakeup;
@@ -321,6 +239,7 @@
 
 	alps {
 			compatible = "alps-input";
+			alps,mag-position  = <0>;
 	};
 
 	sound {
@@ -333,8 +252,8 @@
 			"MIC BIAS1 External", "Handset Mic",
 			"AMIC2", "MIC BIAS2 External",
 			"MIC BIAS2 External", "Headset Mic",
-			"AMIC3", "MIC BIAS3 External",
-			"MIC BIAS3 External", "Sub Mic",
+			"AMIC3", "MIC BIAS1 External",
+			"MIC BIAS1 External", "Sub Mic",
 			"AMIC4", "MIC BIAS2 External",
 			"MIC BIAS2 External", "ANCRight Headset Mic",
 			"AMIC5", "MIC BIAS2 External",
@@ -349,8 +268,8 @@
 		status = "okay";
 		compatible = "samsung,sec-battery";
 		battery,vendor = "SDI SDI";
-		battery,charger_name = "smb358";
-		battery,fuelgauge_name = "sec-fuelgauge";
+		battery,charger_name = "SM5414";
+		battery,fuelgauge_name = "bms";
 		battery,technology = <2>; /* POWER_SUPPLY_TECHNOLOGY_LION */
 
 		battery,chip_vendor = "QCOM";
@@ -360,14 +279,14 @@
 
 		battery,adc_check_count = <5>;
 
-		battery,cable_check_type = <5>; /* SEC_BATTERY_CABLE_CHECK_PSY */
+		battery,cable_check_type = <4>; /* SEC_BATTERY_CABLE_CHECK_PSY */
 		battery,cable_source_type = <1>; /* SEC_BATTERY_CABLE_SOURCE_EXTERNAL */
 		battery,event_check;
 		battery,event_waiting_time = <600>;
 		battery,polling_type = <1>; /* SEC_BATTERY_MONITOR_ALARM */
 		battery,monitor_initial_count = <3>;
 
-		battery,battery_check_type = <0>; /* SEC_BATTERY_CHECK_NONE */
+		battery,battery_check_type = <4>; /* SEC_BATTERY_CHECK_FUELGAUGE */
 		battery,check_count = <0>;
 		battery,check_adc_max = <1440>;
 		battery,check_adc_min = <0>;
@@ -412,25 +331,26 @@
 		battery,recharge_condition_soc = <98>;
 		battery,recharge_condition_vcell = <4300>;
 
-		battery,charging_total_time = <36000>;
+		battery,charging_total_time = <21600>;
 		battery,recharging_total_time = <5400>;
 		battery,charging_reset_time = <0>;
 
 		charger{
 			status = "disable";
 			/* Charger */
-			battery,charger_name = "smb358";
-			battery,vbus_ctrl_gpio = <&msmgpio 65 0x00>;
-			battery,chg_gpio_en = <0>;
+			battery,charger_name = "SM5414";
+			battery,fuelgauge_name = "bms";
+			/* battery,vbus_ctrl_gpio = <&msmgpio 65 0x00>; */
+			battery,chg_gpio_en = <67>;
 			battery,chg_polarity_en = <0>;
 			battery,chg_gpio_status = <0>;
 			battery,chg_polarity_status = <0>;
-			battery,chg_float_voltage = <4340>;
+			battery,chg_float_voltage = <4350>;
 			battery,ovp_uvlo_check_type = <3>; /* SEC_BATTERY_OVP_UVLO_CHGPOLLING */
 			battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 
-			battery,input_current_limit = <1000 460 460 1000 460 900 1000 460 460 1000 650 1000 1000 460 1300 300 700 1300 300 1000 1000 460 460>;
-			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
+			battery,input_current_limit = <1500 0 460 1500 460 900 1000 460 460 1000 650 1500 1500 460 1300 300 700 1300 300 1000 1500 460 460>;
+			battery,fast_charging_current = <1800 0 460 1800 460 1200 1000 460 0 1200 750 1800 1800 0 1300 300 700 1300 300 1000 1800 0 0>;
 			battery,full_check_current_1st = <250 0 250 250 250 250 250 250 0 250 250 250 250 0 250 250 250 250 250 250 250 0 0>;
 			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
 		};
@@ -558,11 +478,58 @@
 			1 &intc 0 221 0
 			2 &msmgpio 38 0x3>;
 	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
+	cd-gpios = <&msmgpio 38 0x1>;
 
 	status = "ok";
 };
 
 &spmi_bus {
+	qcom,pm8226@0 {
+		qcom,power-on@800 {
+			compatible = "qcom,qpnp-power-on";
+			reg = <0x800 0x100>;
+			interrupts = <0x0 0x8 0x0>,
+				     <0x0 0x8 0x1>,
+				     <0x0 0x8 0x4>,
+				     <0x0 0x8 0x5>;
+			interrupt-names = "kpdpwr", "resin",
+					"resin-bark", "kpdpwr-resin-bark";
+			qcom,pon-dbc-delay = <15625>;
+			qcom,system-reset;
+			qcom,s3-debounce = <128>;
+
+			qcom,pon_1 {
+				qcom,pon-type = <0>;
+				qcom,pull-up = <1>;
+				linux,code = <116>;
+				qcom,disable-reset = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <7>;
+			};
+
+			qcom,pon_2 {
+				qcom,pon-type = <1>;
+				qcom,pull-up = <1>;
+				linux,code = <114>;
+				qcom,disable-reset = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <2000>;
+				qcom,s2-type = <7>;
+			};
+
+			qcom,pon_3 {
+				qcom,pon-type = <3>;
+				qcom,support-reset = <1>;
+				qcom,pull-up = <1>;
+				qcom,s1-timer = <6720>;
+				qcom,s2-timer = <1000>;
+				qcom,s2-type = <7>;
+				qcom,use-bark;
+			};		
+		};
+	};
+
 	qcom,pm8226@1 {
                 qcom,leds@d300 {
                         status = "okay";
@@ -613,11 +580,13 @@
 	};
 
 	gpio@c200 { /* GPIO 3 */
-		qcom,mode = <0>;
-		qcom,pull = <4>;
-		qcom,vin-sel = <2>;
-		qcom,src-sel = <0>;
-		qcom,master-en = <1>;
+		qcom,mode = <1>;		/* Digital output */
+		qcom,output-type = <0>;	/* CMOS logic */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO*/
+		qcom,vin-sel = <3>;		/* QPNP_PIN_VIN3 */
+		qcom,out-strength = <3>;/* QPNP_PIN_OUT_STRENGTH_HIGH */
+		qcom,src-sel = <2>;		/* QPNP_PIN_SEL_FUNC_1 */
+		qcom,master-en = <1>;	/* Enable GPIO */
 	};
 
 	gpio@c300 { /* GPIO 4 */
@@ -773,6 +742,7 @@
 
 &slim_msm {
 	tapan_codec {
+		qcom,cdc-reset-gpio = <&msmgpio 36 0>;
 		qcom,cdc-micbias1-ext-cap;
 		qcom,cdc-micbias-cfilt1-mv = <2800>;
 		qcom,cdc-micbias-cfilt2-mv = <2800>;
@@ -797,5 +767,5 @@
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi_magna_octa_720p_video_atlantic>;
+	qcom,dsi-pref-prim-pan = <&dsi_himax_tft_720p_video>;
 };

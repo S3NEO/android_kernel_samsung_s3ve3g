@@ -12,7 +12,7 @@
 
 /include/ "msm8226-camera-sensor-mtp-matisse_eur-r02.dtsi"
 /include/ "msm8226-mc96irda.dtsi"
-/include/ "dsi_panel_tc358764_wxga_video_lte.dtsi"
+/include/ "dsi_panel_tc358764_wxga_video_lte_vzw.dtsi"
 
 &soc {
 	serial@f991f000 {
@@ -123,6 +123,7 @@
 			reg = <0x28>;
 			interrupt-parent = <&msmgpio>;
 			sx9500-i2c,nirq-gpio = <&msmgpio 66 0x00>;
+			sx9500-i2c,adjdet-gpio = <&msmgpio 22 0x00>;
 		};
 	};
 
@@ -168,6 +169,8 @@
 			reg = <0x1D>;
 			interrupt-parent = <&msmgpio>;
 			interrupts = <54 0>;
+			stm,scl = <&msmgpio 7 0>;
+			stm,sda = <&msmgpio 6 0>;
 			stm,irq_gpio = <&msmgpio 54 0x00>;
 			stm,reg_vdd = "8226_l19";
 			stm,reg_vio = "8226_lvs1";
@@ -206,7 +209,7 @@
 				mxts,max_x = <4095>; /*max x*/
 				mxts,max_y = <4095>; /*max y*/
 				mxts,tsp_coord = <27 44 4095 4095>;
-				mxts,pname = "SM-T531"; /*Matisse SM-T531*/
+				mxts,pname = "SM-T537V"; /*Matisse SM-T537V*/
 		};
 	};
 	gpio_keys {
@@ -250,7 +253,7 @@
 			label = "hall_flip";
 			gpios = <&msmgpio 110 0>;
 			linux,input-type = <1>;
-			linux,code = <0x15>;
+			linux,code = <0x0>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -372,6 +375,7 @@
 			status = "disable";
 			/* Charger */
 			battery,charger_name = "smb358";
+			battery,vbus_ctrl_gpio = <&msmgpio 104 0x00>;
 			battery,chg_gpio_en = <0>;
 			battery,chg_polarity_en = <0>;
 			battery,chg_gpio_status = <0>;
@@ -382,7 +386,7 @@
 
 			battery,input_current_limit = <1800 460 460 1800 460 900 1000 460 460 1000 650 1800 1800 460 1300 300 700 1300 300 1000 1800 460 460>;
 			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
-			battery,full_check_current_1st = <400 0 400 400 400 400 400 400 0 400 400 400 400 0 400 400 400 400 400 400 400 0 0>;
+			battery,full_check_current_1st = <300 0 300 300 300 300 300 300 0 300 300 300 300 0 300 300 300 300 300 300 300 0 0>;
 			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
 		};
 	};
@@ -431,6 +435,7 @@
 
 &sdhc_1 {
 	vdd-supply = <&pm8226_l17>;
+	qcom,vdd-always-on;
 	qcom,vdd-voltage-level = <2950000 2950000>;
 	qcom,vdd-current-level = <800 500000>;
 
@@ -551,7 +556,7 @@
 				qcom,pon-type = <3>;
 				qcom,support-reset = <1>;
 				qcom,pull-up = <1>;
-				qcom,s1-timer = <6720>;
+				qcom,s1-timer = <10256>;
 				qcom,s2-timer = <1000>;
 				qcom,s2-type = <7>;
 				qcom,use-bark;
@@ -623,11 +628,13 @@
 	};
 
 	gpio@c400 { /* GPIO 5 */
-		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
-		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
-		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,mode = <1>;		/* Digital output */
+		qcom,output-type = <0>;	/* CMOS logic */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO*/
+		qcom,vin-sel = <3>;		/* QPNP_PIN_VIN3 */
+		qcom,out-strength = <3>;/* QPNP_PIN_OUT_STRENGTH_HIGH */
 		qcom,src-sel = <2>;		/* QPNP_PIN_SEL_FUNC_1 */
-		qcom,master-en = <1>;
+		qcom,master-en = <1>;	/* Enable GPIO */
 	};
 
 	gpio@c500 { /* GPIO 6 */
@@ -768,9 +775,9 @@
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi2lvds_wxga_vid_lte>;
+	qcom,dsi-pref-prim-pan = <&dsi2lvds_wxga_vid_lte_vzw>;
 };
 
-&dsi2lvds_wxga_vid_lte {
+&dsi2lvds_wxga_vid_lte_vzw {
 	qcom,cont-splash-enabled;
 };

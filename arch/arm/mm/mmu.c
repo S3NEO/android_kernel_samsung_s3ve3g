@@ -49,6 +49,8 @@ EXPORT_SYMBOL(empty_zero_page);
  */
 pmd_t *top_pmd;
 
+pmdval_t user_pmd_table = _PAGE_USER_TABLE;
+
 #define CPOLICY_UNCACHED	0
 #define CPOLICY_BUFFERED	1
 #define CPOLICY_WRITETHROUGH	2
@@ -307,11 +309,8 @@ static struct mem_type mem_types[] = {
 		.domain    = DOMAIN_KERNEL,
 	},
 	[MT_MEMORY_DMA_READY] = {
-#ifndef CONFIG_TIMA_RKP
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
-#else
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY | L_PTE_XN,
-#endif
+		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+				L_PTE_XN,
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_KERNEL,
 	},
@@ -347,11 +346,13 @@ int set_memory_##_name(unsigned long addr, int numpages) \
 	unsigned long size = PAGE_SIZE*numpages; \
 	unsigned end = start + size; \
 \
-	if (start < MODULES_VADDR || start >= MODULES_END) \
-		return -EINVAL;\
+	if (!IS_ENABLED(CONFIG_FORCE_PAGES)) { \
+		if (start < MODULES_VADDR || start >= MODULES_END) \
+			return -EINVAL;\
 \
-	if (end < MODULES_VADDR || end >= MODULES_END) \
-		return -EINVAL; \
+		if (end < MODULES_VADDR || end >= MODULES_END) \
+			return -EINVAL; \
+	} \
 \
 	apply_to_page_range(&init_mm, start, size, callback, NULL); \
 	flush_tlb_kernel_range(start, end); \
@@ -548,6 +549,25 @@ static void __init build_mem_type_table(void)
 		}
 	}
 
+#ifndef CONFIG_ARM_LPAE
+        /*
+         * We don't use domains on ARMv6 (since this causes problems with
+         * v6/v7 kernels), so we must use a separate memory type for user
+         * r/o, kernel r/w to map the vectors page.
+         */
+        if (cpu_arch == CPU_ARCH_ARMv6)
+                vecs_pgprot |= L_PTE_MT_VECTORS;
+
+	/*
+	 * Check is it with support for the PXN bit
+	 * in the Short-descriptor translation table format descriptors.
+	 */
+	if (cpu_arch == CPU_ARCH_ARMv7 &&
+		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) >= 4) {
+		user_pmd_table |= PMD_PXNTABLE;
+	}
+#endif
+
 	/*
 	 * Non-cacheable Normal - intended for memory areas that must
 	 * not cause dirty cache line writebacks when used
@@ -577,6 +597,11 @@ static void __init build_mem_type_table(void)
 	}
 	kern_pgprot |= PTE_EXT_AF;
 	vecs_pgprot |= PTE_EXT_AF;
+
+	/*
+	 * Set PXN for user mappings
+	 */
+	user_pgprot |= PTE_EXT_PXN;
 #endif
 
 	for (i = 0; i < 16; i++) {
@@ -1280,6 +1305,20 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 		mdesc->map_io();
 	fill_pmd_gaps();
 
+	if (use_user_accessible_timers()) {
+		/*
+		 * Generate a mapping for the timer page.
+		 */
+		int page_addr = get_timer_page_address();
+		if (page_addr != ARM_USER_ACCESSIBLE_TIMERS_INVALID_PAGE) {
+			map.pfn = __phys_to_pfn(page_addr);
+			map.virtual = CONFIG_ARM_USER_ACCESSIBLE_TIMER_BASE;
+			map.length = PAGE_SIZE;
+			map.type = MT_DEVICE_USER_ACCESSIBLE;
+			create_mapping(&map);
+		}
+	}
+
 	/*
 	 * Finally flush the caches and tlb to ensure that we're in a
 	 * consistent state wrt the writebuffer.  This also ensures that
@@ -1496,6 +1535,125 @@ static void __init map_lowmem(void)
 	}
 }
 
+#ifdef CONFIG_FORCE_PAGES
+/*
+ * remap a PMD into pages
+ * We split a single pmd here none of this two pmd nonsense
+ */
+static noinline void split_pmd(pmd_t *pmd, unsigned long addr,
+				unsigned long end, unsigned long pfn,
+				const struct mem_type *type)
+{
+	pte_t *pte, *start_pte;
+	pmd_t *base_pmd;
+
+	base_pmd = pmd_offset(
+			pud_offset(pgd_offset(&init_mm, addr), addr), addr);
+
+	if (pmd_none(*base_pmd) || pmd_bad(*base_pmd)) {
+		start_pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+#ifndef CONFIG_ARM_LPAE
+		/*
+		 * Following is needed when new pte is allocated for pmd[1]
+		 * cases, which may happen when base (start) address falls
+		 * under pmd[1].
+		 */
+		if (addr & SECTION_SIZE)
+			start_pte += pte_index(addr);
+#endif
+	} else {
+		start_pte = pte_offset_kernel(base_pmd, addr);
+	}
+
+	pte = start_pte;
+
+	do {
+		set_pte_ext(pte, pfn_pte(pfn, type->prot_pte), 0);
+		pfn++;
+	} while (pte++, addr += PAGE_SIZE, addr != end);
+
+	*pmd = __pmd((__pa(start_pte) + PTE_HWTABLE_OFF) | type->prot_l1);
+	mb();
+	flush_pmd_entry(pmd);
+	flush_tlb_all();
+}
+
+/*
+ * It's significantly easier to remap as pages later after all memory is
+ * mapped. Everything is sections so all we have to do is split
+ */
+static void __init remap_pages(void)
+{
+	struct memblock_region *reg;
+
+	for_each_memblock(memory, reg) {
+		phys_addr_t phys_start = reg->base;
+		phys_addr_t phys_end = reg->base + reg->size;
+		unsigned long addr = (unsigned long)__va(phys_start);
+		unsigned long end = (unsigned long)__va(phys_end);
+		pmd_t *pmd = NULL;
+		unsigned long next;
+		unsigned long pfn = __phys_to_pfn(phys_start);
+		bool fixup = false, end_fixup = false;
+		unsigned long saved_start = addr;
+
+		if (phys_start > arm_lowmem_limit)
+			break;
+		if (phys_end > arm_lowmem_limit)
+			end = (unsigned long)__va(arm_lowmem_limit);
+		if (phys_start >= phys_end)
+			break;
+
+		pmd = pmd_offset(
+			pud_offset(pgd_offset(&init_mm, addr), addr), addr);
+
+#ifndef	CONFIG_ARM_LPAE
+		if (addr & SECTION_SIZE) {
+			fixup = true;
+			pmd_empty_section_gap((addr - SECTION_SIZE) & PMD_MASK);
+			pmd++;
+		}
+
+		if (end & SECTION_SIZE) {
+			end_fixup = true;
+			pmd_empty_section_gap(end);
+		}
+#endif
+
+		do {
+			next = addr + SECTION_SIZE;
+
+			if (pmd_none(*pmd) || pmd_bad(*pmd))
+				split_pmd(pmd, addr, next, pfn,
+						&mem_types[MT_MEMORY]);
+			pmd++;
+			pfn += SECTION_SIZE >> PAGE_SHIFT;
+
+		} while (addr = next, addr < end);
+
+		if (fixup) {
+			/*
+			 * Put a faulting page table here to avoid detecting no
+			 * pmd when accessing an odd section boundary. This
+			 * needs to be faulting to help catch errors and avoid
+			 * speculation
+			 */
+			pmd = pmd_off_k(saved_start);
+			pmd[0] = pmd[1] & ~1;
+		}
+		if (end_fixup) {
+			pmd = pmd_off_k(end);
+			pmd[1] = pmd[0] & ~1;
+		}
+	}
+}
+#else
+static void __init remap_pages(void)
+{
+
+}
+#endif
+
 /*
  * paging_init() sets up the page tables, initialises the zone memory
  * maps, and sets up the zero page, bad page and bad page tables.
@@ -1510,6 +1668,7 @@ void __init paging_init(struct machine_desc *mdesc)
 	prepare_page_table();
 	map_lowmem();
 	dma_contiguous_remap();
+	remap_pages();
 	devicemaps_init(mdesc);
 	kmap_init();
 

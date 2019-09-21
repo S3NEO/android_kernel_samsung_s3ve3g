@@ -12,9 +12,10 @@
 
 &soc {
 i2c@f9965000 {
+		status = "okay";
 		gpios = <&msmgpio 51 0>, /* sda */
 			<&msmgpio 52 0>; /* scl */
-		sii8240tmds@39 {
+		sec_mhl: sii8240tmds@39 {
 			compatible = "sii8240,tmds";
 			reg = <0x39>; /* 0x72 >> 1 */
 			sii8240,client_id = <0x00>;
@@ -22,9 +23,9 @@ i2c@f9965000 {
 			interrupt-parent = <&msmgpio>;
 			interrupts = <31 0x1>;
 			sii8240,gpio_mhl_reset = <&pm8941_mpps 6 0>;/*&msmgpio 60 0x00*/
-			sii8240,gpio_mhl_reset_type = "pm8941_mpps";
+			sii8240,gpio_mhl_reset_type = "pm_mpps";
 			sii8240,gpio_mhl_en = <&pm8941_gpios 32 0x1>;
-			sii8240,gpio_mhl_en_type = "pm8941_gpios";
+			sii8240,gpio_mhl_en_type = "pm_gpios";
 			sii8240,gpio_ta_int = <&pm8941_gpios 29 0x1>;
 			sii8240,swing_level = <0x36>;
 
@@ -37,6 +38,7 @@ i2c@f9965000 {
 /*			vcc_1p2v-supply  = <&pm8941_l11>;*/ /*<&pm8941_l11> */
 /*			vcc_1p8v-supply  = <&pm8941_l10>;*/ /*<&pm8941_l10> */
 /*			vcc_3p3v-supply  = <&pm8941_l19>;*/ /*<&pm8941_l19> */
+			qcom,hdmi-tx-map = <&mdss_hdmi_tx>;
 		};
 		sii8240hdmi@49 {
 			compatible = "sii8240,hdmi";
@@ -62,7 +64,8 @@ i2c@f9965000 {
 
 
 	qcom,hdmi_tx@fd922100 {
-		      qcom,hdmi-tx-ddc-clk = <&msmgpio 32 0>;
-		      qcom,hdmi-tx-ddc-data = <&msmgpio 33 0>;
+			qcom,hdmi-tx-ddc-clk = <&msmgpio 32 0>;
+			qcom,hdmi-tx-ddc-data = <&msmgpio 33 0>;
+			mhl,sec-mhl-map = <&sec_mhl>;
 	      };
 };

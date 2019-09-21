@@ -12,7 +12,7 @@
 
 /include/ "msm8226-camera-sensor-mtp-matisse_eur-r02.dtsi"
 /include/ "msm8226-mc96irda.dtsi"
-/include/ "dsi_panel_tc358764_wxga_video_lte.dtsi"
+/include/ "dsi_panel_tc358764_wxga_video_lte_usc.dtsi"
 
 &soc {
 	serial@f991f000 {
@@ -123,6 +123,7 @@
 			reg = <0x28>;
 			interrupt-parent = <&msmgpio>;
 			sx9500-i2c,nirq-gpio = <&msmgpio 66 0x00>;
+			sx9500-i2c,adjdet-gpio = <&msmgpio 22 0x00>;
 		};
 	};
 
@@ -208,7 +209,7 @@
 				mxts,max_x = <4095>; /*max x*/
 				mxts,max_y = <4095>; /*max y*/
 				mxts,tsp_coord = <27 44 4095 4095>;
-				mxts,pname = "SM-T531"; /*Matisse SM-T531*/
+				mxts,pname = "SM-T537R"; /*Matisse SM-T537R*/
 		};
 	};
 	gpio_keys {
@@ -250,7 +251,7 @@
 			label = "hall_flip";
 			gpios = <&msmgpio 110 0>;
 			linux,input-type = <1>;
-			linux,code = <0x15>;
+			linux,code = <0x0>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -334,17 +335,17 @@
 			50 40 30 20 10 0 (-10) (-30) (-40) (-50) (-100) (-150) (-200)>;
 		battery,temp_check_type = <2>; /* SEC_BATTERY_TEMP_CHECK_TEMP */
 		battery,temp_check_count = <1>;
-		battery,temp_high_threshold_event = <600>;
-		battery,temp_high_recovery_event = <450>;
+		battery,temp_high_threshold_event = <535>;
+		battery,temp_high_recovery_event = <500>;
 		battery,temp_low_threshold_event = <(-50)>;
 		battery,temp_low_recovery_event = <0>;
-		battery,temp_high_threshold_normal = <600>;
-		battery,temp_high_recovery_normal = <450>;
+		battery,temp_high_threshold_normal = <545>;
+		battery,temp_high_recovery_normal = <475>;
 		battery,temp_low_threshold_normal = <(-50)>;
 		battery,temp_low_recovery_normal = <0>;
-		battery,temp_high_threshold_lpm = <600>;
-		battery,temp_high_recovery_lpm = <450>;
-		battery,temp_low_threshold_lpm = <(-50)>;
+		battery,temp_high_threshold_lpm = <510>;
+		battery,temp_high_recovery_lpm = <500>;
+		battery,temp_low_threshold_lpm = <(-10)>;
 		battery,temp_low_recovery_lpm = <0>;
 		battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
@@ -616,11 +617,13 @@
 	};
 
 	gpio@c400 { /* GPIO 5 */
-		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
-		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
-		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,mode = <1>;		/* Digital output */
+		qcom,output-type = <0>;	/* CMOS logic */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO*/
+		qcom,vin-sel = <3>;		/* QPNP_PIN_VIN3 */
+		qcom,out-strength = <3>;/* QPNP_PIN_OUT_STRENGTH_HIGH */
 		qcom,src-sel = <2>;		/* QPNP_PIN_SEL_FUNC_1 */
-		qcom,master-en = <1>;
+		qcom,master-en = <1>;	/* Enable GPIO */
 	};
 
 	gpio@c500 { /* GPIO 6 */
@@ -761,9 +764,9 @@
 };
 
 &mdss_dsi0 {
-	qcom,dsi-pref-prim-pan = <&dsi2lvds_wxga_vid_lte>;
+	qcom,dsi-pref-prim-pan = <&dsi2lvds_wxga_vid_lte_usc>;
 };
 
-&dsi2lvds_wxga_vid_lte {
+&dsi2lvds_wxga_vid_lte_usc {
 	qcom,cont-splash-enabled;
 };

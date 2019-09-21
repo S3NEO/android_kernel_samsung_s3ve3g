@@ -235,7 +235,7 @@
                qcom,bam-rx-ep-pipe-index = <5>;        /*Producer pipe*/
                qcom,msm-bus,name = "uart0";
                qcom,msm-bus,num-cases = <2>;
-               qcom,msm-bus,active-only = <0>;
+               /* qcom,msm-bus,active-only = <0>; */
                qcom,msm-bus,num-paths = <1>;
                qcom,msm-bus,vectors-KBps = <86 512 0 0>,
                                           <86 512 500 800>;
@@ -645,6 +645,7 @@
 
 	qcom,wdt@f9017000 {
 		compatible = "qcom,msm-watchdog";
+		qcom,memblock-reserve = <0x0 0x4000>;
 		reg = <0xf9017000 0x1000>;
 		interrupts = <0 3 0>, <0 4 0>;
 		qcom,bark-time = <15000>;
@@ -1310,7 +1311,7 @@
 		qcom,qsee-ce-hw-instance = <0>;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;
-		qcom,msm-bus,active-only = <0>;
+		/* qcom,msm-bus,active-only = <0>; */
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,
@@ -1330,7 +1331,7 @@
 		qcom,ce-hw-shared;
 		qcom,msm-bus,name = "qcrypto-noc";
 		qcom,msm-bus,num-cases = <2>;
-		qcom,msm-bus,active-only = <0>;
+		/* qcom,msm-bus,active-only = <0>; */
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,
@@ -1348,7 +1349,7 @@
 		qcom,ce-hw-shared;
 		qcom,msm-bus,name = "qcedev-noc";
 		qcom,msm-bus,num-cases = <2>;
-		qcom,msm-bus,active-only = <0>;
+		/* qcom,msm-bus,active-only = <0>; */
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
 				<55 512 0 0>,

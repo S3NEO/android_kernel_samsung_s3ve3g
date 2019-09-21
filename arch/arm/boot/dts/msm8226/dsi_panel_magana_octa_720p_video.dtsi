@@ -82,9 +82,9 @@
 							   06 01 00 00 00 00 01 db 01
 							   06 01 00 00 00 00 01 dc 01];
 
-		qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+		qcom,on-cmds-dsi-state = "dsi_lp_mode";
 		qcom,panel-off-cmds = [05 01 00 00 32 00 02 28 00
 					05 01 00 00 78 00 02 10 00];
-		qcom,off-cmds-dsi-state = "DSI_HS_MODE";
+		qcom,off-cmds-dsi-state = "dsi_hs_mode";
 	};
 };

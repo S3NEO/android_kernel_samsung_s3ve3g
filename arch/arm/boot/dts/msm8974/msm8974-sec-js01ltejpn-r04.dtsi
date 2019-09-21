@@ -301,6 +301,7 @@
 			reg = <0x20>;
 			interrupt-parent = <&pm8941_gpios>;
 			interrupts = <30 0>;
+			synaptics,tsppwr_en = <&pm8941_gpios 9 0x1>;
 			vcc_en-supply = <&pm8941_l10>;
 			synaptics,supply-num = <1>;		/* the number of regulators */
 			synaptics,supply-name = "8941_l10";	/* the name of regulators, in power-on order */

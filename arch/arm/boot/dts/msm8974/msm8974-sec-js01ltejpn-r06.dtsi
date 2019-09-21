@@ -87,16 +87,16 @@
 			fuelgauge,fuel_int = <&pm8941_gpios 26 0x1>;
 			fuelgauge,bat_int = <&pm8941_mpps 8 0>;
 
-			fuelgauge,capacity_max = <1000>;
+			fuelgauge,capacity_max = <970>;
 			fuelgauge,capacity_max_margin = <50>;
-			fuelgauge,capacity_min = <0>;
+			fuelgauge,capacity_min = <(-7)>;
 			fuelgauge,capacity_calculation_type = <0x17>;
 			fuelgauge,fuel_alert_soc = <2>;
 			/* fuelgaguge,repeated_fuelalert; */
-			fuelgauge,rcomp0 = <0x73>;
-			fuelgauge,rcomp_charging = <0x8D>;
-			fuelgauge,temp_cohot = <(-1000)>;
-			fuelgauge,temp_cocold = <(-4325)>;
+			fuelgauge,rcomp0 = <0x75>;
+			fuelgauge,rcomp_charging = <0x80>;
+			fuelgauge,temp_cohot = <(-700)>;
+			fuelgauge,temp_cocold = <(-4875)>;
 			fuelgauge,is_using_model_data;
 			fuelgauge,type_str = "SDI";
 			qcom,sec-fuelgauge-vadc = <&pm8941_vadc>;
@@ -302,14 +302,11 @@
 			reg = <0x20>;
 			interrupt-parent = <&pm8941_gpios>;
 			interrupts = <30 0>;
+			synaptics,tsppwr_en = <&pm8941_gpios 9 0x1>;
 			vcc_en-supply = <&pm8941_l10>;
-			synaptics,supply-num = <1>;		/* the number of regulators */
-			synaptics,supply-name = "8941_l10";	/* the name of regulators, in power-on order */
-			synaptics,external_ldo = <&pm8941_gpios 9 0x1>;
 			synaptics,irq-gpio = <&pm8941_gpios 30 0x1>;
 			synaptics,tsp-coords = <1079 1919>;
 			synaptics,i2c-pull-up = <1>;
-			synaptics,tsp-extra_config = <0 0 0 0>;/* <"pwrctrl", "N", "N", "N"> */
 		};
 	};
 
@@ -501,10 +498,16 @@
 		};
 	};
 
+	/* BLSP#3 */
+	i2c@f9925000 {
+		status = "disabled";
+	};
+
 	aliases {
 		spi2 = &spi_2;
 	};
 	spi_2: spi@f9925000 {
+		status = "okay";
 		compatible = "qcom,spi-qup-v2";
 		reg = <0xf9925000 0x1000>, <0xf9904000 0x19000>;
 		reg-names = "spi_physical", "spi_bam_physical";
@@ -1127,6 +1130,13 @@
 	};
 
 	gpio@dd00 { /* GPIO 30 */
+		qcom,mode = <0>;
+		qcom,output-type = <0>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <2>;
+		qcom,src-sel = <3>;
+		qcom,pull = <5>;
+		qcom,master-en = <1>;
 	};
 
 	gpio@de00 { /* GPIO 31 */

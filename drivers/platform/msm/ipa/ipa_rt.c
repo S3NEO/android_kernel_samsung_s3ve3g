@@ -611,13 +611,12 @@ static int __ipa_add_rt_rule(enum ipa_ip_type ip, const char *name,
 		goto fail_rt_tbl_sanity;
 	}
 	/*
-	 * do not allow any rules to be added at end of the "default" routing
-	 * tables
+	 * do not allow any rule to be added at "default" routing
+	 * table
 	 */
 	if (!strncmp(tbl->name, IPA_DFLT_RT_TBL_NAME, IPA_RESOURCE_NAME_MAX) &&
-	    (tbl->rule_cnt > 0) && (at_rear != 0)) {
-		IPAERR("cannot add rule at end of tbl rule_cnt=%d at_rear=%d\n",
-		       tbl->rule_cnt, at_rear);
+	    (tbl->rule_cnt > 0)) {
+		IPAERR_RL("cannot add rules to default rt table\n");
 		goto fail_rt_tbl_sanity;
 	}
 
@@ -838,6 +837,8 @@ int ipa_reset_rt(enum ipa_ip_type ip)
 	struct ipa_rt_entry *rule_next;
 	struct ipa_tree_node *node;
 	struct ipa_rt_tbl_set *rset;
+	struct ipa_hdr_entry *hdr_entry;
+	struct ipa_hdr_proc_ctx_entry *hdr_proc_entry;
 
 	if (ip >= IPA_IP_MAX) {
 		IPAERR("bad parm\n");
@@ -874,6 +875,27 @@ int ipa_reset_rt(enum ipa_ip_type ip)
 				continue;
 
 			list_del(&rule->link);
+			if (rule->hdr) {
+				hdr_entry = ipa_id_find(
+					rule->rule.hdr_hdl);
+				if (!hdr_entry ||
+				hdr_entry->cookie != IPA_HDR_COOKIE) {
+					IPAERR_RL(
+					"Header already deleted\n");
+					return -EINVAL;
+				}
+			} else if (rule->proc_ctx) {
+				hdr_proc_entry =
+					ipa_id_find(
+					rule->rule.hdr_proc_ctx_hdl);
+				if (!hdr_proc_entry ||
+					hdr_proc_entry->cookie !=
+						IPA_PROC_HDR_COOKIE) {
+				IPAERR_RL(
+					"Proc entry already deleted\n");
+					return -EINVAL;
+				}
+			}
 			tbl->rule_cnt--;
 			if (rule->hdr)
 				__ipa_release_hdr((u32)rule->hdr);

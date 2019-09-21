@@ -354,7 +354,7 @@
 		battery,temp_low_threshold_lpm = <(-50)>;
 		battery,temp_low_recovery_lpm = <0>;
 		battery,full_check_type = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */ 
-		battery,full_check_type_2nd = <3>; /* SEC_BATTERY_FULLCHARGED_TIME */
+		battery,full_check_type_2nd = <2>; /* SEC_BATTERY_FULLCHARGED_FG_CURRENT */
 		battery,full_check_count = <1>;
 		battery,chg_gpio_full_check = <0>;
 		battery,chg_polarity_full_check = <1>;
@@ -364,7 +364,7 @@
 		   SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
 		battery,full_condition_soc = <95>;
-		battery,full_condition_vcell = <4300>;
+		battery,full_condition_vcell = <4250>;
 
 		battery,recharge_check_count = <1>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
@@ -390,7 +390,7 @@
 			battery,input_current_limit = <1000 460 460 1000 460 900 1000 460 460 1000 650 1000 1000 460 1300 300 700 1300 300 1000 1000 460 460>;
 			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 (-1) 1300 300 700 1300 300 1000 2100 0 0>;
 			battery,full_check_current_1st = <223 0 223 223 223 223 223 223 0 223 223 223 223 0 223 223 223 223 223 223 223 0 0>;
-			battery,full_check_current_2nd = <2400 0 2400 2400 2400 2400 2400 2400 0 2400 2400 2400 2400 0 2400 2400 2400 2400 2400 2400 2400 0 0>;
+			battery,full_check_current_2nd = <180 0 180 180 180 180 180 180 0 180 180 180 180 0 180 180 180 180 180 180 180 0 0>;
 		};
 	};
 };
@@ -737,6 +737,10 @@
 
 &dsi_sdc_wxga_vid_lte {
 	qcom,cont-splash-enabled;
+};
+
+&pm8226_l19 {
+		regulator-boot-on;
 };
 
 &pm8226_lvs1 {

@@ -202,6 +202,7 @@
 			battery,fast_charging_current = <2100 0 460 2100 460 1200 1000 460 0 1200 750 2100 2100 0 1300 300 700 1300 300 1000 2100 0 0>;
 			battery,full_check_current_1st = <350 0 350 350 350 350 350 350 0 350 350 350 350 0 350 350 350 350 350 350 350 0 0>;
 			battery,full_check_current_2nd = <1200 0 1200 1200 1200 1200 1200 1200 0 1200 1200 1200 1200 0 1200 1200 1200 1200 1200 1200 1200 0 0>;
+			battery,full_check_current_1st_sdi = <200 0 200 200 200 200 200 200 0 200 200 200 200 0 200 200 200 200 200 200 200 0 0>;
 		};
 	};
 
@@ -858,6 +859,10 @@
 	};
 
 	gpio@d900 { /* GPIO 26 */
+		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
 	};
 
 	gpio@da00 { /* GPIO 27 */

@@ -208,7 +208,7 @@
 				mxts,max_x = <4095>; /*max x*/
 				mxts,max_y = <4095>; /*max y*/
 				mxts,tsp_coord = <27 44 4095 4095>;
-				mxts,pname = "SM-T531"; /*Matisse SM-T531*/
+				mxts,pname = "SM-T537A"; /*Matisse SM-T537A*/
 		};
 	};
 	gpio_keys {
@@ -250,7 +250,7 @@
 			label = "hall_flip";
 			gpios = <&msmgpio 110 0>;
 			linux,input-type = <1>;
-			linux,code = <0x15>;
+			linux,code = <0x0>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -357,7 +357,7 @@
 		   SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
 		battery,full_condition_soc = <95>;
-		battery,full_condition_vcell = <4300>;
+		battery,full_condition_vcell = <4250>;
 
 		battery,recharge_check_count = <1>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
@@ -616,11 +616,13 @@
 	};
 
 	gpio@c400 { /* GPIO 5 */
-		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
-		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
-		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,mode = <1>;		/* Digital output */
+		qcom,output-type = <0>;	/* CMOS logic */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO*/
+		qcom,vin-sel = <3>;		/* QPNP_PIN_VIN3 */
+		qcom,out-strength = <3>;/* QPNP_PIN_OUT_STRENGTH_HIGH */
 		qcom,src-sel = <2>;		/* QPNP_PIN_SEL_FUNC_1 */
-		qcom,master-en = <1>;
+		qcom,master-en = <1>;	/* Enable GPIO */
 	};
 
 	gpio@c500 { /* GPIO 6 */

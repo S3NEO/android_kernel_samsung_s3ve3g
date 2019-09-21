@@ -58,11 +58,8 @@
 			qcom,cal-poll7 = <0 0x0 0 0x0 0 0>;
 			qcom,cal-mem7 = <4 0x3FFC 3 0 1 0>;
 
-			cam_vio-supply = <&pm8226_l27>;
 			qcom,cam-vreg-name = "cam_vio";
 			qcom,cam-vreg-type = <0>;
-			qcom,cam-vreg-min-voltage = <1800000>;
-			qcom,cam-vreg-max-voltage = <1800000>;
 			qcom,cam-vreg-op-mode = <1800000>;
 			qcom,cam-power-seq-type = "sensor_gpio";
 			qcom,cam-power-seq-val = "sensor_gpio_ext_camio_en";
@@ -100,9 +97,9 @@
 		qcom,led-flash-src = <&led_flash0>;
 		cam_vdig-supply = <&pm8226_l26>;
 		cam_vaf-supply = <&pm8226_l28>;
-		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vaf";
-		qcom,cam-vreg-type = <0 0 0>;
-		qcom,cam-vreg-op-mode = <1225000 0 2800000>;
+		qcom,cam-vreg-name = "cam_vdig", "cam_vaf";
+		qcom,cam-vreg-type = <0 0>;
+		qcom,cam-vreg-op-mode = <1225000 2800000>;
 		qcom,gpio-no-mux = <0>;
 		gpios = <&msmgpio 26 0>,
 			<&msmgpio 37 0>,

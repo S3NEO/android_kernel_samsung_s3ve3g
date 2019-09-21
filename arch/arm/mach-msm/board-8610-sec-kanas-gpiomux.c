@@ -714,6 +714,30 @@ static struct msm_gpiomux_config msm_secjack_gpio_configs[] __initdata = {
 };
 #endif
 
+#if defined(CONFIG_MACH_KANAS3G_CMCC)
+static struct gpiomux_setting gpio_uart_rxd_active_config = {
+	.pull = GPIOMUX_PULL_DOWN,
+	.drv = GPIOMUX_DRV_8MA,
+	.func = GPIOMUX_FUNC_2,
+};
+
+static struct gpiomux_setting gpio_uart_rxd_suspend_config = {
+	.pull = GPIOMUX_PULL_DOWN,
+	.drv = GPIOMUX_DRV_8MA,
+	.func = GPIOMUX_FUNC_2,
+};
+
+static struct msm_gpiomux_config msm_uart_rxd_configs[] = {
+	{
+		.gpio = 5,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &gpio_uart_rxd_active_config,
+			[GPIOMUX_SUSPENDED] = &gpio_uart_rxd_suspend_config,
+		}
+	},
+};
+#endif
+
 static struct gpiomux_setting gpio_uart_boot_on_config = {
 	.drv = GPIOMUX_DRV_2MA,
 	.func = GPIOMUX_FUNC_GPIO,
@@ -779,6 +803,37 @@ static struct msm_gpiomux_config native_sensor_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE]    = &acc_interrupt_cfg,
 			[GPIOMUX_SUSPENDED] = &acc_interrupt_cfg,
+		},
+	},
+};
+
+static struct msm_gpiomux_config hw_rev_configs[] __initdata = {
+	{
+		.gpio      = 86,		/* HW_REV(3) */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
+		},
+	},
+	{
+		.gpio      = 87,		/* HW_REV(2) */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
+		},
+	},
+	{
+		.gpio      = 88,		/* HW_REV(1) */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
+		},
+	},
+	{
+		.gpio      = 89,		/* HW_REV(0) */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_suspend_config[0],
+			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
 		},
 	},
 };
@@ -872,11 +927,21 @@ static struct msm_gpiomux_config nc_gpio_configs[] __initdata = {
 #endif
 };
 /* GPIO_73(VOL_DOWN) is NC since REV0.2 */
-#if !defined(CONFIG_MACH_KANAS3G_CMCC)
 static struct msm_gpiomux_config nc_gpio_configs2[] __initdata = {
 	FAST_GPIO_CONFIG(73, nc_gpio_cfg, nc_gpio_cfg),
 };
 #endif
+
+#if defined(CONFIG_MACH_KANAS3G_CMCC)
+static struct gpiomux_setting np_gpio_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+static struct msm_gpiomux_config np_gpio_configs[] __initdata = {
+	FAST_GPIO_CONFIG(56, np_gpio_cfg, np_gpio_cfg),
+};
 #endif
 
 void __init msm8610_init_gpiomux(void)
@@ -915,6 +980,9 @@ void __init msm8610_init_gpiomux(void)
 		msm_gpiomux_install(msm_non_qrd_configs,
 			ARRAY_SIZE(msm_non_qrd_configs));
 	}
+#if defined(CONFIG_MACH_KANAS3G_CMCC)
+	msm_gpiomux_install(msm_uart_rxd_configs, ARRAY_SIZE(msm_uart_rxd_configs));
+#endif
 	msm_gpiomux_install(msm_uart_boot_on_configs,
 			ARRAY_SIZE(msm_uart_boot_on_configs));
 
@@ -924,12 +992,15 @@ void __init msm8610_init_gpiomux(void)
 #if defined(CONFIG_SAMSUNG_JACK)
 	msm_gpiomux_install(msm_secjack_gpio_configs, ARRAY_SIZE(msm_secjack_gpio_configs));
 #endif
+	msm_gpiomux_install(hw_rev_configs, ARRAY_SIZE(hw_rev_configs));
 #if defined(CONFIG_MACH_KANAS3G_CU) || defined(CONFIG_MACH_KANAS3G_CMCC)
 	msm_gpiomux_install(nc_gpio_configs, ARRAY_SIZE(nc_gpio_configs));
 	/* GPIO_73(VOL_DOWN) is NC since REV0.2 */
-#if !defined(CONFIG_MACH_KANAS3G_CMCC)
 	if(system_rev > 1)
 		msm_gpiomux_install(nc_gpio_configs2, ARRAY_SIZE(nc_gpio_configs2));
 #endif
+
+#if defined(CONFIG_MACH_KANAS3G_CMCC)
+	msm_gpiomux_install(np_gpio_configs, ARRAY_SIZE(np_gpio_configs));
 #endif
 }

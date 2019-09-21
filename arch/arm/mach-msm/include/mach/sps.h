@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -109,8 +109,6 @@
 #define SPS_BAM_NO_LOCAL_CLK_GATING (1UL << 5)
 /* Don't enable writeback cancel*/
 #define SPS_BAM_CANCEL_WB           (1UL << 6)
-/* Hold memory for BAM DMUX */
-#define SPS_BAM_HOLD_MEM            (1UL << 8)
 
 
 /* BAM device management flags */
@@ -179,8 +177,6 @@ enum sps_option {
 	SPS_O_IRQ_MTI   = 0x00020000,
 	/* NWD bit written with EOT for BAM2BAM producer pipe */
 	SPS_O_WRITE_NWD   = 0x00040000,
-	/* EOT set after pipe SW offset advanced */
-	SPS_O_LATE_EOT   = 0x00080000,
 
 	/* Options to enable software features */
 	/* Do not disable a pipe during disconnection */

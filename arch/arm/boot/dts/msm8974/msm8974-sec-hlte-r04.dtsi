@@ -61,12 +61,17 @@
 	mdss_mdp: qcom,mdss_mdp@fd900000 {
 		qcom,mdss-pref-prim-intf = "dsi";
 		mdss_fb0: qcom,mdss_fb_primary {
+		    qcom,memblock-reserve = <0x03200000 0x00F00000>;
 			qcom,memory-alt-reservation-size = <0x1F40000>;	 /* Framebuffer reservation only for LPM or recovery boot mode */
 		};
 	};
 
 	qcom,hdmi_tx@fd922100 {
 		status = "ok";
+	};
+
+	qcom,wcnss-wlan@fb000000 {
+		status = "disabled";
 	};
 
 	i2c@19 {
@@ -203,8 +208,8 @@
 		   SEC_BATTERY_FULL_CONDITION_NOTIMEFULL |
 		   SEC_BATTERY_FULL_CONDITION_VCELL */
 		battery,full_condition_type = <13>;
-		battery,full_condition_soc = <97>;
-		battery,full_condition_vcell = <4300>;
+		battery,full_condition_soc = <93>;
+		battery,full_condition_vcell = <4250>;
 
 		battery,recharge_check_count = <1>;
 		battery,recharge_condition_type = <4>; /* SEC_BATTERY_RECHARGE_CONDITION_VCELL */
@@ -530,7 +535,7 @@
 				<85 512 40000 160000>;
         };
 
-	wlan0: qca,wlan {
+	/* wlan0: qca,wlan {
 		compatible = "qca,ar6004-hsic";
 		qcom,msm-bus,name = "wlan";
 		qcom,msm-bus,num-cases = <5>;
@@ -542,7 +547,7 @@
 				<85 512 40000 320000>,
 				<85 512 40000 480000>,
 				<85 512 40000 800000>;
-	};
+	};*/
 
 	bluetooth_hostwake{
 		compatible = "bluetooth_hostwake";
@@ -873,6 +878,7 @@
 	};
 
 	gpio@cc00 { /* GPIO 13 */
+		qcom,vin-sel = <2>;
 	};
 
 	gpio@cd00 { /* GPIO 14 */
@@ -978,6 +984,10 @@
 	};
 
 	gpio@d900 { /* GPIO 26 */
+		qcom,mode = <0>;		/* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
 	};
 
 	gpio@da00 { /* GPIO 27 */

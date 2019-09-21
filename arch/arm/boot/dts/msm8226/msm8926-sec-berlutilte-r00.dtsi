@@ -12,6 +12,7 @@
 
 /include/ "msm8226-camera-sensor-mtp-berluti3g_eur.dtsi"
 /include/ "dsi_panel_magna_ea8061v_octa_720p_video.dtsi"
+/include/ "msm8928-w1.dtsi"
 
 &soc {
 	serial@f991f000 {
@@ -19,17 +20,19 @@
 	}; 
 	
 	i2c@f9925000 {
+		compatible = "qcom,i2c-qup";
+		qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,sda-gpio = <&msmgpio 10 0>;
+		status = "okay";
 		sec-nfc@27 {
 			compatible = "sec-nfc";
 			reg = <0x27>;
 			interrupt-parent = <&msmgpio>;
-			interrupts = <21 0>,
-				     <67 0x03>;
+			interrupts = <21 0>;
 			vdd_nfc-supply = <&pm8226_l6>;
 			sec-nfc,firm-gpio = <&msmgpio 62 0x00>;
 			sec-nfc,ven-gpio = <&msmgpio 20 0x00>;
 			sec-nfc,irq-gpio = <&msmgpio 21 0x01>;
-			sec-nfc,clk_req-gpio = <&msmgpio 67 0x03>;
 			nfc_ldo-supply = <&pm8226_l22>;
 		};
 	};
@@ -57,30 +60,35 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		fsa9485@25 {
-			compatible = "fsa9485,muic";
-			reg = <0x25>; /* 0x4A >> 1 */
+		tsu6721@25{
+			compatible = "tsu6721,i2c";
+			reg = <0x25>;
 			interrupt-parent = <&msmgpio>;
-			interrupts = <52 0>;
-			fsa9485,irq-gpio = <&msmgpio 52 0x00>;
- 			fsa9485,sda-gpio = <&msmgpio 4 0x00>;
- 			fsa9485,scl-gpio = <&msmgpio 5 0x00>;
- 			fsa9485,uarton-gpio = <&msmgpio 109 0x00>;		
+			interrupts= <52 0>;
+			tsu6721,irq-gpio = <&msmgpio 52 0x00>;
+			tsu6721,gpio-sda = <&msmgpio 4 0x00>;
+			tsu6721,gpio-scl = <&msmgpio 5 0x00>;
+			tsu6721,uarton-gpio = <&msmgpio 109 0x00>;
 		};
 	};
 
 	i2c@f9924000 { /* BLSP1 QUP2 */
-		mpu6500_input@68 {
-			compatible = "invensense,mpu_6500";
+		mpu9250@68 {
+			compatible = "mpu6515";
 			reg = <0x68>;
 			interrupt-parent = <&msmgpio>;
-			interrupts = <64 0>;
-			invensense,i2c_pull-up = <1>;
-			invensense,irq-gpio= <&msmgpio 64 0x1>;
-			invensense,scl-gpio = <&msmgpio 7 0x00>;
-			invensense,sda-gpio = <&msmgpio 6 0x00>;
-			invensense,acc_cal_path = "/efs/calibration_data";
-			invensense,gyro_cal_path = "/efs/gyro_cal_data";
+			mpu9250,device_rev = <0>;
+			mpu9250,irq_gpio = <&msmgpio 64 0x0>;
+			mpu9250,int_config = <0>;
+			mpu9250,level_shifter = <0>;
+			mpu9250,sec_slave_type = <0>;
+			mpu9250,sec_slave_id = <0>;
+			mpu9250,orientation = <1 2 1 2 1 1 1 1 0>;
+			mpu9250,key = <211 22 205 7
+				217 186 151 55
+				206 254 35 144
+				225 102 47 50>;
+			mpu9250-lvs1-supply = <&pm8226_lvs1>;
 		};
 		ak09911c-i2c@0c {
 			compatible = "ak09911c-i2c";
@@ -184,7 +192,7 @@
 				cypress,sda-gpio = <&msmgpio 22 0x00>;
 				cypress,irq-gpio = <&msmgpio 49 0x00>;
 				/* cypress,touchkey_id-gpio = <&msmgpio 101 0x00>; */
-				cypress,tkey-keycodes = <158 254>;
+				cypress,tkey-keycodes = <254 158>;
 				cypress,i2c-pull-up = <1>;
 		};
 	};
@@ -197,15 +205,6 @@
 			gpios = <&msmgpio 108 0x1>;
 			linux,input-type = <1>;
 			linux,code = <172>;
-			gpio-key,wakeup;
-			debounce-interval = <15>;
-		};
-
-		vol_down {
-			label = "volume_down";
-			gpios = <&msmgpio 107 0>;
-			linux,input-type = <1>;
-			linux,code = <114>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -234,6 +233,9 @@
 	};
 	alps {
 			compatible = "alps-input";
+	};
+	onewire {
+		gpios = <&msmgpio 107 0x00>;
 	};
 	spi@f9923000 {
 		ethernet-switch@3 {

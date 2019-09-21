@@ -87,10 +87,9 @@ static struct msm_gpiomux_config msm_hsic_configs[] = {
 
 #define KS8851_IRQ_GPIO 115
 
-#if defined (CONFIG_MACH_MILLETLTE_OPEN) || \
+#if defined (CONFIG_SEC_MILLETLTE_COMMON) || \
 	defined (CONFIG_SEC_MILLETWIFI_COMMON) || \
-	defined (CONFIG_MACH_MILLET3G_EUR) || \
-	defined (CONFIG_MACH_MILLETLTE_VZW)
+	defined (CONFIG_MACH_MILLET3G_EUR)
 #define NC_GPIO_CONFIG(gpio_num) { \
 		.gpio = gpio_num, \
 		.settings ={[GPIOMUX_SUSPENDED] = &nc_cfg,}\
@@ -101,6 +100,19 @@ static struct gpiomux_setting nc_cfg = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 	.dir = GPIOMUX_IN,
+};
+#endif
+
+#if defined(CONFIG_MACH_MILLETLTE_CAN)
+#define NC_GPIO_CONFIG_CAN(gpio_num) { \
+		.gpio = gpio_num, \
+		.settings ={[GPIOMUX_SUSPENDED] = &nc_cfg_can,}\
+}
+
+static struct gpiomux_setting nc_cfg_can = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
 };
 #endif
 
@@ -1564,7 +1576,7 @@ static void msm_gpiomux_sdc3_install(void) {}
 
 extern int system_rev;
 
-#if defined (CONFIG_MACH_MILLETLTE_OPEN)
+#if defined (CONFIG_MACH_MILLETLTE_OPEN) || defined (CONFIG_MACH_MILLETLTE_KOR)
 static struct msm_gpiomux_config millet_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(115),
 	NC_GPIO_CONFIG(116),
@@ -1594,10 +1606,15 @@ static struct msm_gpiomux_config milletwifi_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(116),
 };
 #endif
-#if defined (CONFIG_MACH_MILLETLTE_VZW)
-static struct msm_gpiomux_config milletltevzw_nc_gpio_cfgs[] __initdata = {
+#if defined (CONFIG_MACH_MILLETLTE_VZW) || defined(CONFIG_MACH_MILLETLTE_ATT) || defined(CONFIG_MACH_MILLETLTE_TMO) || defined(CONFIG_MACH_MILLETLTE_CAN)
+static struct msm_gpiomux_config milletltevzw_att_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(2),
 	NC_GPIO_CONFIG(3),
+#if defined(CONFIG_MACH_MILLETLTE_CAN)
+	NC_GPIO_CONFIG_CAN(22),
+#else
+	NC_GPIO_CONFIG(22),
+#endif
 	NC_GPIO_CONFIG(52),
 };
 #endif
@@ -1613,7 +1630,7 @@ static struct msm_gpiomux_config millet3g_nc_gpio_cfgs[] __initdata = {
 };
 #endif
 
-#if defined (CONFIG_MACH_MILLETLTE_VZW)
+#if defined (CONFIG_SEC_MILLET_PROJECT)
 static struct gpiomux_setting gpio_10_sda_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -1632,6 +1649,21 @@ static struct msm_gpiomux_config milletltevzw_gpio_10[] __initdata = {
 };
 #endif
 
+#if defined (CONFIG_MACH_MILLETLTE_ATT) || defined(CONFIG_MACH_MILLETLTE_TMO) || defined(CONFIG_MACH_MILLETLTE_CAN)
+static struct msm_gpiomux_config milletatt_tmo_nc_gpio_107[] __initdata = {
+	NC_GPIO_CONFIG(107),	// NC, revision 1 onwards
+};
+#endif
+#if defined (CONFIG_MACH_MILLETLTE_VZW)
+static struct msm_gpiomux_config milletvzw_nc_gpio_22[] __initdata = {
+	NC_GPIO_CONFIG(22),
+};
+static struct msm_gpiomux_config milletvzw_nc_gpio_107[] __initdata = {
+	NC_GPIO_CONFIG(107),	// NC only after revision 4
+};
+#endif
+
+
 void __init msm8226_init_gpiomux(void)
 {
 	int rc;
@@ -1641,7 +1673,7 @@ void __init msm8226_init_gpiomux(void)
 		pr_err("%s failed %d\n", __func__, rc);
 		return;
 	}
-#if defined (CONFIG_MACH_MILLETLTE_VZW)
+#if defined (CONFIG_SEC_MILLET_PROJECT)
 	msm_gpiomux_install(milletltevzw_gpio_10, ARRAY_SIZE(milletltevzw_gpio_10));
 #endif
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
@@ -1672,10 +1704,10 @@ void __init msm8226_init_gpiomux(void)
 		msm_gpiomux_install(msm_keyboad_cypress_configs,
 				ARRAY_SIZE(msm_keyboad_cypress_configs));
 #elif defined(CONFIG_SEC_MILLET_PROJECT)
-msm_gpiomux_install(msm_melfas_configs,
+	msm_gpiomux_install(msm_melfas_configs,
 				ARRAY_SIZE(msm_melfas_configs));
 #else
-		msm_gpiomux_install(msm_synaptics_configs,
+	msm_gpiomux_install(msm_synaptics_configs,
 				ARRAY_SIZE(msm_synaptics_configs));
 #endif
 	if (of_board_is_skuf())
@@ -1718,50 +1750,62 @@ msm_gpiomux_install(msm_melfas_configs,
 
 	msm_gpiomux_install(msm_ta_nchg_configs, ARRAY_SIZE(msm_ta_nchg_configs));
 	msm_gpiomux_install(msm_ta_int_n_configs, ARRAY_SIZE(msm_ta_int_n_configs));
-  #if defined (CONFIG_SEC_MILLETLTE_COMMON)
-  if ( system_rev >= 3)
-  {
-    msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
-  }
-  #else
-    msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
-  #endif
+#if defined (CONFIG_SEC_MILLETLTE_COMMON)
+	if ( system_rev >= 3)
+	{
+		msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
+	}
+#else
+	msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
+#endif
 #if defined (CONFIG_SEC_MILLETWIFI_COMMON)
 	msm_gpiomux_install(milletwifi_nc_gpio_cfgs, ARRAY_SIZE(milletwifi_nc_gpio_cfgs));
 #endif
-#if defined (CONFIG_MACH_MILLETLTE_OPEN)
-msm_gpiomux_install(millet_nc_gpio_cfgs, ARRAY_SIZE(millet_nc_gpio_cfgs));
-if ( system_rev >= 3){
-	msm_gpiomux_install(millet_nc3_gpio_cfgs, ARRAY_SIZE(millet_nc3_gpio_cfgs));
-}
+#if defined (CONFIG_MACH_MILLETLTE_OPEN) || defined (CONFIG_MACH_MILLETLTE_KOR)
+	msm_gpiomux_install(millet_nc_gpio_cfgs, ARRAY_SIZE(millet_nc_gpio_cfgs));
+	if ( system_rev >= 3){
+		msm_gpiomux_install(millet_nc3_gpio_cfgs, ARRAY_SIZE(millet_nc3_gpio_cfgs));
+	}
 #endif
 #if defined (CONFIG_MACH_MILLET3G_EUR)
-if ( system_rev >= 2)
-	msm_gpiomux_install(millet3g_nc_gpio_cfgs, ARRAY_SIZE(millet3g_nc_gpio_cfgs));
+	if ( system_rev >= 2)
+		msm_gpiomux_install(millet3g_nc_gpio_cfgs, ARRAY_SIZE(millet3g_nc_gpio_cfgs));
 #endif
 #if defined (CONFIG_MACH_MILLETLTE_VZW)
-if ( system_rev >= 1)
-	msm_gpiomux_install(milletltevzw_nc_gpio_cfgs, ARRAY_SIZE(milletltevzw_nc_gpio_cfgs));
+	msm_gpiomux_install(milletvzw_nc_gpio_22, ARRAY_SIZE(milletvzw_nc_gpio_22));
+
+	if ( system_rev >= 4)
+		msm_gpiomux_install(milletvzw_nc_gpio_107, ARRAY_SIZE(milletvzw_nc_gpio_107));
+
+	if ( system_rev >= 1)
+		msm_gpiomux_install(milletltevzw_att_nc_gpio_cfgs, ARRAY_SIZE(milletltevzw_att_nc_gpio_cfgs));
 #endif
+#if defined (CONFIG_MACH_MILLETLTE_ATT) || defined(CONFIG_MACH_MILLETLTE_TMO) || defined(CONFIG_MACH_MILLETLTE_CAN)
+	msm_gpiomux_install(milletltevzw_att_nc_gpio_cfgs, ARRAY_SIZE(milletltevzw_att_nc_gpio_cfgs));
+	msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
+	if (system_rev >= 1)
+		msm_gpiomux_install(milletatt_tmo_nc_gpio_107, ARRAY_SIZE(milletatt_tmo_nc_gpio_107));
+#endif
+
 #if defined(CONFIG_SAMSUNG_JACK)
 	msm_gpiomux_install(msm_earjack_gpio_configs, ARRAY_SIZE(msm_earjack_gpio_configs));
 #endif
 	if(!poweroff_charging)
 	msm_gpiomux_install(wcdcodec_reset_cfg, ARRAY_SIZE(wcdcodec_reset_cfg));
-#ifdef CONFIG_SND_SOC_MAX98504
-#if defined(CONFIG_MACH_MILLETLTE_OPEN)
-				if ( system_rev >= 0 && system_rev < 3)
-#elif defined (CONFIG_MACH_MILLET3G_EUR)
-				if ( system_rev >= 2 && system_rev < 4)
-#elif defined(CONFIG_MACH_MILLETWIFI_OPEN)
-				if ( system_rev >= 0 && system_rev < 5)
-#endif
 
-		{
-			msm_gpiomux_install(msm8226_tertiary_mi2s_configs,ARRAY_SIZE(msm8226_tertiary_mi2s_configs));
-			msm_gpiomux_install(msm8226_blsp_codec_configs,ARRAY_SIZE(msm8226_blsp_codec_configs));
-			msm_gpiomux_install(msm8226_amp_int_configs,ARRAY_SIZE(msm8226_amp_int_configs));
-		}
+#ifdef CONFIG_SND_SOC_MAX98504
+#if defined(CONFIG_MACH_MILLETLTE_OPEN) || defined (CONFIG_MACH_MILLETLTE_KOR)
+	if ( system_rev >= 0 && system_rev < 3)
+#elif defined (CONFIG_MACH_MILLET3G_EUR)
+	if ( system_rev >= 2 && system_rev < 4)
+#elif defined(CONFIG_MACH_MILLETWIFI_OPEN)
+	if ( system_rev >= 0 && system_rev < 5)
+#endif
+	{
+		msm_gpiomux_install(msm8226_tertiary_mi2s_configs,ARRAY_SIZE(msm8226_tertiary_mi2s_configs));
+		msm_gpiomux_install(msm8226_blsp_codec_configs,ARRAY_SIZE(msm8226_blsp_codec_configs));
+		msm_gpiomux_install(msm8226_amp_int_configs,ARRAY_SIZE(msm8226_amp_int_configs));
+	}
 #endif
 }
 

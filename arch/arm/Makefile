@@ -1,3 +1,4 @@
+#
 # arch/arm/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -22,7 +23,6 @@ KBUILD_CFLAGS	+=$(call cc-option,-marm,)
 
 # Never generate .eh_frame
 KBUILD_CFLAGS	+= $(call cc-option,-fno-dwarf2-cfi-asm)
-KBUILD_CFLAGS	+= -fno-pic
 
 # Do not use arch/arm/defconfig - it's always outdated.
 # Select a platform tht is kept up-to-date
@@ -88,8 +88,7 @@ arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
 # doesn't even support -march=armv7-a, since in that situation we would have
 # bigger problems.
 arch-$(CONFIG_ARCH_MSM_KRAIT)	:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-mcpu=cortex-a15,-march=armv7-a)
-arch-$(CONFIG_ARCH_MSM8226)     :=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-mcpu=cortex-a7,-march=armv7-a)		
-arch-$(CONFIG_ARCH_MSM8610)     :=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-mcpu=cortex-a7,-march=armv7-a)
+arch-$(CONFIG_MSM_CORTEX_A7)	:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-mcpu=cortex-a15,-march=armv7-a)
 
 # This selects how we optimise for the processor.
 tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
@@ -316,6 +315,9 @@ zinstall uinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 dtbs: scripts
+	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+
+zImage-dtb: vmlinux scripts
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 # We use MRPROPER_FILES and CLEAN_FILES now

@@ -191,7 +191,7 @@
 				mxts,max_x = <4095>; /*max x*/
 				mxts,max_y = <4095>; /*max y*/
 				mxts,tsp_coord = <27 44 4095 4095>;
-				mxts,pname = "SM-T531"; /*Matisse SM-T531*/
+				mxts,pname = "SM-T530"; /*Matisse SM-T530*/
 		};
 	};
 	gpio_keys {
@@ -233,7 +233,7 @@
 			label = "hall_flip";
 			gpios = <&msmgpio 110 0>;
 			linux,input-type = <1>;
-			linux,code = <0x15>;
+			linux,code = <0x0>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -355,6 +355,7 @@
 			status = "disable";
 			/* Charger */
 			battery,charger_name = "smb358";
+			battery,vbus_ctrl_gpio = <&msmgpio 64 0x00>;
 			battery,chg_gpio_en = <0>;
 			battery,chg_polarity_en = <0>;
 			battery,chg_gpio_status = <0>;

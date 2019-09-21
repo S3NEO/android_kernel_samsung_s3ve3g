@@ -20,7 +20,7 @@
 
 /dts-v1/;
 /include/ "msm8926.dtsi"
-/include/ "msm8926-sec-matisseltevzw-r01.dtsi"
+/include/ "msm8926-sec-matisselteusc-r01.dtsi"
 
 / {
 	model = "[MATISSE-LTE-USC] Rev-01-MTP-v2";

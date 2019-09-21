@@ -50,13 +50,6 @@ static struct msm_gpiomux_config msm_hsic_configs[] = {
 			[GPIOMUX_SUSPENDED] = &hsic_sus_cfg,
 		},
 	},
-	{
-		.gpio = 116,               /* HSIC_DATA */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &hsic_act_cfg,
-			[GPIOMUX_SUSPENDED] = &hsic_sus_cfg,
-		},
-	},
 };
 #endif
 
@@ -342,6 +335,16 @@ static struct gpiomux_setting lcd_esd_cfg = {
 	.dir = GPIOMUX_IN,
 };
 
+static struct msm_gpiomux_config msm_lcd_1p8v_en_configs[] __initdata = {
+	{
+		.gpio = 116,		/* LCD IO 1P8V EN */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &lcd_rst_act_cfg,
+			[GPIOMUX_SUSPENDED] = &lcd_rst_sus_cfg,
+		},
+	},
+};
+
 static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 	{
 		.gpio = 25,		/* LCD Reset */
@@ -402,7 +405,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 #if !defined (CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT)
-#if !defined(CONFIG_MACH_AFYONLTE_TMO)
+#if !defined(CONFIG_MACH_AFYONLTE_TMO) && !defined(CONFIG_MACH_AFYONLTE_CAN)
 	{
 		.gpio      = 0,		/* BLSP1 QUP1 SPI_DATA_MOSI */
 		.settings = {
@@ -706,7 +709,7 @@ static struct msm_gpiomux_config msm_skuf_goodix_configs[] __initdata = {
 		},
 	},
 };
-#if !defined (CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT) && !defined(CONFIG_MACH_AFYONLTE_TMO)
+#if !defined (CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT) && !defined(CONFIG_MACH_AFYONLTE_TMO) && !defined(CONFIG_MACH_AFYONLTE_CAN) && !defined(CONFIG_MACH_AFYONLTE_MTR)
 
 static struct gpiomux_setting nfc_ldo_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -747,7 +750,7 @@ static struct gpiomux_setting nfc_wake_sus_cfg = {
 };
 
 static struct msm_gpiomux_config msm_skuf_nfc_configs[] __initdata = {
-#if !defined (CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT) && !defined(CONFIG_MACH_AFYONLTE_TMO)
+#if !defined (CONFIG_SEC_MILLET_PROJECT) && !defined(CONFIG_SEC_MATISSE_PROJECT) && !defined(CONFIG_MACH_AFYONLTE_TMO) && !defined(CONFIG_MACH_AFYONLTE_CAN) && !defined(CONFIG_MACH_AFYONLTE_MTR)
 	{					/*  NFC  LDO EN */
 		.gpio      = 0,
 		.settings = {
@@ -927,6 +930,11 @@ static struct gpiomux_setting cam_settings[] = {
 		.pull = GPIOMUX_PULL_NONE,
 		.dir = GPIOMUX_OUT_LOW,
 	},
+	{
+		.func = GPIOMUX_FUNC_1, /*active 1*/ /* 6 */
+		.drv = GPIOMUX_DRV_4MA,
+		.pull = GPIOMUX_PULL_NONE,
+	},
 };
 
 
@@ -934,7 +942,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 	{
 		.gpio = 26, /* CAM_MCLK */
 		.settings = {
-			[GPIOMUX_ACTIVE]    = &cam_settings[0],
+			[GPIOMUX_ACTIVE]    = &cam_settings[6],
 			[GPIOMUX_SUSPENDED] = &cam_settings[1],
 		},
 	},
@@ -1156,6 +1164,26 @@ static struct msm_gpiomux_config msm8226_tertiary_mi2s_configs[] __initdata = {
 };
 #endif /* CONFIG_SND_SOC_MAX98504 */
 
+static struct gpiomux_setting ovp_enable_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_HIGH,
+};
+
+static struct msm_gpiomux_config ovp_enable_configs[] = {
+	{
+		.gpio = 120,             /* OVP enable */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &ovp_enable_cfg,
+			[GPIOMUX_SUSPENDED] = &ovp_enable_cfg,
+		},
+	},
+};
+static struct msm_gpiomux_config ovp_nc_configs[] = {
+	NC_GPIO_CONFIG(120),
+};
+
 static struct gpiomux_setting usb_otg_sw_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -1259,6 +1287,10 @@ static void msm_gpiomux_sdc3_install(void) {}
 extern int system_rev;
 
 /*NC GPIOs configuration*/
+static struct msm_gpiomux_config afyon_nc_gpio_116[] __initdata = {
+	/* Not NC after revision 5 board, install this only for revision 4 or less */
+	NC_GPIO_CONFIG(116),
+};
 static struct msm_gpiomux_config afyon_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(24),
 	NC_GPIO_CONFIG(45),
@@ -1283,9 +1315,7 @@ static struct msm_gpiomux_config afyon_nc_gpio_cfgs[] __initdata = {
 	NC_GPIO_CONFIG(103),
 	NC_GPIO_CONFIG(104),
 	NC_GPIO_CONFIG(115),
-	NC_GPIO_CONFIG(116),
 	NC_GPIO_CONFIG(117),
-	NC_GPIO_CONFIG(120),
 };
 
 void __init msm8226_init_gpiomux(void)
@@ -1338,6 +1368,9 @@ void __init msm8226_init_gpiomux(void)
 
 	msm_gpiomux_install_nowrite(msm_lcd_configs,
 			ARRAY_SIZE(msm_lcd_configs));
+	if (system_rev >=5)
+	msm_gpiomux_install_nowrite(msm_lcd_1p8v_en_configs,
+			ARRAY_SIZE(msm_lcd_1p8v_en_configs));
 
 	msm_gpiomux_install(msm_sensor_configs, ARRAY_SIZE(msm_sensor_configs));
 
@@ -1348,6 +1381,11 @@ void __init msm8226_init_gpiomux(void)
 	msm_gpiomux_install(msm_auxpcm_configs,
 			ARRAY_SIZE(msm_auxpcm_configs));
 
+	if ( system_rev>=4 && system_rev<6)
+		msm_gpiomux_install(ovp_enable_configs, ARRAY_SIZE(ovp_enable_configs));
+	else
+		msm_gpiomux_install(ovp_nc_configs, ARRAY_SIZE(ovp_nc_configs));
+
 	if (of_board_is_cdp() || of_board_is_mtp() || of_board_is_xpm())
 		msm_gpiomux_install(usb_otg_sw_configs,
 					ARRAY_SIZE(usb_otg_sw_configs));
@@ -1356,10 +1394,12 @@ void __init msm8226_init_gpiomux(void)
 #endif
 
 	/*
-	 * gpio mux settings for the NC GPIOs	
+	 * gpio mux settings for the NC GPIOs
 	 */
 	msm_gpiomux_install(afyon_nc_gpio_cfgs,
 			ARRAY_SIZE(afyon_nc_gpio_cfgs));
+	if(system_rev <=4)
+		msm_gpiomux_install(afyon_nc_gpio_116, ARRAY_SIZE(afyon_nc_gpio_116));
 
 	msm_gpiomux_sdc3_install();
 
