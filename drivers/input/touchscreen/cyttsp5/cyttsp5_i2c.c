@@ -117,12 +117,23 @@ static struct of_device_id cyttsp5_i2c_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, cyttsp5_i2c_of_match);
 
+#if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
+extern int get_lcd_attached(void);
+#endif
+
 static int cyttsp5_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *i2c_id)
 {
 	struct device *dev = &client->dev;
 #ifdef CONFIG_TOUCHSCREEN_CYTTSP5_DEVICETREE_SUPPORT	
 	const struct of_device_id *match;
+#endif
+
+#if defined(CONFIG_FB_MSM8x26_MDSS_CHECK_LCD_CONNECTION)
+	if (get_lcd_attached() == 0) {
+		dev_err(&client->dev, "%s : get_lcd_attached()=0 \n", __func__);
+		return -EIO;
+	}
 #endif
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
@@ -159,6 +170,19 @@ static int cyttsp5_i2c_remove(struct i2c_client *client)
 	return 0;
 }
 
+static void cyttsp5_i2c_shutdown(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	const struct of_device_id *match;
+	struct cyttsp5_core_data *cd = i2c_get_clientdata(client);
+
+	cyttsp5_release(cd);
+
+	match = of_match_device(of_match_ptr(cyttsp5_i2c_of_match), dev);
+	if (match)
+		cyttsp5_devtree_clean_pdata(dev);
+}
+
 static const struct i2c_device_id cyttsp5_i2c_id[] = {
 	{ CYTTSP5_I2C_NAME, 0, },
 	{ }
@@ -169,11 +193,12 @@ static struct i2c_driver cyttsp5_i2c_driver = {
 	.driver = {
 		.name = CYTTSP5_I2C_NAME,
 		.owner = THIS_MODULE,
-		.pm = &cyttsp5_pm_ops,
+/*		.pm = &cyttsp5_pm_ops,*/
 		.of_match_table = cyttsp5_i2c_of_match,
 	},
 	.probe = cyttsp5_i2c_probe,
 	.remove = cyttsp5_i2c_remove,
+	.shutdown = cyttsp5_i2c_shutdown,
 	.id_table = cyttsp5_i2c_id,
 };
 

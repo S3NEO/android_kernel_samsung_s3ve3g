@@ -389,11 +389,23 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 		return 0;
 	}
 
+#ifdef CONFIG_VIBRATOR_UPDATE
 	/* Check buffer size */
+	if ((count < SPI_HEADER_SIZE) || (count > SPI_BUFFER_SIZE)) {
+		DbgOut((KERN_ERR "tspdrv: invalid write buffer size.\n"));
+		return 0;
+	}
+	if (count == SPI_HEADER_SIZE)
+		g_bOutputDataBufferEmpty = 1;
+	else
+		g_bOutputDataBufferEmpty = 0;
+
+#else
 	if ((count <= SPI_HEADER_SIZE) || (count > SPI_BUFFER_SIZE)) {
 		DbgOut((KERN_ERR "tspdrv: invalid write buffer size.\n"));
 		return 0;
 	}
+#endif
 
 	/* Copy immediately the input buffer */
 	if (0 != copy_from_user(g_cwrite_buffer, buf, count)) {
@@ -408,7 +420,11 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 		samples_buffer *pinput_buffer =
 			(samples_buffer *)(&g_cwrite_buffer[i]);
 
+#ifdef CONFIG_VIBRATOR_UPDATE
+		if ((i + SPI_HEADER_SIZE) > count) {
+#else
 		if ((i + SPI_HEADER_SIZE) >= count) {
+#endif
 			/*
 			** Index is about to go beyond the buffer size.
 			** (Should never happen).
@@ -534,6 +550,9 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 
 	case TSPDRV_MAGIC_NUMBER:
+#ifdef CONFIG_VIBRATOR_UPDATE
+	case TSPDRV_SET_MAGIC_NUMBER:
+#endif
 		filp->private_data = (void *)TSPDRV_MAGIC_NUMBER;
 		break;
 
@@ -551,8 +570,15 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		** If a stop was requested, ignore the request as the amp
 		** will be disabled by the timer proc when it's ready
 		*/
+#ifdef CONFIG_VIBRATOR_UPDATE
+		g_bstoprequested = true;
+		/* Last data processing to disable amp and stop timer */
+		VibeOSKernelProcessData(NULL);
+		g_bisplaying = false;
+#else
 		if (!g_bstoprequested)
 			ImmVibeSPI_ForceOut_AmpDisable(arg);
+#endif
 		wake_unlock(&vib_wake_lock);
 		break;
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -38,11 +38,10 @@
 #define MIN_PLAYBACK_NUM_PERIODS (4)
 #define MAX_PLAYBACK_NUM_PERIODS (768)
 
-#define MIN_CAPTURE_PERIOD_SIZE (128 * 2)
+#define MIN_CAPTURE_PERIOD_SIZE (128 * 2 * 4)
 #define MAX_CAPTURE_PERIOD_SIZE (128 * 2 * 2 * 6 * 4)
 #define MIN_CAPTURE_NUM_PERIODS (4)
-#define MAX_CAPTURE_NUM_PERIODS (1536)
-
+#define MAX_CAPTURE_NUM_PERIODS (384)
 
 static struct snd_pcm_hardware msm_afe_hardware_playback = {
 	.info =                 (SNDRV_PCM_INFO_MMAP |
@@ -495,6 +494,7 @@ done:
 	mutex_unlock(&prtd->lock);
 	prtd->prepared--;
 	kfree(prtd);
+	runtime->private_data = NULL;
 	return 0;
 }
 static int msm_afe_prepare(struct snd_pcm_substream *substream)

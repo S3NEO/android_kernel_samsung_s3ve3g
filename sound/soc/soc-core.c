@@ -1580,7 +1580,7 @@ static int snd_soc_instantiate_card(struct snd_soc_card *card)
 	struct snd_soc_dai_link *dai_link;
 	int ret, i, order;
 
-	mutex_lock(&card->mutex);
+	mutex_lock_nested(&card->mutex, SND_SOC_CARD_CLASS_INIT);
 
 
 	/* bind DAIs */
@@ -2039,9 +2039,13 @@ unsigned int snd_soc_read(struct snd_soc_codec *codec, unsigned int reg)
 		dev_err(codec->dev, "read 0x%02x while offline\n", reg);
 		return -ENODEV;
 	}
-	ret = codec->read(codec, reg);
-	dev_dbg(codec->dev, "read %x => %x\n", reg, ret);
-	trace_snd_soc_reg_read(codec, reg, ret);
+        if (codec->read) {
+		ret = codec->read(codec, reg);
+		dev_dbg(codec->dev, "read %x => %x\n", reg, ret);
+		trace_snd_soc_reg_read(codec, reg, ret);
+        }
+        else
+		ret = -EIO;
 
 	return ret;
 }
@@ -2054,9 +2058,13 @@ unsigned int snd_soc_write(struct snd_soc_codec *codec,
 		dev_err(codec->dev, "write 0x%02x while offline\n", reg);
 		return -ENODEV;
 	}
-	dev_dbg(codec->dev, "write %x = %x\n", reg, val);
-	trace_snd_soc_reg_write(codec, reg, val);
-	return codec->write(codec, reg, val);
+	if (codec->write) {
+		dev_dbg(codec->dev, "write %x = %x\n", reg, val);
+		trace_snd_soc_reg_write(codec, reg, val);
+		return codec->write(codec, reg, val);
+        }
+	else
+		return -EIO;
 }
 EXPORT_SYMBOL_GPL(snd_soc_write);
 
@@ -2941,115 +2949,6 @@ int snd_soc_put_volsw_2r_sx(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_put_volsw_2r_sx);
-
-int snd_soc_bytes_info(struct snd_kcontrol *kcontrol,
-		       struct snd_ctl_elem_info *uinfo)
-{
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	struct soc_bytes *params = (void *)kcontrol->private_value;
-
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BYTES;
-	uinfo->count = params->num_regs * codec->val_bytes;
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(snd_soc_bytes_info);
-
-int snd_soc_bytes_get(struct snd_kcontrol *kcontrol,
-		      struct snd_ctl_elem_value *ucontrol)
-{
-	struct soc_bytes *params = (void *)kcontrol->private_value;
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	int ret;
-
-	if (codec->using_regmap)
-		ret = regmap_raw_read(codec->control_data, params->base,
-				      ucontrol->value.bytes.data,
-				      params->num_regs * codec->val_bytes);
-	else
-		ret = -EINVAL;
-
-	/* Hide any masked bytes to ensure consistent data reporting */
-	if (ret == 0 && params->mask) {
-		switch (codec->val_bytes) {
-		case 1:
-			ucontrol->value.bytes.data[0] &= ~params->mask;
-			break;
-		case 2:
-			((u16 *)(&ucontrol->value.bytes.data))[0]
-				&= ~params->mask;
-			break;
-		case 4:
-			((u32 *)(&ucontrol->value.bytes.data))[0]
-				&= ~params->mask;
-			break;
-		default:
-			return -EINVAL;
-		}
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(snd_soc_bytes_get);
-
-int snd_soc_bytes_put(struct snd_kcontrol *kcontrol,
-		      struct snd_ctl_elem_value *ucontrol)
-{
-	struct soc_bytes *params = (void *)kcontrol->private_value;
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	int ret, len;
-	unsigned int val;
-	void *data;
-
-	if (!codec->using_regmap || !params->num_regs)
-		return -EINVAL;
-
-	data = ucontrol->value.bytes.data;
-	len = params->num_regs * codec->val_bytes;
-
-	/*
-	 * If we've got a mask then we need to preserve the register
-	 * bits.  We shouldn't modify the incoming data so take a
-	 * copy.
-	 */
-	if (params->mask) {
-		ret = regmap_read(codec->control_data, params->base, &val);
-		if (ret != 0)
-			return ret;
-
-		val &= params->mask;
-
-		data = kmemdup(data, len, GFP_KERNEL);
-		if (!data)
-			return -ENOMEM;
-
-		switch (codec->val_bytes) {
-		case 1:
-			((u8 *)data)[0] &= ~params->mask;
-			((u8 *)data)[0] |= val;
-			break;
-		case 2:
-			((u16 *)data)[0] &= cpu_to_be16(~params->mask);
-			((u16 *)data)[0] |= cpu_to_be16(val);
-			break;
-		case 4:
-			((u32 *)data)[0] &= cpu_to_be32(~params->mask);
-			((u32 *)data)[0] |= cpu_to_be32(val);
-			break;
-		default:
-			return -EINVAL;
-		}
-	}
-
-	ret = regmap_raw_write(codec->control_data, params->base,
-			       data, len);
-
-	if (params->mask)
-		kfree(data);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(snd_soc_bytes_put);
 
 /**
  * snd_soc_dai_set_sysclk - configure DAI system or master clock.

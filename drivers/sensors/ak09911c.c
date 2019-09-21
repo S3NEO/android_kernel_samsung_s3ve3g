@@ -33,14 +33,16 @@
 #include "ak09911c_reg.h"
 
 /* Rx buffer size. i.e ST,TMPS,H1X,H1Y,H1Z*/
-#define SENSOR_DATA_SIZE		9
-#define AK09911C_DEFAULT_DELAY		200000000LL
-#define AK09911C_DRDY_TIMEOUT_MS	100
-#define AK09911C_WIA1_VALUE		0x48
-#define AK09911C_WIA2_VALUE		0x05
+#define SENSOR_DATA_SIZE				9
+#define AK09911C_DEFAULT_DELAY			200000000LL
+#define BASE_DELAY                 		20000000LL
+#define MOD_DELAY                   	1000000LL
+#define AK09911C_DRDY_TIMEOUT_MS		100
+#define AK09911C_WIA1_VALUE				0x48
+#define AK09911C_WIA2_VALUE				0x05
 
-#define I2C_M_WR                        0 /* for i2c Write */
-#define I2c_M_RD                        1 /* for i2c Read */
+#define I2C_M_WR						0 /* for i2c Write */
+#define I2c_M_RD						1 /* for i2c Read */
 
 #define VENDOR_NAME                     "AKM"
 #define MODEL_NAME                      "AK09911C"
@@ -80,6 +82,7 @@ struct ak09911c_p {
 	u8 asa[3];
 	u32 chip_pos;
 	int m_rst_n;
+	u64 timestamp;
 };
 
 static int ak09911c_i2c_read(struct i2c_client *client,
@@ -136,12 +139,27 @@ static int ak09911c_i2c_write(struct i2c_client *client,
 static int ak09911c_i2c_read_block(struct i2c_client *client,
 		unsigned char reg_addr, unsigned char *buf, unsigned char len)
 {
-	int i, ret = 0;
+	int ret;
+	struct i2c_msg msg[2];
 
-	for (i = 0; i < len; i++)
-		ret += ak09911c_i2c_read(client, reg_addr + i, &buf[i]);
+	msg[0].addr = client->addr;
+	msg[0].flags = I2C_M_WR;
+	msg[0].len = 1;
+	msg[0].buf = &reg_addr;
 
-	return ret;
+	msg[1].addr = client->addr;
+	msg[1].flags = I2C_M_RD;
+	msg[1].len = len;
+	msg[1].buf = buf;
+
+	ret = i2c_transfer(client->adapter, msg, 2);
+	if (ret < 0) {
+		pr_err("[SENSOR]: %s - i2c bus read error %d\n",
+			__func__, ret);
+		return ret;
+	}
+
+	return 0;
 }
 
 static int ak09911c_ecs_set_mode_power_down(struct ak09911c_p *data)
@@ -208,12 +226,15 @@ again:
 
 	/* Check ST bit */
 	if (!(temp[0] & 0x01)) {
-		if ((retries++ < 5) && (temp[0] == 0)) {
-			mdelay(2);
+		if ((retries++ < 3) && (temp[0] == 0)) {
 			goto again;
 		} else {
-			ret = -EAGAIN;
-			goto exit_i2c_read_fail;
+			// If data is not ready to read, store previous data to avoid event gap
+			mag->x = data->magdata.x;
+			mag->y = data->magdata.y;
+			mag->z = data->magdata.z;
+			ret = 0;
+			goto exit;
 		}
 	}
 
@@ -221,13 +242,13 @@ again:
 			&temp[1], SENSOR_DATA_SIZE - 1);
 	if (ret < 0)
 		goto exit_i2c_read_err;
-
+#if 0
 	/* Check ST2 bit */
-	if ((temp[8] & 0x01)) {
+	if ((temp[8] & 0x08)) {
 		ret = -EAGAIN;
-		goto exit_i2c_read_fail;
+		goto exit_i2c_read_err;
 	}
-
+#endif
 	mag->x = temp[1] | (temp[2] << 8);
 	mag->y = temp[3] | (temp[4] << 8);
 	mag->z = temp[5] | (temp[6] << 8);
@@ -236,7 +257,6 @@ again:
 
 	goto exit;
 
-exit_i2c_read_fail:
 exit_i2c_read_err:
 	pr_err("[SENSOR]: %s - ST1 = %u, ST2 = %u\n",
 		__func__, temp[0], temp[8]);
@@ -249,15 +269,34 @@ static void ak09911c_work_func(struct work_struct *work)
 {
 	int ret;
 	struct ak09911c_v mag;
+	struct timespec ts;
+	int time_hi, time_lo;
+
 	struct ak09911c_p *data = container_of((struct delayed_work *)work,
 			struct ak09911c_p, work);
 	unsigned long delay = nsecs_to_jiffies(atomic_read(&data->delay));
 
+	ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	
+	time_hi = (int)((data->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
+	time_lo = (int)(data->timestamp & TIME_LO_MASK);
+
 	ret = ak09911c_read_mag_xyz(data, &mag);
+
+	// 0 value is ignored using input_report_rel.
+	mag.x = (mag.x >= 0) ? (mag.x + 1) : (mag.x - 1);
+	mag.y = (mag.y >= 0) ? (mag.y + 1) : (mag.y - 1);
+	mag.z = (mag.z >= 0) ? (mag.z + 1) : (mag.z - 1);
+	time_hi = (time_hi >= 0) ? (time_hi + 1) : (time_hi - 1);
+	time_lo = (time_lo >= 0) ? (time_lo + 1) : (time_lo - 1);
+
 	if (ret >= 0) {
 		input_report_rel(data->input, REL_X, mag.x);
 		input_report_rel(data->input, REL_Y, mag.y);
 		input_report_rel(data->input, REL_Z, mag.z);
+		input_report_rel(data->input, REL_RX, time_hi);
+		input_report_rel(data->input, REL_RY, time_lo);
 		input_sync(data->input);
 		data->magdata = mag;
 	}
@@ -334,6 +373,9 @@ static ssize_t ak09911c_delay_store(struct device *dev,
 		pr_err("[SENSOR]: %s - Invalid Argument\n", __func__);
 		return ret;
 	}
+
+	if (delay >= BASE_DELAY)
+		delay = delay - MOD_DELAY;
 
 	atomic_set(&data->delay, (int64_t)delay);
 	pr_info("[SENSOR]: %s - poll_delay = %lld\n", __func__, delay);
@@ -597,6 +639,8 @@ static ssize_t ak09911c_adc(struct device *dev,
 	else
 		success = true;
 
+	data->magdata = mag;
+
 exit:
 	return snprintf(buf, PAGE_SIZE, "%s,%d,%d,%d\n",
 			(success ? "OK" : "NG"), mag.x, mag.y, mag.z);
@@ -614,6 +658,7 @@ static ssize_t ak09911c_raw_data_read(struct device *dev,
 	}
 
 	ak09911c_read_mag_xyz(data, &mag);
+	data->magdata = mag;
 
 exit:
 	return snprintf(buf, PAGE_SIZE, "%d,%d,%d\n", mag.x, mag.y, mag.z);
@@ -757,6 +802,8 @@ static int ak09911c_input_init(struct ak09911c_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
+	input_set_capability(dev, EV_REL, REL_RX); /* time_hi */
+	input_set_capability(dev, EV_REL, REL_RY); /* time_lo */
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);
@@ -841,7 +888,7 @@ static void ak09911c_power_enable(int en)
 	}
 	return;
 }
-#elif defined(CONFIG_SEC_BERLUTI_PROJECT)
+#elif defined(CONFIG_SEC_BERLUTI_PROJECT) || defined(CONFIG_MACH_CHAGALL_KDI)
 static void ak09911c_power_enable(struct device *dev, bool onoff)
 {
 	struct regulator *ak09911c_vcc, *ak09911c_lvs1;
@@ -911,8 +958,11 @@ static int ak09911c_probe(struct i2c_client *client,
 #if defined(CONFIG_MACH_FRESCONEOLTE_CTC)
 	ak09911c_power_enable(1);
 	mdelay(10);
-#elif defined(CONFIG_SEC_BERLUTI_PROJECT)
+#elif defined(CONFIG_SEC_BERLUTI_PROJECT) || defined(CONFIG_MACH_CHAGALL_KDI)
 	ak09911c_power_enable(&client->dev, 1);
+#endif
+#if defined(CONFIG_MACH_CHAGALL_KDI)
+	mdelay(10);
 #endif
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("[SENSOR]: %s - i2c_check_functionality error\n",
@@ -1071,6 +1121,7 @@ static struct i2c_driver ak09911c_driver = {
 
 static int __init ak09911c_init(void)
 {
+	printk(KERN_INFO" ak0911c_init \n");
 	return i2c_add_driver(&ak09911c_driver);
 }
 

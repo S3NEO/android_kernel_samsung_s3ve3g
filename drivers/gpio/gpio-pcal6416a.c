@@ -471,7 +471,7 @@ static int pcal6416a_parse_dt(struct device *dev,
 		}
 	} else {
 		pdata->init_config = 0x0000;
-		pdata->init_data_out = 0x0000;
+		pdata->init_data_out = 0x0400;
 		pdata->init_en_pull = 0x0000;
 		pdata->init_sel_pull = 0x0000;
 	}
@@ -584,14 +584,26 @@ static ssize_t store_pcal6416a_gpio_inout(struct device *dev,
 	char in_out, msg[13];
 	struct pcal6416a_chip *data = dev_get_drvdata(dev);
 
-	retval = sscanf(buf, "%c %d %d", &in_out, &off, &val);
+	retval = sscanf(buf, "%1c %3d %1d", &in_out, &off, &val);
 	if (retval == 0) {
 		dev_err(&data->client->dev, "[%s] fail to pcal6416a out.\n", __func__);
 		return count;
 	}
+	if (!(in_out == 'i' || in_out == 'o')) {
+		pr_err("[%s] wrong in_out value [%c]\n", __func__,  in_out);
+		return count;
+	}
+	if ((off < 0) || (off > 15)) {
+		pr_err("[%s] wrong offset value [%d]\n", __func__, off);
+		return count;
+	}
+	if (!(val == 0 || val == 1)) {
+		pr_err("[%s] wrong val value [%d]\n", __func__, val);
+		return count;
+	}
 
 	gpio_pcal6416a = data->gpio_start + off;
-	sprintf(msg, "exp-gpio%d\n", off);
+	snprintf(msg, sizeof(msg)/sizeof(char), "exp-gpio%d\n", off);
 	if (gpio_is_valid(gpio_pcal6416a)) {
 		retval = gpio_request(gpio_pcal6416a, msg);
 		if (retval) {

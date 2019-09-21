@@ -229,6 +229,9 @@ static void enable_vibetonz_from_user(struct timed_output_dev *dev, int value)
 	hrtimer_cancel(&timer);
 
 	/* set_vibetonz(value); */
+#ifdef CONFIG_TACTILE_ASSIST
+	g_bOutputDataBufferEmpty = 0;
+#endif
 	vibrator_work = value;
 	schedule_work(&vibetonz_work);
 
@@ -359,11 +362,15 @@ static int tspdrv_parse_dt(struct platform_device *pdev)
 #else
 	vibrator_drvdata.vib_pwm_gpio = of_get_named_gpio(np, "samsung,pmic_vib_pwm", 0);
 #endif
-	
+
 	if (!gpio_is_valid(vibrator_drvdata.vib_pwm_gpio)) {
 		pr_err("%s:%d, reset gpio not specified\n",
 				__func__, __LINE__);
-	} 
+	}
+
+#if defined(CONFIG_MOTOR_ISA1000)
+	vibrator_drvdata.vib_en_gpio = of_get_named_gpio(np, "samsung,vib_en_gpio", 0);
+#endif
 
 #if defined(CONFIG_MOTOR_DRV_DRV2603)
 	vibrator_drvdata.drv2603_en_gpio = of_get_named_gpio(np, "samsung,drv2603_en", 0);
@@ -372,7 +379,12 @@ static int tspdrv_parse_dt(struct platform_device *pdev)
 				__func__, __LINE__);
 	}
 #endif
-	
+#if defined(CONFIG_MOTOR_DRV_MAX77888)
+	vibrator_drvdata.max77888_en_gpio = of_get_named_gpio(np, "samsung,vib_power_en", 0);
+	if (!gpio_is_valid(vibrator_drvdata.max77888_en_gpio)) {
+		pr_err("%s:%d, max77888_en_gpio not specified\n",__func__, __LINE__);
+	}
+#endif
 	rc = of_property_read_u32(np, "samsung,vib_model", &vibrator_drvdata.vib_model);
 	if (rc) {
 		pr_err("%s:%d, vib_model not specified\n",
@@ -414,6 +426,16 @@ static int tspdrv_parse_dt(struct platform_device *pdev)
 		pr_err("%s:%d, duty_us not specified\n",
 						__func__, __LINE__);
 		return -EINVAL;
+	}
+	rc = of_property_read_u32(np, "samsung,changed_chip", &vibrator_drvdata.changed_chip);
+	if (rc) {
+		pr_info("%s:%d, changed_chip not specified\n",	__func__, __LINE__);
+		vibrator_drvdata.changed_chip = 0;
+		rc = 0;
+	} else {
+		if (vibrator_drvdata.changed_chip)
+			vibrator_drvdata.changed_en_gpio = of_get_named_gpio(np, "samsung,changed_en_gpio", 0);
+
 	}
 	return rc;
 }
@@ -558,6 +580,69 @@ static int32_t drv2603_gpio_init(void)
 	return 0;
 }
 #endif
+#if defined(CONFIG_MOTOR_DRV_MAX77888)
+void max77888_gpio_en(bool en)
+{
+	if (en) {
+		gpio_direction_output(vibrator_drvdata.max77888_en_gpio, 1);
+	} else {
+		gpio_direction_output(vibrator_drvdata.max77888_en_gpio, 0);
+	}
+}
+static int32_t max77888_gpio_init(void)
+{
+	int ret;
+	ret = gpio_request(vibrator_drvdata.max77888_en_gpio, "vib enable");
+	if (ret < 0) {
+		printk(KERN_ERR "vib enable gpio_request is failed\n");
+		return 1;
+	}
+	return 0;
+}
+#endif
+
+static struct device *vib_dev;
+extern struct class *sec_class;
+
+static ssize_t show_vib_tuning(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	sprintf(buf, "gp_clk_m %d, gp_clk_n %d, gp_clk_d %d,\
+			pwm_mul %d, strength %d, min_str %d\n", \
+			g_nlra_gp_clk_m, g_nlra_gp_clk_n, g_nlra_gp_clk_d, \
+			g_nlra_gp_clk_pwm_mul, motor_strength, motor_min_strength);
+	return strlen(buf);
+}
+
+static ssize_t store_vib_tuning(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	int retval;
+	int temp_m, temp_n, temp_str;
+
+	retval = sscanf(buf, "%3d %3d %2d", &temp_m, &temp_n, &temp_str);
+	if (retval == 0) {
+		pr_info("%s, fail to get vib_tuning value\n", __func__);
+		return count;
+	}
+
+	g_nlra_gp_clk_m = temp_m;
+	g_nlra_gp_clk_n = temp_n;
+	g_nlra_gp_clk_d = temp_n / 2;
+	g_nlra_gp_clk_pwm_mul = temp_n;
+	motor_strength = temp_str;
+	motor_min_strength = g_nlra_gp_clk_n*MOTOR_MIN_STRENGTH/100;
+
+	pr_info("%s gp_clk_m %d, gp_clk_n %d, gp_clk_d %d,\
+			pwm_mul %d, strength %d, min_str %d\n", __func__,\
+			g_nlra_gp_clk_m, g_nlra_gp_clk_n, g_nlra_gp_clk_d,\
+			g_nlra_gp_clk_pwm_mul, motor_strength, motor_min_strength);
+
+	return count;
+}
+
+static DEVICE_ATTR(vib_tuning, 0664, show_vib_tuning, store_vib_tuning);
 
 static __devinit int tspdrv_probe(struct platform_device *pdev)
 {
@@ -634,6 +719,16 @@ static __devinit int tspdrv_probe(struct platform_device *pdev)
 	wake_lock_init(&vib_wake_lock, WAKE_LOCK_SUSPEND, "vib_present");
 
 	vibetonz_start();
+
+	vib_dev = device_create(sec_class, NULL, 0, NULL, "vib");
+	if (IS_ERR(vib_dev)) {
+		pr_info("Failed to create device for samsung vib\n");
+	}
+
+	ret = sysfs_create_file(&vib_dev->kobj, &dev_attr_vib_tuning.attr);
+	if (ret) {
+		pr_info("Failed to create sysfs group for samsung specific led\n");
+	}
 
 	return 0;
 }

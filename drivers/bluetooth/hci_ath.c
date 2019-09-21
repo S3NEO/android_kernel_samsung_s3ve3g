@@ -5,7 +5,7 @@
  *  power management protocol extension to H4 to support AR300x Bluetooth Chip.
  *
  *  Copyright (c) 2009-2010 Atheros Communications Inc.
- *  Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
  *
  *  Acknowledgements:
  *  This file is based on hci_h4.c, which was written
@@ -40,6 +40,8 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/proc_fs.h>
+
+#include <linux/jiffies.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -134,7 +136,7 @@ static void hsuart_serial_clock_off(struct uart_port *port)
 static void modify_timer_task(void)
 {
 	spin_lock(&rw_lock);
-	mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
+	mod_timer(&tx_timer, jiffies + msecs_to_jiffies(TX_TIMER_INTERVAL * 1000));
 	clear_bit(BT_TXEXPIRED, &flags);
 	spin_unlock(&rw_lock);
 

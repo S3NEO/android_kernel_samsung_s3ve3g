@@ -139,10 +139,12 @@ struct usb_device_id {
 #define USB_DEVICE_ID_MATCH_INT_NUMBER		0x0400
 
 #define HID_ANY_ID				(~0)
+#define HID_BUS_ANY				0xffff
+#define HID_GROUP_ANY				0x0000
 
 struct hid_device_id {
 	__u16 bus;
-	__u16 pad1;
+	__u16 group;
 	__u32 vendor;
 	__u32 product;
 	kernel_ulong_t driver_data
@@ -294,7 +296,11 @@ struct pcmcia_device_id {
 #define INPUT_DEVICE_ID_KEY_MIN_INTERESTING	0x71
 #define INPUT_DEVICE_ID_KEY_MAX		0x2ff
 #define INPUT_DEVICE_ID_REL_MAX		0x0f
+#ifdef CONFIG_INPUT_EXPANDED_ABS
+#define INPUT_DEVICE_ID_ABS_MAX		0x4f
+#else
 #define INPUT_DEVICE_ID_ABS_MAX		0x3f
+#endif
 #define INPUT_DEVICE_ID_MSC_MAX		0x07
 #define INPUT_DEVICE_ID_LED_MAX		0x0f
 #define INPUT_DEVICE_ID_SND_MAX		0x07

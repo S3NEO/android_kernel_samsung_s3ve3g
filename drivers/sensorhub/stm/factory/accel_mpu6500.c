@@ -21,7 +21,11 @@
 #define VENDOR		"INVENSENSE"
 #define CHIP_ID		"MPU6500"
 
+#ifdef CONFIG_MACH_KACTIVELTE_KOR
+#define CALIBRATION_FILE_PATH	"/efs/FactoryApp/calibration_data"
+#else
 #define CALIBRATION_FILE_PATH	"/efs/calibration_data"
+#endif
 #define CALIBRATION_DATA_AMOUNT	20
 
 static ssize_t accel_vendor_show(struct device *dev,
@@ -45,7 +49,7 @@ int accel_open_calibration(struct ssp_data *data)
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY, 0666);
+	cal_filp = filp_open(CALIBRATION_FILE_PATH, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0660);
 	if (IS_ERR(cal_filp)) {
 		set_fs(old_fs);
 		iRet = PTR_ERR(cal_filp);
@@ -113,19 +117,19 @@ int set_accel_cal(struct ssp_data *data)
 
 static int enable_accel_for_cal(struct ssp_data *data)
 {
-	u8 uBuf[4] = { 0, };
+	u8 uBuf[9] = { 0, };
 	s32 dMsDelay = get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]);
 	memcpy(&uBuf[0], &dMsDelay, 4);
 
 	if (atomic_read(&data->aSensorEnable) & (1 << ACCELEROMETER_SENSOR)) {
 		if (get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]) != 10) {
 			send_instruction(data, CHANGE_DELAY,
-				ACCELEROMETER_SENSOR, uBuf, 4);
+				ACCELEROMETER_SENSOR, uBuf, 9);
 			return SUCCESS;
 		}
 	} else {
 		send_instruction(data, ADD_SENSOR,
-			ACCELEROMETER_SENSOR, uBuf, 4);
+			ACCELEROMETER_SENSOR, uBuf, 9);
 	}
 
 	return FAIL;
@@ -133,14 +137,14 @@ static int enable_accel_for_cal(struct ssp_data *data)
 
 static void disable_accel_for_cal(struct ssp_data *data, int iDelayChanged)
 {
-	u8 uBuf[4] = { 0, };
+	u8 uBuf[9] = { 0, };
 	s32 dMsDelay = get_msdelay(data->adDelayBuf[ACCELEROMETER_SENSOR]);
 	memcpy(&uBuf[0], &dMsDelay, 4);
 
 	if (atomic_read(&data->aSensorEnable) & (1 << ACCELEROMETER_SENSOR)) {
 		if (iDelayChanged)
 			send_instruction(data, CHANGE_DELAY,
-				ACCELEROMETER_SENSOR, uBuf, 4);
+				ACCELEROMETER_SENSOR, uBuf, 9);
 	} else {
 		send_instruction(data, REMOVE_SENSOR,
 			ACCELEROMETER_SENSOR, uBuf, 4);
@@ -192,7 +196,7 @@ static int accel_do_calibrate(struct ssp_data *data, int iEnable)
 	set_fs(KERNEL_DS);
 
 	cal_filp = filp_open(CALIBRATION_FILE_PATH,
-			O_CREAT | O_TRUNC | O_WRONLY, 0666);
+			O_CREAT | O_TRUNC | O_WRONLY | O_NOFOLLOW | O_NONBLOCK, 0660);			
 	if (IS_ERR(cal_filp)) {
 		pr_err("[SSP]: %s - Can't open calibration file\n", __func__);
 		set_fs(old_fs);
@@ -356,6 +360,46 @@ static ssize_t accel_hw_selftest_show(struct device *dev,
 		shift_ratio[1] / 10, shift_ratio[1] % 10,
 		shift_ratio[2] / 10, shift_ratio[2] % 10);
 }
+static ssize_t accel_lowpassfilter_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t size)
+{
+	int iRet = 0, new_enable = 1;
+	struct ssp_data *data = dev_get_drvdata(dev);
+	struct ssp_msg *msg = kzalloc(sizeof(*msg), GFP_KERNEL);
+	if (msg == NULL) {
+		pr_err("[SSP] %s, failed to alloc memory\n", __func__);
+		goto exit;
+	}
+
+	if (sysfs_streq(buf, "1"))
+		new_enable = 1;
+	else if (sysfs_streq(buf, "0"))
+		new_enable = 0;
+	else
+		ssp_dbg("[SSP]: %s - invalid value!\n", __func__);
+
+	msg->cmd = MSG2SSP_AP_SENSOR_LPF;
+	msg->length = 1;
+	msg->options = AP2HUB_WRITE;
+	msg->buffer = (char*) kzalloc(1, GFP_KERNEL);
+	if (msg->buffer == NULL) {
+		pr_err("[SSP] %s, failed to alloc memory\n", __func__);
+		kfree(msg);
+		goto exit;
+	}
+
+	*msg->buffer = new_enable;
+	msg->free_buffer = 1;
+
+	iRet = ssp_spi_async(data, msg);
+	if (iRet != SUCCESS)
+		pr_err("[SSP] %s - fail %d\n", __func__, iRet);
+	else
+		pr_info("[SSP] %s - %d\n", __func__, new_enable);
+
+exit:
+	return size;
+}
 static DEVICE_ATTR(name, S_IRUGO, accel_name_show, NULL);
 static DEVICE_ATTR(vendor, S_IRUGO, accel_vendor_show, NULL);
 static DEVICE_ATTR(calibration, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -364,6 +408,8 @@ static DEVICE_ATTR(raw_data, S_IRUGO, raw_data_read, NULL);
 static DEVICE_ATTR(reactive_alert, S_IRUGO | S_IWUSR | S_IWGRP,
 	accel_reactive_alert_show, accel_reactive_alert_store);
 static DEVICE_ATTR(selftest, S_IRUGO, accel_hw_selftest_show, NULL);
+static DEVICE_ATTR(lowpassfilter, S_IWUSR | S_IWGRP,
+	NULL, accel_lowpassfilter_store);
 
 static struct device_attribute *acc_attrs[] = {
 	&dev_attr_name,
@@ -372,6 +418,7 @@ static struct device_attribute *acc_attrs[] = {
 	&dev_attr_raw_data,
 	&dev_attr_reactive_alert,
 	&dev_attr_selftest,
+	&dev_attr_lowpassfilter,
 	NULL,
 };
 

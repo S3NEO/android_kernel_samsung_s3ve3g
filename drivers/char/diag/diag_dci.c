@@ -510,9 +510,11 @@ static int diag_dci_remove_req_entry(unsigned char *buf, int len,
 				     struct dci_pkt_req_entry_t *entry)
 {
 	uint16_t rsp_count = 0, delayed_rsp_id = 0;
+	mutex_lock(&driver->dci_mutex);
 	if (!buf || len <= 0 || !entry) {
 		pr_err("diag: In %s, invalid input buf: %p, len: %d, entry: %p\n",
 			__func__, buf, len, entry);
+		mutex_unlock(&driver->dci_mutex);
 		return -EIO;
 	}
 
@@ -520,12 +522,14 @@ static int diag_dci_remove_req_entry(unsigned char *buf, int len,
 	if (*buf != 0x80) {
 		list_del(&entry->track);
 		kfree(entry);
+		mutex_unlock(&driver->dci_mutex);
 		return 1;
 	}
 
 	/* It is a delayed response. Check if the length is valid */
 	if (len < MIN_DELAYED_RSP_LEN) {
 		pr_err("diag: Invalid delayed rsp packet length %d\n", len);
+		mutex_unlock(&driver->dci_mutex);
 		return -EINVAL;
 	}
 
@@ -537,6 +541,7 @@ static int diag_dci_remove_req_entry(unsigned char *buf, int len,
 	if (delayed_rsp_id == 0) {
 		list_del(&entry->track);
 		kfree(entry);
+		mutex_unlock(&driver->dci_mutex);
 		return 1;
 	}
 
@@ -550,9 +555,10 @@ static int diag_dci_remove_req_entry(unsigned char *buf, int len,
 	if (rsp_count > 0 && rsp_count < 0x1000) {
 		list_del(&entry->track);
 		kfree(entry);
+		mutex_unlock(&driver->dci_mutex);
 		return 1;
 	}
-
+	mutex_unlock(&driver->dci_mutex);
 	return 0;
 }
 

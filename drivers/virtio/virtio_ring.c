@@ -489,18 +489,18 @@ static void vring_disable_cb(struct virtqueue *_vq)
 }
 
 /**
- * vring_enable_cb - restart callbacks after disable_cb.
+ * vring_enable_cb_prepare - restart callbacks after disable_cb.
  * @vq: the struct virtqueue we're talking about.
  *
  * This re-enables callbacks; it returns current queue state
  * in an opaque unsigned value. This value should be later tested by
- * virtqueue_poll, to detect a possible race between the driver checking for
+ * vring_poll, to detect a possible race between the driver checking for
  * more work, and enabling callbacks.
  *
  * Caller must ensure we don't call this with other virtqueue
  * operations at the same time (except where noted).
  */
-unsigned virtqueue_enable_cb_prepare(struct virtqueue *_vq)
+static unsigned vring_enable_cb_prepare(struct virtqueue *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 	u16 last_used_idx;
@@ -517,28 +517,26 @@ unsigned virtqueue_enable_cb_prepare(struct virtqueue *_vq)
 	END_USE(vq);
 	return last_used_idx;
 }
-EXPORT_SYMBOL_GPL(virtqueue_enable_cb_prepare);
 
 /**
- * virtqueue_poll - query pending used buffers
+ * vring_poll - query pending used buffers
  * @vq: the struct virtqueue we're talking about.
- * @last_used_idx: virtqueue state (from call to virtqueue_enable_cb_prepare).
+ * @last_used_idx: virtqueue state (from call to vring_enable_cb_prepare).
  *
  * Returns "true" if there are pending used buffers in the queue.
  *
  * This does not need to be serialized.
  */
-bool virtqueue_poll(struct virtqueue *_vq, unsigned last_used_idx)
+static bool vring_poll(struct virtqueue *_vq, unsigned last_used_idx)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
 
 	virtio_mb(vq);
 	return (u16)last_used_idx != vq->vring.used->idx;
 }
-EXPORT_SYMBOL_GPL(virtqueue_poll);
 
 /**
- * virtqueue_enable_cb - restart callbacks after disable_cb.
+ * vring_enable_cb - restart callbacks after disable_cb.
  * @vq: the struct virtqueue we're talking about.
  *
  * This re-enables callbacks; it returns "false" if there are pending
@@ -548,10 +546,10 @@ EXPORT_SYMBOL_GPL(virtqueue_poll);
  * Caller must ensure we don't call this with other virtqueue
  * operations at the same time (except where noted).
  */
-bool virtqueue_enable_cb(struct virtqueue *_vq)
+static bool vring_enable_cb(struct virtqueue *_vq)
 {
-	unsigned last_used_idx = virtqueue_enable_cb_prepare(_vq);
-	return !virtqueue_poll(_vq, last_used_idx);
+	unsigned last_used_idx = vring_enable_cb_prepare(_vq);
+	return !vring_poll(_vq, last_used_idx);
 }
 
 /**
@@ -668,6 +666,8 @@ static struct virtqueue_ops vring_vq_ops = {
 	.kick_prepare = vring_kick_prepare,
 	.kick_notify = vring_kick_notify,
 	.disable_cb = vring_disable_cb,
+	.enable_cb_prepare = vring_enable_cb_prepare,
+	.poll = vring_poll,
 	.enable_cb = vring_enable_cb,
 	.enable_cb_delayed = vring_enable_cb_delayed,
 	.detach_unused_buf = vring_detach_unused_buf,

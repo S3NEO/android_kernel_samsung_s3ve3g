@@ -10,19 +10,25 @@
 #include <linux/fs.h>
 #include <linux/ioctl.h>
 #include "sensors_core.h"
+#ifdef CONFIG_OF
+#include <linux/of_gpio.h>
+#endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
 #include <linux/alps_compass_io.h>
 #include <linux/input-polldev.h>
+#include <linux/math64.h>
 
 #define EVENT_TYPE_ACCEL_X          ABS_X
 #define EVENT_TYPE_ACCEL_Y          ABS_Y
 #define EVENT_TYPE_ACCEL_Z          ABS_Z
 
-#define EVENT_TYPE_MAG_X           ABS_X
-#define EVENT_TYPE_MAG_Y           ABS_Y
-#define EVENT_TYPE_MAG_Z           ABS_Z
+#define EVENT_TYPE_MAG_X           REL_X
+#define EVENT_TYPE_MAG_Y           REL_Y
+#define EVENT_TYPE_MAG_Z           REL_Z
+#define EVENT_TYPE_MAG_TIME_HI     REL_DIAL
+#define EVENT_TYPE_MAG_TIME_LO     REL_MISC
 
 #define ALPS_POLL_INTERVAL   200    /* msecs */
 #define ALPS_INPUT_FUZZ        0    /* input event threshold */
@@ -48,12 +54,15 @@ struct alps_data {
 	int delay;
 	int flgM;
 	int flgA;
+	u32 position;
+	u64 old_timestamp;
 };
 
 /* for I/O Control */
 static long alps_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int ret = -1, tmpval;
+	int64_t delay_ns;
 	void __user *argp = (void __user *)arg;
 	struct alps_data *data = container_of(filp->private_data,
 					     struct alps_data, alps_device);
@@ -61,6 +70,8 @@ static long alps_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case ALPSIO_SET_MAGACTIVATE:
 		ret = copy_from_user(&tmpval, argp, sizeof(tmpval));
+		if (tmpval && (tmpval != data->flgM))
+			data->old_timestamp = 0ULL;
 		if (ret) {
 			pr_err("%s : failed for ALPSIO_SET_MAGACTIVATE\n",
 				__func__);
@@ -98,22 +109,18 @@ static long alps_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		break;
 */
 	case ALPSIO_SET_DELAY:
-		ret = copy_from_user(&tmpval, argp, sizeof(tmpval));
+		ret = copy_from_user(&delay_ns, argp, sizeof(delay_ns));
 		if (ret) {
 			pr_err("%s : failed for ALPSIO_SET_DELAY\n", __func__);
 			return -EFAULT;
 		}
 
 		mutex_lock(&data->alps_lock);
-		if (tmpval <= 10)
-			tmpval = 10;
-		else if (tmpval <= 20)
-			tmpval = 20;
-		else if (tmpval <=  70)
-			tmpval =  70;
-		else
-			tmpval = 200;
-		data->delay = tmpval;
+		data->delay = (int)div64_long(delay_ns, 1000000LL);
+		if (delay_ns >= SENSOR_NS_DELAY_NORMAL)
+			data->delay = SENSOR_MS_DELAY_NORMAL;
+		else if (delay_ns <= SENSOR_NS_DELAY_FASTEST)
+			data->delay = SENSOR_MS_DELAY_FASTEST;
 
 		if (data->flgM)
 			hscd_activate(1, data->flgM, data->delay);
@@ -193,16 +200,47 @@ static const struct file_operations alps_fops = {
 	}
 }
 */
-static void hscd_poll(struct input_dev *idev)
+static void hscd_poll(struct alps_data *data)
 {
 	int xyz[3];
+	struct input_dev * idev = data->alps_idev->input;
+	int time_hi, time_lo;
+	struct timespec ts;
+    get_monotonic_boottime(&ts);
+	u64 timestamp_new = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	u64 delay = data->delay * 1000000ULL;
+	u64 shift_timestamp = delay >> 1;
+	u64 timestamp = 0ULL;
 
 	if (hscd_get_magnetic_field_data(xyz) == 0) {
-		input_report_abs(idev, EVENT_TYPE_MAG_X, xyz[0]);
-		input_report_abs(idev, EVENT_TYPE_MAG_Y, xyz[1]);
-		input_report_abs(idev, EVENT_TYPE_MAG_Z, xyz[2]);
+		remap_sensor_data_32(xyz, data->position);
+
+		if (data->old_timestamp != 0 && ((timestamp_new - data->old_timestamp) * 10 > delay * 18)) {
+			for (timestamp = data->old_timestamp + delay; timestamp < timestamp_new - shift_timestamp; timestamp += delay) {
+				time_hi = (int)((timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
+				time_lo = (int)(timestamp & TIME_LO_MASK);
+				input_report_rel(idev, EVENT_TYPE_MAG_X, xyz[0]);
+				input_report_rel(idev, EVENT_TYPE_MAG_Y, xyz[1]);
+				input_report_rel(idev, EVENT_TYPE_MAG_Z, xyz[2]);
+				input_report_rel(idev, EVENT_TYPE_MAG_TIME_HI, time_hi);
+				input_report_rel(idev, EVENT_TYPE_MAG_TIME_LO, time_lo);
+				idev->sync = 0;
+				input_event(idev, EV_SYN, SYN_REPORT, 2);
+				data->old_timestamp = timestamp;
+			}
+		}
+
+		time_hi = (int)((timestamp_new & TIME_HI_MASK) >> TIME_HI_SHIFT);
+		time_lo = (int)(timestamp_new & TIME_LO_MASK);
+
+		input_report_rel(idev, EVENT_TYPE_MAG_X, xyz[0]);
+		input_report_rel(idev, EVENT_TYPE_MAG_Y, xyz[1]);
+		input_report_rel(idev, EVENT_TYPE_MAG_Z, xyz[2]);
+		input_report_rel(idev, EVENT_TYPE_MAG_TIME_HI, time_hi);
+		input_report_rel(idev, EVENT_TYPE_MAG_TIME_LO, time_lo);
 		idev->sync = 0;
 		input_event(idev, EV_SYN, SYN_REPORT, 2);
+		data->old_timestamp = timestamp_new;
 	}
 }
 
@@ -215,7 +253,7 @@ static void alps_poll(struct input_polled_dev *dev)
 		data->alps_idev->poll_interval = data->delay;
 
 		if (data->flgM)
-			hscd_poll(data->alps_idev->input);
+			hscd_poll(data);
 /*		if (data->flgA)
 			accsns_poll(data->alps_idev->input);*/
 		mutex_unlock(&data->alps_lock);
@@ -229,6 +267,27 @@ static struct of_device_id alps_match_table[] = {
 };
 #else
 #define magnetic_match_table NULL
+#endif
+
+#ifdef CONFIG_OF
+/* device tree parsing */
+static int alps_parse_dt(struct device *dev, struct alps_data *data)
+{
+	struct device_node *np = dev->of_node;
+
+	if (of_property_read_u32(np, "alps,mag-position", &data->position))
+		data->position = 0;
+
+	pr_info("%s position %d", __func__, data->position);
+
+	return 0;
+}
+#else
+static int alps_parse_dt(struct device *dev, struct alps_data *data)
+{
+	data->position = 0;
+	return -ENODEV;
+}
 #endif
 
 static int alps_probe(struct platform_device *dev)
@@ -260,6 +319,9 @@ static int alps_probe(struct platform_device *dev)
 		goto out_device;
 	}
 
+	if (alps_parse_dt(&dev->dev, data))
+		pr_err("ALPS parse for position failed");
+
 	data->alps_idev->poll = alps_poll;
 	data->alps_idev->poll_interval = ALPS_POLL_INTERVAL;
 	data->alps_idev->private = data;
@@ -281,12 +343,11 @@ static int alps_probe(struct platform_device *dev)
 			2048, 2047, ALPS_INPUT_FUZZ, ALPS_INPUT_FLAT);
 
     /* 15-bit output (HSCDTD008A) */
-	input_set_abs_params(idev, EVENT_TYPE_MAG_X,
-			-16384, 16383, ALPS_INPUT_FUZZ, ALPS_INPUT_FLAT);
-	input_set_abs_params(idev, EVENT_TYPE_MAG_Y,
-			-16384, 16383, ALPS_INPUT_FUZZ, ALPS_INPUT_FLAT);
-	input_set_abs_params(idev, EVENT_TYPE_MAG_Z,
-			-16384, 16383, ALPS_INPUT_FUZZ, ALPS_INPUT_FLAT);
+	input_set_capability(idev, EV_REL, EVENT_TYPE_MAG_X);
+	input_set_capability(idev, EV_REL, EVENT_TYPE_MAG_Y);
+	input_set_capability(idev, EV_REL, EVENT_TYPE_MAG_Z);
+	input_set_capability(idev, EV_REL, EVENT_TYPE_MAG_TIME_HI);
+	input_set_capability(idev, EV_REL, EVENT_TYPE_MAG_TIME_LO);
 
 	ret = input_register_polled_device(data->alps_idev);
 	if (ret)

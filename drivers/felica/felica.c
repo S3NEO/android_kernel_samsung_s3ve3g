@@ -42,6 +42,8 @@
  * log
  ******************************************************************************/
 #include <mach/sec_debug.h>
+#define NO_CHECK_TAMPER
+#define SRIB_DIAG_ENABLED
 
 /******************************************************************************
  * Board configuration
@@ -61,6 +63,7 @@ static struct platform_device *felica_gpio_pdev;
 #if defined(CONFIG_MACH_HLTEDCM)
 static int g_uicc_initrev = 7;		//HW Rev 0.9
 static int gfelica_sps_pin = 130;	//Select Power Supply
+static int gfelica_hsel_pin = GPIO_PINID_NFC_HSEL;
 #define HW_REV09_OR_10		7	// to fix hltedcm i2c h/w issue in REV 09/10.
 extern void of_sii8240_hw_poweron(bool enable);  // to fix hltedcm i2c h/w issue in REV 09/10.  Defined in driver/video/msm/mhl_v2/sii8240.c
 /* K MODEL */
@@ -76,14 +79,17 @@ static int gfelica_pon_pin = GPIO_FELICA_PON_REV06;	// PON
 static int gfelica_hsel_pin = -1;
 static int gfelica_sps_pin = -1;
 static int g_uicc_initrev = 0;
+static int gfelica_uim_mon = 0;
 //#define NO_CHECK_TAMPER
 //#define SRIB_DIAG_ENABLED
 #elif defined(CONFIG_MACH_HLTEKDI)
 static int g_uicc_initrev = 4;
 static int gfelica_sps_pin = -1;
+static int gfelica_hsel_pin = GPIO_PINID_NFC_HSEL;
 #elif defined(CONFIG_MACH_JS01LTEDCM)
 static int g_uicc_initrev = 8;      // HW Rev 0.4
 static int gfelica_sps_pin = 130;	// Select Power Supply
+static int gfelica_hsel_pin = GPIO_PINID_NFC_HSEL;
 #endif
 #endif /* CONFIG_ARCH_MSM8974 */
 
@@ -817,9 +823,7 @@ static void felica_nl_recv_msg(struct sk_buff *skb)
 
 	struct nlmsghdr *nlh;
 	struct sk_buff *wskb;
-#if defined(CONFIG_MACH_T0) || defined(CONFIG_MACH_M3)
-	int port_threshold = 0;
-#endif
+
 #ifdef FELICA_UICC_FUNCTION
 	int init_flag = 0;
 #endif
@@ -839,12 +843,6 @@ static void felica_nl_recv_msg(struct sk_buff *skb)
 			/* pid of sending process */
 			gfa_pid = nlh->nlmsg_pid;
 
-#if defined(CONFIG_MACH_T0)
-			port_threshold = 0x0a;
-#elif defined(CONFIG_MACH_M3)
-			port_threshold = 0x02;
-#endif
-
 	if (felica_get_tamper_fuse_cmd() != 1)
 			{
 			/* jmodel */
@@ -854,8 +852,10 @@ static void felica_nl_recv_msg(struct sk_buff *skb)
 			felica_uart_port = 1;
 #elif defined(CONFIG_ARCH_APQ8064)
 			felica_uart_port = 2;
-#elif defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+#elif defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_SBM)
 			felica_uart_port = 2;
+#elif defined(CONFIG_MACH_HLTEDCM)	|| defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+			felica_uart_port = 1;
 #endif
 
 			felica_set_felica_info();
@@ -1344,7 +1344,14 @@ static ssize_t felica_pon_write(struct file *file, const char __user *data,
 #elif defined(CONFIG_ARCH_APQ8064)
 	ice_gpiox_set(GPIO_PINID_FELICA_PON, setparam);
 #elif defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
-#if defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_SBM)
+#if defined(CONFIG_MACH_KLTE_KDI)
+	if(gfelica_uim_mon == 1) {
+		FELICA_PR_ERR(" %s gfelica_uim_mon=%d\n", __func__, gfelica_uim_mon);
+		gpio_set_value(gfelica_pon_pin, GPIO_VALUE_HIGH);		
+		return FELICA_PON_DATA_LEN;
+	}
+	gpio_set_value(gfelica_pon_pin, setparam);
+#elif defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_SBM)
 	gpio_set_value(gfelica_pon_pin, setparam);
 #else
 	gpio_set_value(GPIO_PINID_FELICA_PON, setparam);
@@ -1621,24 +1628,30 @@ static ssize_t felica_cen_read(struct file *file, char __user *buf, \
 	int ret;
 	unsigned char address = gi2c_lockaddress;
 	unsigned char read_buff = 0;
+	struct i2c_msg read_msgs[2];
 
-	gread_msgs[0].addr = gi2c_address;
-	gread_msgs[0].buf = &address;
-	gread_msgs[1].addr = gi2c_address;
-	gread_msgs[1].buf = &read_buff;
+	read_msgs[0].flags = gread_msgs[0].flags;
+	read_msgs[0].len = gread_msgs[0].len;
+	read_msgs[1].flags = gread_msgs[1].flags;
+	read_msgs[1].len = gread_msgs[1].len;
+
+	read_msgs[0].addr = gi2c_address;
+	read_msgs[0].buf = &address;
+	read_msgs[1].addr = gi2c_address;
+	read_msgs[1].buf = &read_buff;
 
 	if (felica_i2c_client == NULL) {
 		FELICA_PR_ERR(" felica_i2c_client is NULL %s -EIO",__func__);
 		return -EIO;
 	}
 
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[0], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[0], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[0]), ret=[%d]",
 			       __func__, ret);
 		return -EIO;
 	}
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[1], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[1], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[1]), ret=[%d]",
 			       __func__, ret);
@@ -2245,8 +2258,8 @@ static void felica_int_poll_init(void)
 		cdev_del(&cdev_felica_int_poll);
 		unregister_chrdev_region(devid_felica_int_poll,
 					 FELICA_MINOR_COUNT);
-		FELICA_PR_ERR(" %s ERROR(request_irq)= %d, ret=[%d]",
-			       __func__,GPIO_PINID_FELICA_INT,ret);
+		FELICA_PR_ERR(" %s ERROR(request_irq), ret=[%d]",
+			       __func__,ret);
 		return;
 	}
 #if defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
@@ -2707,11 +2720,17 @@ static ssize_t felica_ant_read(struct file *file, char __user *buf, \
 	int ret;
 	unsigned char address = gi2c_antaddress;
 	unsigned char read_buff = 0;
+	struct i2c_msg read_msgs[2];
 
-	gread_msgs[0].addr = gi2c_address;
-	gread_msgs[0].buf = &address;
-	gread_msgs[1].addr = gi2c_address;
-	gread_msgs[1].buf = &read_buff;
+	read_msgs[0].flags = gread_msgs[0].flags;
+	read_msgs[0].len = gread_msgs[0].len;
+	read_msgs[1].flags = gread_msgs[1].flags;
+	read_msgs[1].len = gread_msgs[1].len;
+
+	read_msgs[0].addr = gi2c_address;
+	read_msgs[0].buf = &address;
+	read_msgs[1].addr = gi2c_address;
+	read_msgs[1].buf = &read_buff;
 
 	FELICA_PR_DBG(" %s START", __func__);
 	if (felica_i2c_client == NULL) {
@@ -2720,13 +2739,13 @@ static ssize_t felica_ant_read(struct file *file, char __user *buf, \
 		return -EIO;
 	}
 
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[0], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[0], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[0]), ret=[%d]",
 			       __func__, ret);
 		return -EIO;
 	}
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[1], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[1], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[1]), ret=[%d]",
 			       __func__, ret);
@@ -2763,19 +2782,17 @@ static ssize_t felica_ant_write(struct file *file, const char __user *data,
 		return -EIO;
 	}
 
-	gwrite_msgs[0].buf = &write_buff[0];
-	gwrite_msgs[0].addr = gi2c_address;
-	write_buff[0] = gi2c_antaddress;
-
-
 	ret = copy_from_user(&ant, data, FELICA_ANT_DATA_LEN);
 	if (ret != 0) {
 		FELICA_PR_ERR(" %s ERROR(copy_from_user), ret=[%d]",
 			       __func__, ret);
 		return -EFAULT;
 	}
+	write_buff[0] = gi2c_antaddress;
 	write_buff[1] = ant;
-
+	gwrite_msgs[0].buf = &write_buff[0];
+	gwrite_msgs[0].addr = gi2c_address;
+	
 	ret = i2c_transfer(felica_i2c_client->adapter, gwrite_msgs, 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer), ret=[%d]",
@@ -3172,7 +3189,7 @@ static ssize_t hsel_read(struct file *file, char __user *buf, size_t len,
 					loff_t *ppos)
 {
 	char	hsel_val;
-	int		ret;
+	int		ret = -EINVAL;
 
 	FELICA_PR_DBG(" %s START", __func__);
 
@@ -3193,7 +3210,7 @@ static ssize_t hsel_read(struct file *file, char __user *buf, size_t len,
 	ret = ice_gpiox_get(GPIO_PINID_NFC_HSEL);
 #elif defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
 	ret = gpio_get_value(gfelica_hsel_pin);
-#endif
+	#endif
 	if (0 > ret) {
 		FELICA_PR_ERR(" %s ERROR(gpio_get_value), ret=[%d]",
 					__func__, ret);
@@ -3255,7 +3272,7 @@ static ssize_t hsel_write(struct file *file, const char __user *data,\
 	ice_gpiox_set(GPIO_PINID_NFC_HSEL , hsel_val);
 #elif defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
 	gpio_set_value(gfelica_hsel_pin , hsel_val);
-#endif
+    #endif
 
 	FELICA_PR_DBG(" %s END", __func__);
 	return 1;
@@ -4853,7 +4870,15 @@ static int uartcc_get_felica_status(void)
 	FELICA_PR_DBG(" %s START, guartcc_felica_status=[%d]\n", \
 			__func__, guartcc_felica_status);
 	FELICA_PR_DBG(" %s END\n", __func__);
+#if defined(CONFIG_MACH_KLTE_KDI)
+	if(gfelica_uim_mon == 1) {
+		FELICA_PR_ERR(" %s gfelica_uim_mon=%d\n", __func__, gfelica_uim_mon);
+		return UARTCC_FELICA_STATAUS_IN_INIT;
+	}
 	return guartcc_felica_status;
+#else
+	return guartcc_felica_status;
+#endif
 }
 
 /*
@@ -5095,6 +5120,17 @@ static long uicc_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 
 		break;
+
+	case UICC_POWER_UIM_MON:
+#if defined(CONFIG_MACH_KLTE_KDI)
+		FELICA_PR_INFO(" %s UICC_POWER_UIM_MON! make PON always high!\n", __func__);
+		gfelica_uim_mon = 1;
+		gpio_set_value(gfelica_pon_pin, GPIO_VALUE_HIGH);
+#else
+		FELICA_PR_ERR(" %s UICC_POWER_UIM_MON! this is only for K-KDDI\n", __func__);
+#endif			
+		break;
+
 	default:
 		FELICA_PR_ERR(" %s Undefine Paramater [%d]", __func__, cmd);
 		return UICC_ERROR;
@@ -5148,11 +5184,17 @@ static ssize_t snfc_cen_sts_init(void)
 	int ret;
 	unsigned char address = gi2c_lockaddress;
 	unsigned char read_buff = 0;
+	struct i2c_msg read_msgs[2];
 
-	gread_msgs[0].addr = gi2c_address;
-	gread_msgs[0].buf = &address;
-	gread_msgs[1].addr = gi2c_address;
-	gread_msgs[1].buf = &read_buff;
+	read_msgs[0].flags = gread_msgs[0].flags;
+	read_msgs[0].len = gread_msgs[0].len;
+	read_msgs[1].flags = gread_msgs[1].flags;
+	read_msgs[1].len = gread_msgs[1].len;
+
+	read_msgs[0].addr = gi2c_address;
+	read_msgs[0].buf = &address;
+	read_msgs[1].addr = gi2c_address;
+	read_msgs[1].buf = &read_buff;
 
 	FELICA_PR_DBG(" %s START", __func__);
 	if (felica_i2c_client == NULL) {
@@ -5169,13 +5211,13 @@ static ssize_t snfc_cen_sts_init(void)
 	}	
 	#endif
 	
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[0], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[0], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[0]), ret=[%d]",
 			       __func__, ret);
 		return -EIO;
 	}
-	ret = i2c_transfer(felica_i2c_client->adapter, &gread_msgs[1], 1);
+	ret = i2c_transfer(felica_i2c_client->adapter, &read_msgs[1], 1);
 	if (ret < 0) {
 		FELICA_PR_ERR(" %s ERROR(i2c_transfer[1]), ret=[%d]",
 			       __func__, ret);

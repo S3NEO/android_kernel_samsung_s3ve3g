@@ -148,8 +148,6 @@ source "drivers/virt/Kconfig"
 
 source "drivers/devfreq/Kconfig"
 
-source "drivers/gud/Kconfig"
-
 source "drivers/coresight/Kconfig"
 
 source "drivers/bif/Kconfig"
@@ -164,11 +162,14 @@ source "drivers/motor/Kconfig"
 source "drivers/sensorhub/Kconfig"
 source "drivers/fingerprint/Kconfig"
 
+source "drivers/adsp_factory/Kconfig"
+
 source "drivers/felica/Kconfig"
 
 source "drivers/extcon/Kconfig"
 
 source "drivers/irda/Kconfig"
 
-source "drivers/secfilter/Kconfig"
+source "drivers/qsc/Kconfig"
+
 endmenu

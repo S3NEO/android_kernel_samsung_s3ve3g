@@ -10,8 +10,6 @@
  * GNU General Public License for more details.
  */
 
-#define SPS_BAM_HOLD_MEM            (1UL << 8)
-
 #include <linux/types.h>	/* u32 */
 #include <linux/kernel.h>	/* pr_info() */
 #include <linux/mutex.h>	/* mutex */

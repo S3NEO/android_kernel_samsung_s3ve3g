@@ -247,6 +247,7 @@ static int mxt_request_gpio(struct mxt_data *data)
 static int mxt_power_onoff(struct mxt_data *data, bool enable)
 {
 	int ret = 0;
+	static struct regulator *reg_l23;
 
 #if 0
 	static struct regulator *reg_l10;
@@ -300,6 +301,39 @@ static int mxt_power_onoff(struct mxt_data *data, bool enable)
 	}
 #endif
 
+	if (!reg_l23) {
+		reg_l23 = regulator_get(NULL, "8226_l23");
+		if (IS_ERR(reg_l23)) {
+			dev_err(&data->client->dev,
+				"%s: could not get 8226_l23, rc = %ld\n",
+				__func__, PTR_ERR(reg_l23));
+			return -EINVAL;
+		}
+		ret = regulator_set_voltage(reg_l23, 1800000, 1800000);
+		if (ret) {
+			dev_err(&data->client->dev,
+				"%s: unable to set l23 voltage to 1.8V\n",
+				__func__);
+			return -EINVAL;
+		}
+	}
+	if(enable){
+		ret = regulator_enable(reg_l23);
+		if (ret) {
+			dev_err(&data->client->dev,
+			"%s: enable l23 failed, rc=%d\n",
+			__func__, ret);
+			return -EINVAL;
+		}
+	}else{
+		ret = regulator_disable(reg_l23);
+		if (ret) {
+			dev_err(&data->client->dev,
+				"%s: disable l23 failed, rc=%d\n",
+				__func__, ret);
+			return -EINVAL;
+		}
+	}
 	dev_err(&data->client->dev,
 			"%s enable(%d)\n", __func__, enable);
 	ret = gpio_direction_output(data->pdata->tsp_en, enable);
@@ -896,6 +930,18 @@ static void mxt_report_input_data(struct mxt_data *data)
 	int i;
 	int count = 0;
 	int report_count = 0;
+//20140319 multiply 1.2 for palm gesture 
+/*	u16 sumsize_dump = 0;
+	u16 component_dump = 0; */
+#if TSP_USE_SHAPETOUCH
+	u16 touchMinor;
+#endif
+	data->palm = 0;//20140320_5
+	for (i = 0; i < MXT_MAX_FINGER; i++) { //20140320_4
+		if(data->fingers[i].palm == 1)
+			data->palm = 1;
+
+	}
 
 	for (i = 0; i < MXT_MAX_FINGER; i++) {
 		if (data->fingers[i].state == MXT_STATE_INACTIVE)
@@ -905,7 +951,7 @@ static void mxt_report_input_data(struct mxt_data *data)
 		if (data->fingers[i].state == MXT_STATE_RELEASE) {
 #if TSP_USE_PALM_FLAG //0910
 			input_report_abs(data->input_dev, ABS_MT_PALM,
-					data->palm);
+					data->fingers[i].palm); //20140320_2
 #endif
 			input_mt_report_slot_state(data->input_dev,
 					MT_TOOL_FINGER, false);
@@ -922,18 +968,25 @@ static void mxt_report_input_data(struct mxt_data *data)
 					 data->fingers[i].z);
 
 #if TSP_USE_SHAPETOUCH
-/*for preventing palm sweep from multi touch*/
-			if(data->palm == 0)
-				data->fingers[i].component = 1;
-
-			input_report_abs(data->input_dev, ABS_MT_COMPONENT,
-					data->fingers[i].component);
-			input_report_abs(data->input_dev, ABS_MT_SUMSIZE,
-					data->sumsize);
+//20140320 for improving palm sweep.
+			if(data->palm == 0){
+				touchMinor = data->fingers[i].w-1;
+			}else {
+				touchMinor = data->fingers[i].w/2-1;
+			}
+			if(touchMinor == 0)
+				touchMinor = 1;
+			input_report_abs(data->input_dev, ABS_MT_TOUCH_MINOR,
+				touchMinor);
 #endif
 #if TSP_USE_PALM_FLAG
+#if 1//20140320_4
 			input_report_abs(data->input_dev, ABS_MT_PALM,
-					data->palm);
+					data->palm);//20140320_4
+#else
+			if(data->fingers[i].palm == 1)
+				data->palm = 1;
+#endif
 #endif
 
 
@@ -959,7 +1012,7 @@ static void mxt_report_input_data(struct mxt_data *data)
 				data->fingers[i].w, data->fingers[i].z);
 #if TSP_USE_SHAPETOUCH
 			pr_cont(",PALM[%d],COMP[%d],SUM[%d],AREA[%d]\n",
-				data->palm, data->fingers[i].component,
+				data->palm, data->fingers[i].component,  //20140320_4
 					data->sumsize, data->fingers[i].w);
 #else
 			pr_cont("\n");
@@ -985,6 +1038,11 @@ static void mxt_report_input_data(struct mxt_data *data)
 			count++;
 		}
 	}
+
+#if 0 // TSP_USE_PALM_FLAG//20140320_4
+	input_report_abs(data->input_dev, ABS_MT_PALM,
+			data->palm);
+#endif
 
 	if (count == 0) {
 		input_report_key(data->input_dev, BTN_TOUCH, 0);
@@ -1014,6 +1072,7 @@ static void mxt_release_all_finger(struct mxt_data *data)
 	for (i = 0; i < MXT_MAX_FINGER; i++) {
 		if (data->fingers[i].state == MXT_STATE_INACTIVE)
 			continue;
+		data->fingers[i].palm = 0; //20140320_5
 		data->fingers[i].z = 0;
 		data->fingers[i].state = MXT_STATE_RELEASE;
 		count++;
@@ -1129,10 +1188,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] Ignore menu R! by dummy key\n",
 								__func__);
-				} else if (data->ignore_menu_key_by_back) {
-					dev_info(&data->client->dev, 
-							"%s: [TSP_KEY] Ignore menu R! by back key\n",
-								 __func__);
 				} else {
 					input_report_key(data->input_dev, KEY_RECENT, KEY_RELEASE);
 						dev_info(&data->client->dev,
@@ -1149,10 +1204,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 				if (data->ignore_back_key) {
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] Ignore back R! by dummy key\n",
-								__func__);
-				} else if (data->ignore_back_key_by_menu) {
-					dev_info(&data->client->dev,
-							"%s: [TSP_KEY] Ignore back R! by menu key\n",
 								__func__);
 				} else {
 					input_report_key(data->input_dev, KEY_BACK, KEY_RELEASE);
@@ -1180,8 +1231,6 @@ static void mxt_release_all_keys(struct mxt_data *data)
 		"%s: [TSP_KEY] ignore_back_key Disable\n",
 		__func__);
 		}
-		data->ignore_back_key_by_menu = false;
-		data->ignore_menu_key_by_back = false;
 	}
 }
 
@@ -1228,26 +1277,11 @@ static void mxt_treat_T15_object(struct mxt_data *data,
 								"%s: [TSP_KEY] ignore_menu_key Disable\n",
 								__func__);
 					}
-				} else if (data->ignore_menu_key_by_back) {
-					dev_info(&data->client->dev,
-						"%s: [TSP_KEY] Ignore menu %s by back key\n",
-								 __func__, key_state != 0 ? "P" : "R");
 				} else {
 					input_report_key(data->input_dev, KEY_RECENT, key_state != 0 ? KEY_PRESS : KEY_RELEASE);
 					dev_info(&data->client->dev,
 						"%s: [TSP_KEY] menu %s\n",
 								__func__, key_state != 0 ? "P" : "R");
-					if (key_state != 0)
-							data->ignore_back_key_by_menu = true;
-					else {
-						if (input_message & TOUCH_KEY_D_MENU && !data->ignore_menu_key) {
-							data->ignore_menu_key = true;
-							dev_info(&data->client->dev,
-							"%s: [TSP_KEY] ignore_menu_key Enable\n",
-							__func__);
-						}
-						data->ignore_back_key_by_menu = false;
-					}
 #if MXT_TKEY_BOOSTER
 						mxt_tkey_set_dvfs_lock(data, !!key_state);
 #endif
@@ -1268,26 +1302,11 @@ static void mxt_treat_T15_object(struct mxt_data *data,
 								"%s: [TSP_KEY] ignore_back_key Disable\n",
 								__func__);
 					}
-				} else if (data->ignore_back_key_by_menu) {
-					dev_info(&data->client->dev,
-							"%s: [TSP_KEY] Ignore back %s by menu key\n",
-							 __func__, key_state != 0 ? "P" : "R");
 				} else {
 					input_report_key(data->input_dev, KEY_BACK, key_state != 0 ? KEY_PRESS : KEY_RELEASE);
 					dev_info(&data->client->dev,
 							"%s: [TSP_KEY] back %s\n" ,
 							__func__, key_state != 0 ? "P" : "R");
-					if (key_state != 0)
-						data->ignore_menu_key_by_back = true;
-					else {
-						if (input_message & TOUCH_KEY_D_BACK && !data->ignore_back_key) {
-							data->ignore_back_key = true;
-							dev_info(&data->client->dev,
-							"%s: [TSP_KEY] ignore_back_key Enable\n",
-							__func__);
-						}
-						data->ignore_menu_key_by_back = false;
-					}
 #if MXT_TKEY_BOOSTER
 						mxt_tkey_set_dvfs_lock(data, !!key_state);
 #endif
@@ -1366,6 +1385,7 @@ static void mxt_treat_T9_object(struct mxt_data *data,
 		mxt_report_input_data(data);
 
 	if (msg[0] & MXT_RELEASE_MSG_MASK) {
+		data->fingers[id].palm = 0; //20140320_5
 		data->fingers[id].z = 0;
 		data->fingers[id].w = msg[4];
 		data->fingers[id].state = MXT_STATE_RELEASE;
@@ -1399,10 +1419,11 @@ static void mxt_treat_T9_object(struct mxt_data *data,
 		}
 
 #if TSP_USE_PALM_FLAG
-		if(msg[0] & MXT_SUPPRESS_MSG_MASK)/*0x92(Detect|Move|Suppress)*/
-			data->palm = 1;
-		else
-			data->palm = 0;
+		if(msg[0] & MXT_SUPPRESS_MSG_MASK){/*0x92(Detect|Move|Suppress)*/
+			data->fingers[id].palm = 1;//20140320_2
+//20140320_2			mxt_report_input_data(data); //20140320_1
+		}else
+			data->fingers[id].palm = 0;//20140320_2
 /*
 		if(msg[0] & MXT_SUPPRESS_MSG_MASK)
 			data->fingers[id].palm = 1;
@@ -1415,6 +1436,7 @@ static void mxt_treat_T9_object(struct mxt_data *data,
 	} else if ((msg[0] & MXT_SUPPRESS_MSG_MASK)
 		&& (data->fingers[id].state != MXT_STATE_INACTIVE)) {
 			if((msg[0] & MXT_DETECT_MSG_MASK) != MXT_DETECT_MSG_MASK){
+			data->fingers[id].palm = 0; //20140320_5
 			data->fingers[id].z = 0;
 			data->fingers[id].w = msg[4];
 			data->fingers[id].state = MXT_STATE_RELEASE;
@@ -1430,6 +1452,7 @@ static void mxt_treat_T9_object(struct mxt_data *data,
 			dev_err(&data->client->dev, "Unknown state %#02x %#02x\n",
 				msg[0], msg[1]);
 	}
+//20140320_2	if(data->palm == 0)//20140320_1
 	data->finger_mask |= 1U << id;
 }
 
@@ -1514,6 +1537,7 @@ static void mxt_treat_T100_object(struct mxt_data *data,
 			if (touch_event == MXT_T100_EVENT_UP
 				|| touch_event == MXT_T100_EVENT_SUPPESS) {
 
+				data->fingers[id].palm = 0; //20140320_5
 				data->fingers[id].w = 0;
 				data->fingers[id].z = 0;
 				data->fingers[id].state = MXT_STATE_RELEASE;
@@ -1549,6 +1573,7 @@ static void mxt_treat_T100_object(struct mxt_data *data,
 			if (touch_type == MXT_T100_TYPE_HOVERING_FINGER) {
 				data->fingers[id].w = 0;
 				data->fingers[id].z = 0;
+				data->fingers[id].palm = 0; //20140320_5
 			}
 
 			if (touch_event == MXT_T100_EVENT_DOWN
@@ -2524,9 +2549,9 @@ static int mxt_flash_fw_on_probe(struct mxt_fw_info *fw_info)
 		goto out;
 	}
 
-	dev_info(dev, "Updating firmware from app-mode : IC:0x%x,0x%x =! FW:0x%x,0x%x\n",
+	dev_info(dev, "Updating firmware from app-mode : IC:0x%x,0x%x =! FW:0x%x,0x%x Varian Id:0x%x\n",
 			data->info.version, data->info.build,
-			fw_info->fw_ver, fw_info->build_ver);
+			fw_info->fw_ver, fw_info->build_ver,data->info.variant_id);
 
 	error = mxt_enter_bootloader(data);
 	if (error) {
@@ -2593,16 +2618,68 @@ out:
 #endif
 }
 
+#ifdef CHECK_IN_BOOTLOADER
+int mxt_check_chip_variant(struct mxt_data *data)
+{
+	struct i2c_client *client = data->client;
+	u8 buf[3];
+
+	if (i2c_master_recv(data->client_boot, buf, sizeof(buf)) != sizeof(buf)) {
+		dev_err(&client->dev, "%s: i2c recv failed\n", __func__);
+		return 0;
+	}
+	dev_err(&client->dev, "Bootloader ID:%d Version:%d", buf[1], buf[2]);
+
+	if(buf[1] == MXT_CHECK_1664S_BOOT_ID){
+		dev_err(&client->dev, "found 1664S bootloader\n");
+		data->info.variant_id = 0;
+		return 1;
+	}else if(buf[1] == MXT_CHECK_1188S1_BOOT_ID){
+		dev_err(&client->dev, "found 1188S1 bootloader\n");
+		data->info.variant_id = MXT_CHECK_1188S1_BOOT_ID;
+		return 1;
+	}
+
+	return 0;
+}
+#endif
+
 static int __devinit mxt_touch_init(struct mxt_data *data, bool nowait)
 {
 	struct i2c_client *client = data->client;
+	int ret = 0;
+#if defined(CONFIG_SEC_MATISSEWIFI_COMMON)
+        const char *firmware_name;
+	ret = mxt_read_id_info(data);
+
+	if (ret) {
+#ifdef CHECK_IN_BOOTLOADER
+		if(mxt_check_chip_variant(data)){
+			dev_err(&client->dev, "IC is IC bootloader (normal x)\n");
+		}else
+#endif
+		{
+		dev_err(&client->dev, "Failed to read Variant Id\n");
+		goto out;
+	}
+	}
+#endif
 #if defined(CONFIG_MACH_LT03EUR) || defined(CONFIG_MACH_LT03SKT) || defined(CONFIG_MACH_LT03KTT) || defined(CONFIG_MACH_LT03LGT)
 	const char *firmware_name = data->pdata->firmware_name ?: MXT_N_PROJECT_FIRMWARE_NAME;
 #else
+#if !defined(CONFIG_SEC_MATISSEWIFI_COMMON)
 	const char *firmware_name = data->pdata->firmware_name ?: MXT_V_PROJECT_FIRMWARE_NAME;
+#else
+	if(data->info.variant_id != 0){
+		dev_err(&client->dev, "Not 1664S\n");
+	        firmware_name = data->pdata->firmware_name ?: MXT_V_PROJECT_FIRMWARE_NAME;
+	}else {
+		dev_err(&client->dev, "Is 1664S\n");
+	        firmware_name = data->pdata->firmware_name ?: MXT_V_1664S_PROJECT_FIRMWARE_NAME;
+        }
+#endif
 #endif
 
-	int ret = 0;
 
 #if TSP_INFORM_CHARGER
 	/* Register callbacks */
@@ -2793,7 +2870,11 @@ static int __devinit mxt_probe(struct i2c_client *client,
 
 	data->pdata = pdata;
 
-	mxt_request_gpio(data);
+	if(mxt_request_gpio(data) <0)
+	{
+		error =  -EINVAL;
+		goto err_allocate_input_device;
+	}
 
 	input_dev = input_allocate_device();
 	if (!input_dev) {
@@ -2842,14 +2923,10 @@ static int __devinit mxt_probe(struct i2c_client *client,
 				0, pdata->max_y, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
 				0, MXT_AREA_MAX, 0, 0);
+	input_set_abs_params(input_dev, ABS_MT_TOUCH_MINOR,
+				0, MXT_AREA_MAX, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE,
 				0, MXT_AMPLITUDE_MAX, 0, 0);
-#if TSP_USE_SHAPETOUCH
-	input_set_abs_params(input_dev, ABS_MT_COMPONENT,
-				0, MXT_COMPONENT_MAX, 0, 0);
-	input_set_abs_params(input_dev, ABS_MT_SUMSIZE,
-				0, MXT_SUMSIZE_MAX, 0, 0);
-#endif
 
 #if TSP_USE_PALM_FLAG
 	input_set_abs_params(input_dev, ABS_MT_PALM, 

@@ -23,7 +23,11 @@
 
 #define BT532_TS_DEVICE		"bt532_ts_device"
 
+#if defined(CONFIG_SEC_MEGA23G_COMMON) || defined(CONFIG_SEC_MEGA2LTE_COMMON)
+#define SUPPORTED_TOUCH_KEY_LED	1
+#else
 #define SUPPORTED_TOUCH_KEY_LED	0
+#endif
 
 #define zinitix_debug_msg(fmt, args...) \
 	do { \
@@ -61,6 +65,7 @@ struct bt532_ts_platform_data {
 	u16		y_resolution;
 	u16		page_size;
 	u8		orientation;
+        const char      *pname;
 };
 
 extern struct class *sec_class;

@@ -215,7 +215,7 @@ static ssize_t diag_dbgfs_read_dcistats(struct file *file,
 
 	buf_size = ksize(buf);
 	bytes_remaining = buf_size;
-
+	
 	mutex_lock(&diag_dci_dbgfs_mutex);
 	if (diag_dbgfs_dci_data_index == 0) {
 		bytes_written =

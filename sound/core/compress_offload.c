@@ -161,9 +161,12 @@ static int snd_compr_free(struct inode *inode, struct file *f)
 static int snd_compr_update_tstamp(struct snd_compr_stream *stream,
 		struct snd_compr_tstamp *tstamp)
 {
+	int err = 0;
 	if (!stream->ops->pointer)
 		return -ENOTSUPP;
-	stream->ops->pointer(stream, tstamp);
+	err = stream->ops->pointer(stream, tstamp);
+	if (err)
+		return err;
 	pr_debug("dsp consumed till %d total %d bytes\n",
 		tstamp->byte_offset, tstamp->copied_total);
 	if (stream->direction == SND_COMPRESS_PLAYBACK)
@@ -484,7 +487,7 @@ static int snd_compress_check_input(struct snd_compr_params *params)
 {
 	/* first let's check the buffer parameter's */
 	if (params->buffer.fragment_size == 0 ||
-			params->buffer.fragments > UINT_MAX / params->buffer.fragment_size)
+	    params->buffer.fragments > INT_MAX / params->buffer.fragment_size)
 		return -EINVAL;
 
 	/* now codec parameters */
@@ -492,6 +495,9 @@ static int snd_compress_check_input(struct snd_compr_params *params)
 		return -EINVAL;
 
 	if (params->codec.ch_in == 0 || params->codec.ch_out == 0)
+		return -EINVAL;
+
+	if (!(params->codec.sample_rate & SNDRV_PCM_RATE_8000_192000))
 		return -EINVAL;
 
 	return 0;

@@ -1,4 +1,5 @@
-/* Copyright (c) 2010-2012,2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
+ * reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -426,7 +427,7 @@ void kgsl_cffdump_syncmem(struct kgsl_device *device,
 	src = (uint *)kgsl_gpuaddr_to_vaddr(memdesc, gpuaddr);
 	if (memdesc->hostptr == NULL) {
 		KGSL_CORE_ERR(
-		"no kernel map for gpuaddr: 0x%08x, m->host: 0x%p, phys: %pa\n",
+		"no kernel map for gpuaddr: 0x%08x, m->host: 0x%pK, phys: %pa\n",
 		gpuaddr, memdesc->hostptr, &memdesc->physaddr);
 		return;
 	}
@@ -514,9 +515,6 @@ EXPORT_SYMBOL(kgsl_cffdump_waitirq);
 static int subbuf_start_handler(struct rchan_buf *buf,
 	void *subbuf, void *prev_subbuf, uint prev_padding)
 {
-	pr_debug("kgsl: cffdump: subbuf_start_handler(subbuf=%p, prev_subbuf"
-		"=%p, prev_padding=%08x)\n", subbuf, prev_subbuf, prev_padding);
-
 	if (relay_buf_full(buf)) {
 		if (!suspended) {
 			suspended = 1;
@@ -572,9 +570,6 @@ static struct rchan_callbacks relay_callbacks = {
 static struct rchan *create_channel(unsigned subbuf_size, unsigned n_subbufs)
 {
 	struct rchan *chan;
-
-	pr_info("kgsl: cffdump: relay: create_channel: subbuf_size %u, "
-		"n_subbufs %u, dir 0x%p\n", subbuf_size, n_subbufs, dir);
 
 	chan = relay_open("cpu", dir, subbuf_size,
 			  n_subbufs, &relay_callbacks, NULL);
@@ -659,3 +654,46 @@ int kgsl_cff_dump_enable_get(void *data, u64 *val)
 	return 0;
 }
 EXPORT_SYMBOL(kgsl_cff_dump_enable_get);
+
+/*
+ * kgsl_cffdump_capture_ib_desc() - Capture CFF for a list of IB's
+ * @device: Device for which CFF is to be captured
+ * @context: The context under which the IB list executes on device
+ * @ibdesc: The IB list
+ * @numibs: Number of IB's in ibdesc
+ *
+ * Returns 0 on success else error code
+ */
+int kgsl_cffdump_capture_ib_desc(struct kgsl_device *device,
+				struct kgsl_context *context,
+				struct kgsl_cmdbatch *cmdbatch)
+{
+	int ret = 0;
+	unsigned int ptbase;
+	struct kgsl_ibdesc_node *ibdesc;
+
+	if (!device->cff_dump_enable)
+		return 0;
+	/* Dump CFF for IB and all objects in it */
+	ptbase = kgsl_mmu_get_pt_base_addr(&device->mmu,
+					context->proc_priv->pagetable);
+	if (!ptbase) {
+		ret = -EINVAL;
+		goto done;
+	}
+	list_for_each_entry(ib, &cmdbatch->ibdesclist, node) {
+		ret = kgsl_cffdump_capture_adreno_ib_cff(
+			device, ptbase, ibdesc->gpuaddr,
+			ibdesc->sizedwords);
+		if (ret) {
+			KGSL_DRV_ERR(device,
+			"Fail cff capture, IB %lx, size %zx\n",
+			ibdesc->gpuaddr,
+			ibdesc->sizedwords << 2);
+			break;
+		}
+	}
+done:
+	return ret;
+}
+EXPORT_SYMBOL(kgsl_cffdump_capture_ib_desc);

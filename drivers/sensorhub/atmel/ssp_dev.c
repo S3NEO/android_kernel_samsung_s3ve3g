@@ -50,6 +50,10 @@ void ssp_enable(struct ssp_data *data, bool enable)
 static irqreturn_t sensordata_irq_thread_fn(int iIrq, void *dev_id)
 {
 	struct ssp_data *data = dev_id;
+	struct timespec ts;
+
+	get_monotonic_boottime(&ts);
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 
 	select_irq_msg(data);
 	data->uIrqCnt++;

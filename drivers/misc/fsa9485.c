@@ -46,6 +46,9 @@ EXPORT_SYMBOL(uart_connecting);
 int detached_status;
 EXPORT_SYMBOL(detached_status);
 
+static int mmdock_connect;
+static int mmdock_flag;
+
 static int jig_state;
 
 struct fsa9485_usbsw {
@@ -198,12 +201,24 @@ void FSA9485_CheckAndHookAudioDock(int value)
 {
 	struct i2c_client *client = local_usbsw->client;
 	struct fsa9485_platform_data *pdata = local_usbsw->pdata;
+	unsigned int dev3;
 	int ret = 0;
+
+	dev3 = i2c_smbus_read_byte_data(client,
+			FSA9485_REG_RESERVED_1D);
+	if(dev3 < 0) {
+		dev_err(&client->dev, "%s: err %d\n", __func__, dev3);
+		return ;
+	}
 
 	if (value) {
 		pr_info("FSA9485_CheckAndHookAudioDock ON\n");
-			if (pdata->dock_cb)
-				pdata->dock_cb(FSA9485_ATTACHED_DESK_DOCK);
+			if (pdata->dock_cb) {
+				if(dev3 & 0x02)			// check vbus valid
+					pdata->dock_cb(FSA9485_ATTACHED_DESK_DOCK);
+				else
+					pdata->dock_cb(FSA9485_ATTACHED_DESK_DOCK_NO_VBUS);
+			}
 
 			ret = i2c_smbus_write_byte_data(client,
 					FSA9485_REG_MANSW1, SW_AUDIO);
@@ -506,7 +521,7 @@ static ssize_t fsa9485_set_apo_factory(struct device *dev,
 	} else {
 		pr_warn("%s Wrong command\n", __func__);
 		return count;
-	}	
+	}
 
 	return count;
 }
@@ -660,7 +675,7 @@ static int fsa9485_detect_lanhub(struct fsa9485_usbsw *usbsw) {
 	unsigned int dev1, dev2, adc;
 	struct fsa9485_platform_data *pdata = usbsw->pdata;
 	struct i2c_client *client = usbsw->client;
-	
+
 	pr_info("%s", __func__);
 
 	device_type = i2c_smbus_read_word_data(client, FSA9485_REG_DEV_T1);
@@ -752,6 +767,88 @@ static int fsa9485_detect_lanhub(struct fsa9485_usbsw *usbsw) {
 }
 #endif
 
+void fsa9485_mmdock_attach(void){
+
+	int ret;
+	struct i2c_client *client = local_usbsw->client;
+    struct fsa9485_platform_data *pdata = local_usbsw->pdata;
+
+	dev_info(&client->dev, "MM dock connect\n");
+	mmdock_flag = 1;
+	ret = i2c_smbus_write_byte_data(client,FSA9485_REG_MANSW1, SW_DHOST);
+	if (ret < 0)
+		dev_err(&client->dev,"%s: err %d\n", __func__, ret);
+	ret = i2c_smbus_read_byte_data(client,
+					FSA9485_REG_CTRL);
+	if (ret < 0)
+		dev_err(&client->dev,
+				"%s: err %d\n", __func__, ret);
+	ret = i2c_smbus_write_byte_data(client,
+			FSA9485_REG_CTRL, ret & ~CON_MANUAL_SW);
+	if (ret < 0)
+		dev_err(&client->dev,
+				"%s: err %d\n", __func__, ret);
+#if defined(CONFIG_VIDEO_MHL_V2)
+	if (pdata->mhl_cb)
+	{
+		pr_info("MMDock callback from FSA chip for PSY setting in MHL driver\n");
+		pdata->mhl_cb(FSA9485_MMDOCK_ATTACHED);		
+	}
+#endif
+	if (pdata->otg_cb)
+		pdata->otg_cb(FSA9485_ATTACHED);
+
+	if (pdata->mmdock_cb)
+		pdata->mmdock_cb(FSA9485_ATTACHED);
+
+}
+
+void fsa9485_mmdock_detach(void){
+
+	int ret;
+	struct i2c_client *client = local_usbsw->client;
+    struct fsa9485_platform_data *pdata = local_usbsw->pdata;
+
+	dev_info(&client->dev, "MM dock disconnect\n");
+	mmdock_flag = 0;
+
+	ret = i2c_smbus_read_byte_data(client,FSA9485_REG_CTRL);
+	if (ret < 0)
+		dev_err(&client->dev,"%s: err %d\n", __func__, ret);
+	ret = i2c_smbus_write_byte_data(client,FSA9485_REG_CTRL,ret | CON_MANUAL_SW);
+	if (ret < 0)
+		dev_err(&client->dev,"%s: err %d\n", __func__, ret);
+	if (pdata->otg_cb)
+		pdata->otg_cb(FSA9485_DETACHED);
+
+#if defined(CONFIG_VIDEO_MHL_V2)
+	if (pdata->mhl_cb)
+		pdata->mhl_cb(FSA9485_DETACHED);
+#endif
+
+	if (pdata->mmdock_cb)
+		pdata->mmdock_cb(FSA9485_DETACHED);
+
+}
+
+void fsa9485_mmdock_vbus_check(bool vbus_status)
+{
+	if(vbus_status){
+		if(mmdock_connect ==1 && mmdock_flag ==0)
+			fsa9485_mmdock_attach();
+	}
+	else{
+		if(mmdock_connect == 1 && mmdock_flag ==1)
+			fsa9485_mmdock_detach();
+	}
+}
+EXPORT_SYMBOL(fsa9485_mmdock_vbus_check);
+
+int check_mmdock_connect(void){
+	return mmdock_connect;
+}
+EXPORT_SYMBOL(check_mmdock_connect);
+
 static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 {
 	int device_type, ret;
@@ -773,13 +870,6 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 
 	jig_state = (dev2 & DEV_T2_JIG_MASK) ? 1 : 0;
 
-	dev3 = i2c_smbus_read_byte_data(client,
-			FSA9485_REG_RESERVED_1D);
-	if(dev3 < 0) {
-		dev_err(&client->dev, "%s: err %d\n", __func__, dev3);
-		return dev3;
-	}
-	dev3 = dev3 & 0x02;
 	adc = i2c_smbus_read_byte_data(client, FSA9485_REG_ADC);
 
 /* remove for right perform for lanhub / defence code for factory */
@@ -789,7 +879,9 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 #endif
 
 	if (local_usbsw->dock_ready == 1) {
-		if (adc == 0x10)
+		if (adc == 0x0f)
+			dev2 = DEV_INCOMPATIBLE;
+		else if (adc == 0x10)
 			dev2 = DEV_SMARTDOCK;
 		else if (adc == 0x12)
 			dev2 = DEV_AUDIO_DOCK;
@@ -797,10 +889,29 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 		else if (adc == 0x13)
 			dev2 = DEV_LANHUB;
 #endif
+		else if (adc == 0x14)
+			dev2 = DEV_CHARGING_CABLE;
+		else if (adc == 0x15){
+			dev2 = DEV_MMDOCK;
+			ret = i2c_smbus_read_byte_data(client,FSA9485_REG_CTRL);
+			if (ret < 0)
+				dev_err(&client->dev,"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_write_byte_data(client, FSA9485_REG_CTRL, ret & ~CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+			mmdock_connect = 1;
+		}
 	}
 
-	dev_info(&client->dev, "dev1: 0x%02x, dev2: 0x%02x, adc: 0x%02x\n",
-		dev1, dev2, adc);
+	dev3 = i2c_smbus_read_byte_data(client,
+			FSA9485_REG_RESERVED_1D);
+	if(dev3 < 0) {
+		dev_err(&client->dev, "%s: err %d\n", __func__, dev3);
+		return dev3;
+	}
+	dev3 = dev3 & 0x02;
+	dev_info(&client->dev, "dev1: 0x%02x, dev2: 0x%02x,dev3: 0x%02x, adc: 0x%02x\n",
+		dev1, dev2, dev3, adc);
 
 	/* Attached */
 	if (dev1 || dev2) {
@@ -897,8 +1008,12 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 #if defined(CONFIG_VIDEO_MHL_V1) || defined(CONFIG_VIDEO_MHL_V2)
 				DisableFSA9485Interrupts();
 
-				isMhlAttached = MHL_ATTACHED;
-				schedule_delayed_work(&usbsw->mhl_work, msecs_to_jiffies(100));
+				if (isMhlAttached != MHL_ATTACHED) {
+					isMhlAttached = MHL_ATTACHED;
+					schedule_delayed_work(&usbsw->mhl_work, msecs_to_jiffies(100));
+				} else {
+					dev_info(&client->dev, "FSA mhl is initializing... bypass\n");
+				}
 
 				EnableFSA9485Interrupts();
 #else
@@ -951,6 +1066,12 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 				}
 			}
 #endif /* !CONFIG_MUIC_FSA9485_SUPPORT_CAR_DOCK */
+		} else if (dev2 & DEV_INCOMPATIBLE) {
+			usbsw->adc = adc;
+			dev_info(&client->dev, "Inompatible CHARGER connect\n");
+
+			if (pdata->in_charger_cb)
+				pdata->in_charger_cb(FSA9485_ATTACHED);
 		/* SmartDock */
 		} else if (dev2 & DEV_SMARTDOCK) {
 			usbsw->adc = adc;
@@ -978,6 +1099,11 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 #if defined(CONFIG_VIDEO_MHL_V1) || defined(CONFIG_VIDEO_MHL_V2)
 //			mhl_onoff_ex(1);
 #endif
+		/*MMDock*/
+		} else if ((dev2 & DEV_MMDOCK) && (dev3 & 0x02)) {
+			if(mmdock_flag == 0)
+				fsa9485_mmdock_attach();
+
 		} else if (dev2 & DEV_AUDIO_DOCK) {
 			usbsw->adc = adc;
 			dev_info(&client->dev, "audio dock connect\n");
@@ -1034,12 +1160,20 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 			if (pdata->lanhub_cb)
 				pdata->lanhub_cb(FSA9485_ATTACHED);
 #endif
+		/* CHARGING CABLE */
+		} else if (dev2 & DEV_CHARGING_CABLE) {
+			dev_info(&client->dev, "charging cable connect\n");
+			usbsw->dock_attached = FSA9485_ATTACHED;
+			usbsw->adc = adc;
+
+			if (pdata->charge_cb)
+				pdata->charge_cb(FSA9485_ATTACHED);
 		/* Incompatible */
 		} else if (dev3 & DEV_VBUS_DEBOUNCE) {
 			dev_info(&client->dev,
-					"Incompatible Charger connect\n");
-			if (pdata->in_charger_cb)
-				pdata->in_charger_cb(FSA9485_ATTACHED);
+					"Unsupported ADC, VBUS is valid = CHARGER\n");
+			if (pdata->charger_cb)
+				pdata->charger_cb(FSA9485_ATTACHED);
 		}
 	/* Detached */
 	} else {
@@ -1140,6 +1274,12 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 				dev_info(&client->dev, "[FSA9485] uart disconnect\n");
 			}
 #endif /* !CONFIG_MUIC_FSA9485_SUPPORT_CAR_DOCK */
+		} else if (usbsw->adc == 0x0f) {
+			dev_info(&client->dev, "Incompatible Charger disconnect\n");
+
+			if (pdata->in_charger_cb)
+				pdata->in_charger_cb(FSA9485_DETACHED);
+			usbsw->adc = 0;
 		} else if (usbsw->adc == 0x10) {
 			dev_info(&client->dev, "smart dock disconnect\n");
 
@@ -1208,11 +1348,25 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 			usbsw->adc = 0;
 			usbsw->lanhub_ta_status=0;
 #endif
+		/* Charging Cable */
+		} else if (usbsw->adc == 0x14) {
+			dev_info(&client->dev, "charging_cable disconnect\n");
+			usbsw->dock_attached = FSA9485_DETACHED;
+			usbsw->adc = 0;
+			usbsw->dev2 = 0;
+			if (pdata->charge_cb)
+				pdata->charge_cb(FSA9485_DETACHED);
+		/*MM DOCK*/
+		}else if (mmdock_connect == 1) {
+			mmdock_connect = 0;
+			if(mmdock_flag == 1)
+				fsa9485_mmdock_detach();
+
 		} else if (usbsw->dev3 & DEV_VBUS_DEBOUNCE) {
 			dev_info(&client->dev,
-					"Incompatible Charger disconnect\n");
-			if (pdata->in_charger_cb)
-				pdata->in_charger_cb(FSA9485_DETACHED);
+					"Unsupported adc, Charger disconnect\n");
+			if (pdata->charger_cb)
+				pdata->charger_cb(FSA9485_DETACHED);
 		}
 		/*	set auto mode	*/
 		i2c_smbus_write_byte_data(client,FSA9485_REG_CTRL, 0x1E);
@@ -1364,6 +1518,7 @@ static void fsa9485_mhl_detect(struct work_struct *work)
 	if (local_usbsw->mhl_ready == 0) {
 		fsa9485_set_mhl_cable(isMhlAttached);
 		dev_info(&usbsw->client->dev, "%s: ignore mhl-detection in booting time\n", __func__);
+		isMhlAttached = MHL_DETACHED;
 		return;
 	}
 
@@ -1557,7 +1712,11 @@ static int __devinit fsa9485_probe(struct i2c_client *client,
 	if(poweroff_charging)
 		schedule_delayed_work(&usbsw->init_work, msecs_to_jiffies(1000));
 	else
+#ifdef CONFIG_SEC_BERLUTI_PROJECT
+		schedule_delayed_work(&usbsw->init_work, msecs_to_jiffies(100));
+#else
 		schedule_delayed_work(&usbsw->init_work, msecs_to_jiffies(3000));
+#endif
 	INIT_DELAYED_WORK(&usbsw->audio_work, fsa9485_delayed_audio);
 	schedule_delayed_work(&usbsw->audio_work, msecs_to_jiffies(20000));
 #if defined(CONFIG_VIDEO_MHL_V1) || defined(CONFIG_VIDEO_MHL_V2)

@@ -143,7 +143,7 @@ static int VibeOSKernelProcessData(void* data)
     /* If finished playing, stop timer */
     if (g_bStopRequested)
     {
-        VibeOSKernelLinuxStopTimer();
+        VibeOSKernelLinuxStopTimer();#if defined(CONFIG_VIBRATOR_UPDATE)		// stop all actuator		for (i = 0; i < NUM_ACTUATORS; i++)		{			ImmVibeSPI_ForceOut_AmpDisable(i);		}#endif
 
         /* Reset watchdog counter */
         g_nWatchdogCounter = 0;

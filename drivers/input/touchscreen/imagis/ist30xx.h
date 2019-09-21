@@ -28,7 +28,7 @@
 #define IMAGIS_IST3038          (3)
 #define IMAGIS_IST3044          (4)
 
-#if defined(CONFIG_MACH_KANAS3G_CU)
+#if defined(CONFIG_SEC_KANAS_PROJECT)
 #define IMAGIS_TSP_IC           IMAGIS_IST3038
 #else
 #define IMAGIS_TSP_IC           IMAGIS_IST30XXB
@@ -63,18 +63,18 @@
 # define IST30XX_TRACKING_MODE  (0)
 # define IST30XX_ALGORITHM_MODE (0)
 #endif
-#define IST30XX_DETECT_TA       (1)
-#define IST30XX_DETECT_CALLER   (0)
+
 #define IST30XX_USE_KEY         (1)
 #define IST30XX_DEBUG           (1)
 
 #define SEC_FACTORY_MODE        (1)
-#define IST30XX_FACTORY_TEST    (1)
+#define IST30XX_CMCS_TEST       (1)
 
 #define IST30XX_DEV_NAME        "sec_touch"
 #define IST30XX_CHIP_ID         (0x30003000)
 #define IST30XXA_CHIP_ID        (0x300a300a)
 #define IST30XXB_CHIP_ID        (0x300b300b)
+#define IST3038_CHIP_ID         (0x30383038)
 
 #define IST30XX_DEV_ID          (0xA0 >> 1)
 #define IST30XX_FW_DEV_ID       (0xA4 >> 1)
@@ -102,6 +102,28 @@
 #define LOW_TEMPERATURE         (1)
 #define HIGH_TEMPERATURE        (2)
 
+/* TSP Local Code */
+#define TSP_LOCAL_EU               (0)
+#define TSP_LOCAL_EEU             (1)
+#define TSP_LOCAL_TD               (11)
+#define TSP_LOCAL_CMCC           (12)
+#define TSP_LOCAL_CU               (13)
+#define TSP_LOCAL_SPRD            (14)
+#define TSP_LOCAL_CTC               (15)
+#define TSP_LOCAL_INDIA           (21)
+#define TSP_LOCAL_SWASIA         (22)
+#define TSP_LOCAL_NA              (31)
+#define TSP_LOCAL_LA               (32)
+#if defined(CONFIG_MACH_KANAS3G_CTC)
+#define TSP_LOCAL_CODE           TSP_LOCAL_CTC
+#elif defined(CONFIG_MACH_KANAS3G_CMCC)
+#define TSP_LOCAL_CODE           TSP_LOCAL_CMCC
+#elif defined(CONFIG_MACH_KANAS3G_CU)
+#define TSP_LOCAL_CODE           TSP_LOCAL_CU
+#else
+#define TSP_LOCAL_CODE           TSP_LOCAL_EU
+#endif
+
 /* Debug message */
 #define DEV_ERR     (1)
 #define DEV_WARN    (2)
@@ -110,7 +132,7 @@
 #define DEV_VERB    (5)
 
 #define IST30XX_DEBUG_TAG       "[ TSP ]"
-#define IST30XX_DEBUG_LEVEL     DEV_DEBUG
+#define IST30XX_DEBUG_LEVEL     DEV_INFO
 //#define IST30XX_DEBUG_LEVEL     DEV_VERB
 
 #define tsp_err(fmt, ...)   tsp_printk(DEV_ERR, fmt, ## __VA_ARGS__)
@@ -119,7 +141,7 @@
 #define tsp_debug(fmt, ...) tsp_printk(DEV_DEBUG, fmt, ## __VA_ARGS__)
 #define tsp_verb(fmt, ...)  tsp_printk(DEV_VERB, fmt, ## __VA_ARGS__)
 
-#ifdef CONFIG_SEC_DVFS
+#if defined(CONFIG_SEC_DVFS) || defined (CONFIG_CPU_FREQ_LIMIT_USERSPACE)
 #define TOUCH_BOOSTER			1
 #define TOUCH_BOOSTER_OFF_TIME	100
 #define TOUCH_BOOSTER_CHG_TIME	200
@@ -132,7 +154,7 @@ enum ist30xx_commands {
 	CMD_UPDATE_CONFIG           = 0x05,
 	CMD_ENTER_REG_ACCESS        = 0x07,
 	CMD_EXIT_REG_ACCESS         = 0x08,
-	CMD_SET_TA_MODE             = 0x0A,
+	CMD_SET_NOISE_MODE          = 0x0A,
 	CMD_START_SCAN              = 0x0B,
 	CMD_ENTER_FW_UPDATE         = 0x0C,
 	CMD_RUN_DEVICE              = 0x0D,
@@ -146,7 +168,9 @@ enum ist30xx_commands {
 	CMD_SAME_POSITION           = 0x16,
 	CMD_CHECK_CALIB             = 0x1A,
 	CMD_SET_TEMPER_MODE         = 0x1B,
-	CMD_SET_CALL_MODE           = 0x1C,
+	CMD_USE_CORRECT_CP          = 0x1C,
+	CMD_SET_REPORT_RATE         = 0x1D,
+	CMD_SET_IDLE_TIME           = 0x1E,
 
 	CMD_GET_COORD               = 0x20,
 
@@ -156,6 +180,7 @@ enum ist30xx_commands {
 	CMD_GET_LCD_RESOLUTION      = 0x33,
 	CMD_GET_TSP_CHNUM1          = 0x34,
 	CMD_GET_PARAM_VER           = 0x35,
+	CMD_GET_SUB_VER             = 0x36,
 	CMD_GET_CALIB_RESULT        = 0x37,
 	CMD_GET_TSP_SWAP_INFO       = 0x38,
 	CMD_GET_KEY_INFO1           = 0x39,
@@ -168,6 +193,7 @@ enum ist30xx_commands {
 	CMD_GET_TSP_PANNEL_TYPE     = 0x40,
 
 	CMD_GET_CHECKSUM_ALL        = 0x41,
+	CMD_DEFAULT                 = 0xFF,
 };
 
 #define CMD_FW_UPDATE_MAGIC     (0x85FDAE8A)
@@ -188,7 +214,7 @@ typedef struct _ALGR_INFO {
 } ALGR_INFO;
 
 #if IST30XX_EXTEND_COORD
-
+#define EXTEND_COORD_CHECKSUM   (0)
 #define IST30XX_INTR_STATUS1    (0x71000000)
 #define IST30XX_INTR_STATUS2    (0x00000C00)
 #define CHECK_INTR_STATUS1(n)   (((n & IST30XX_INTR_STATUS1) == IST30XX_INTR_STATUS1) ? 1 : 0)
@@ -211,7 +237,7 @@ typedef union {
 	u32 full_field;
 } finger_info;
 #else  // IST30XX_EXTEND_COORD
-
+#define EXTEND_COORD_CHECKSUM   (0)
 typedef union {
 	struct {
 		u32	y       : 10;
@@ -239,6 +265,7 @@ struct ist30xx_fw {
 	u32	prev_param_ver;
 	u32	core_ver;
 	u32	param_ver;
+	u32	sub_ver;
 	u32	index;
 	u32	size;
 	u32	chksum;
@@ -322,10 +349,12 @@ extern struct mutex ist30xx_mutex;
 extern int ist30xx_dbg_level;
 
 void tsp_printk(int level, const char *fmt, ...);
+int ist30xx_intr_wait(long ms);
 
 void ist30xx_enable_irq(struct ist30xx_data *data);
 void ist30xx_disable_irq(struct ist30xx_data *data);
-
+void ist30xx_set_ta_mode(bool charging);
+void ist30xx_set_cover_mode(int mode);
 void ist30xx_start(struct ist30xx_data *data);
 int ist30xx_get_ver_info(struct ist30xx_data *data);
 int ist30xx_init_touch_driver(struct ist30xx_data *data);

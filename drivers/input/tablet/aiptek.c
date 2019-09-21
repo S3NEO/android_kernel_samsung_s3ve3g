@@ -1865,7 +1865,7 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		dev_info(&intf->dev,
 			 "Aiptek tried all speeds, no sane response\n");
 		err = -EINVAL;
-		goto fail3;
+		goto fail2;
 	}
 
 	/* Associate this driver's struct with the usb interface.

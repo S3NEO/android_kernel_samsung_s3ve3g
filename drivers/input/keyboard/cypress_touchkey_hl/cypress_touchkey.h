@@ -18,10 +18,6 @@
 #include <linux/earlysuspend.h>
 #endif
 
-#ifdef CONFIG_INPUT_BOOSTER
-#include <linux/input/input_booster.h>
-#endif
-
 #include <linux/i2c/touchkey_hl.h>
 
 /* Touchkey Register */
@@ -35,6 +31,9 @@
 #define CYPRESS_REG_DIFF	0X0A
 #define CYPRESS_REG_RAW		0X0E
 #define CYPRESS_REG_BASE	0X12
+#define CYPRESS_REG_CRC		0X16
+#define CYPRESS_REG_DETECTION		0x18
+#define CYPRESS_REG_DETECTION_FLAG	0x1B
 
 #define KEYCODE_REG			0x00
 
@@ -47,17 +46,18 @@
 #define TK_BIT_FW_ID_55		0x20
 #define TK_BIT_FW_ID_65		0x04
 
+#define TK_BIT_DETECTION_CONFIRM	0xEE
+
 #define TK_CMD_LED_ON		0x10
 #define TK_CMD_LED_OFF		0x20
+
+#define TK_CMD_DUAL_DETECTION	0x01
 
 #define I2C_M_WR 0		/* for i2c */
 
 #define TK_UPDATE_DOWN		1
 #define TK_UPDATE_FAIL		-1
 #define TK_UPDATE_PASS		0
-
-#ifdef CONFIG_SEC_TSP_FACTORY
-#endif
 
 /* Flip cover*/
 #define TKEY_FLIP_MODE 
@@ -87,16 +87,31 @@
 #define TK_HAS_FIRMWARE_UPDATE
 #define TK_UPDATABLE_BD_ID	0
 
+#if defined(CONFIG_SEC_S_PROJECT)
+#define CYPRESS_CRC_CHECK
+#define TK_USE_RECENT
+#define FW_PATH "tkey/s_cypress_tkey.fw"
+#define TOUCHKEY_BOOSTER
+#else
 #define FW_PATH "tkey/fresco_n_cypress_tkey.fw"
+#endif
+
 #define TKEY_MODULE07_HWID 8
 #define TKEY_FW_PATH "/sdcard/cypress/fw.bin"
 
 #define  TOUCHKEY_FW_UPDATEABLE_HW_REV  11
-#if !defined(CONFIG_INPUT_BOOSTER)
-//#define TOUCHKEY_BOOSTER
+
+#if defined(CONFIG_SEC_S_PROJECT)
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0x0D
+#elif defined(CONFIG_SEC_FRESCO_PROJECT)
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0x0B
+#else
+#define CYPRESS_RECENT_BACK_REPORT_FW_VER	0xFF
 #endif
+
 #ifdef TOUCHKEY_BOOSTER
-#include <linux/pm_qos.h>
+#include <linux/cpufreq.h>
+
 #define TKEY_BOOSTER_ON_TIME	500
 #define TKEY_BOOSTER_OFF_TIME	500
 #define TKEY_BOOSTER_CHG_TIME	130
@@ -106,14 +121,6 @@ enum BOOST_LEVEL {
 	TKEY_BOOSTER_LEVEL1,
 	TKEY_BOOSTER_LEVEL2,
 };
-
-#define TKEY_BOOSTER_CPU_FREQ1 1600000
-#define TKEY_BOOSTER_MIF_FREQ1 667000
-#define TKEY_BOOSTER_INT_FREQ1 333000
-
-#define TKEY_BOOSTER_CPU_FREQ2 650000
-#define TKEY_BOOSTER_MIF_FREQ2 400000
-#define TKEY_BOOSTER_INT_FREQ2 111000
 #endif
 
 /* #define TK_USE_OPEN_DWORK */
@@ -163,6 +170,8 @@ struct touchkey_i2c {
 	struct early_suspend early_suspend;
 #endif
 	struct mutex lock;
+	struct mutex i2c_lock;
+	struct mutex irq_lock;
 	struct wake_lock fw_wakelock;
 	struct device	*dev;
 	int irq;
@@ -175,23 +184,22 @@ struct touchkey_i2c {
 	int update_status;
 	bool enabled;
 #ifdef TOUCHKEY_BOOSTER
-	bool tsk_dvfs_lock_status;
-	struct delayed_work tsk_work_dvfs_off;
-	struct delayed_work tsk_work_dvfs_chg;
-	struct mutex tsk_dvfs_lock;
-	struct pm_qos_request cpu_qos;
-	struct pm_qos_request mif_qos;
-	struct pm_qos_request int_qos;
-	unsigned char boost_level;
-	bool dvfs_signal;
+	bool dvfs_lock_status;
+	struct delayed_work work_dvfs_off;
+	struct delayed_work work_dvfs_chg;
+	struct mutex dvfs_lock;
+	int dvfs_old_stauts;
+	int dvfs_boost_mode;
+	int dvfs_freq;
 #endif
 #ifdef TK_USE_OPEN_DWORK
 	struct delayed_work open_work;
 #endif
 #ifdef CONFIG_GLOVE_TOUCH
-	struct delayed_work glove_change_work;
-	bool tsk_glove_lock_status;
-	bool tsk_glove_mode_status;
+	struct work_struct glove_change_work;
+	int ic_mode;
+	bool tsk_cmd_glove;
+	bool tsk_enable_glove_mode;
 	struct mutex tsk_glove_lock;
 #endif
 #ifdef TK_INFORM_CHARGER

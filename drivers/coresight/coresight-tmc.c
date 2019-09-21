@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -177,6 +177,7 @@ struct tmc_drvdata {
 	bool			byte_cntr_read_active;
 	wait_queue_head_t	wq;
 	char			*byte_cntr_node;
+	uint32_t		mem_size;
 };
 
 static void tmc_wait_for_flush(struct tmc_drvdata *drvdata)
@@ -502,6 +503,14 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
 		return ret;
 
 	mutex_lock(&drvdata->usb_lock);
+	spin_lock_irqsave(&drvdata->spinlock, flags);
+	if (drvdata->reading) {
+		ret = -EBUSY;
+		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+		goto err0;
+	}
+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+
 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
 		coresight_cti_map_trigout(drvdata->cti_flush, 1, 0);
 		coresight_cti_map_trigin(drvdata->cti_reset, 0, 0);
@@ -531,10 +540,6 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
 	}
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
-	if (drvdata->reading) {
-		ret = -EBUSY;
-		goto err1;
-	}
 
 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
 		__tmc_etb_enable(drvdata);
@@ -553,11 +558,6 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
 
 	dev_info(drvdata->dev, "TMC enabled\n");
 	return 0;
-err1:
-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
-		if (drvdata->out_mode == TMC_ETR_OUT_MODE_USB)
-			usb_qdss_close(drvdata->usbch);
 err0:
 	mutex_unlock(&drvdata->usb_lock);
 	clk_disable_unprepare(drvdata->clk);
@@ -639,7 +639,6 @@ static void __tmc_etb_dump(struct tmc_drvdata *drvdata)
 	char *hdr;
 	char *bufp;
 	uint32_t read_data;
-	int i;
 
 	memwidth = BMVAL(tmc_readl(drvdata, CORESIGHT_DEVID), 8, 10);
 	if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
@@ -653,16 +652,22 @@ static void __tmc_etb_dump(struct tmc_drvdata *drvdata)
 
 	bufp = drvdata->buf;
 	while (1) {
-		for (i = 0; i < memwords; i++) {
-			read_data = tmc_readl_no_log(drvdata, TMC_RRD);
-			if (read_data == 0xFFFFFFFF)
-				goto out;
-			memcpy(bufp, &read_data, BYTES_PER_WORD);
-			bufp += BYTES_PER_WORD;
+		read_data = tmc_readl_no_log(drvdata, TMC_RRD);
+		if (read_data == 0xFFFFFFFF)
+			goto out;
+		if ((bufp - drvdata->buf) >= drvdata->size) {
+			dev_err(drvdata->dev, "ETF-ETB end marker missing\n");
+			goto out;
 		}
+		memcpy(bufp, &read_data, BYTES_PER_WORD);
+		bufp += BYTES_PER_WORD;
 	}
 
 out:
+	if ((bufp - drvdata->buf) % (memwords * BYTES_PER_WORD))
+		dev_dbg(drvdata->dev, "ETF-ETB data is not %lx bytes aligned\n",
+			(unsigned long) memwords * BYTES_PER_WORD);
+
 	if (drvdata->aborting) {
 		hdr = drvdata->buf - PAGE_SIZE;
 		*(uint32_t *)(hdr + TMC_ETFETB_DUMP_MAGIC_OFF) =
@@ -886,11 +891,13 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
 out:
 	drvdata->reading = true;
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+	mutex_unlock(&drvdata->usb_lock);
 
 	dev_info(drvdata->dev, "TMC read start\n");
 	return 0;
 err:
 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+	mutex_unlock(&drvdata->usb_lock);
 	return ret;
 }
 
@@ -899,6 +906,7 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
 	unsigned long flags;
 	enum tmc_mode mode;
 
+	mutex_lock(&drvdata->usb_lock);
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 	if (!drvdata->enable)
 		goto out;
@@ -950,7 +958,11 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
 {
 	struct tmc_drvdata *drvdata = container_of(file->private_data,
 						   struct tmc_drvdata, miscdev);
-	char *bufp = drvdata->buf + *ppos;
+	char *bufp;
+
+	mutex_lock(&drvdata->usb_lock);
+
+	bufp  = drvdata->buf + *ppos;
 
 	if (*ppos + len > drvdata->size)
 		len = drvdata->size - *ppos;
@@ -966,6 +978,7 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
 
 	if (copy_to_user(data, bufp, len)) {
 		dev_dbg(drvdata->dev, "%s: copy_to_user failed\n", __func__);
+		mutex_unlock(&drvdata->usb_lock);
 		return -EFAULT;
 	}
 
@@ -973,6 +986,8 @@ static ssize_t tmc_read(struct file *file, char __user *data, size_t len,
 
 	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
 		__func__, len, (int) (drvdata->size - *ppos));
+
+	mutex_unlock(&drvdata->usb_lock);
 	return len;
 }
 
@@ -1310,6 +1325,32 @@ static ssize_t tmc_etr_store_byte_cntr_value(struct device *dev,
 static DEVICE_ATTR(byte_cntr_value, S_IRUGO | S_IWUSR,
 		   tmc_etr_show_byte_cntr_value, tmc_etr_store_byte_cntr_value);
 
+static ssize_t tmc_etr_show_mem_size(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val = drvdata->mem_size;
+
+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
+}
+
+static ssize_t tmc_etr_store_mem_size(struct device *dev,
+				      struct device_attribute *attr,
+				      const char *buf, size_t size)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
+	unsigned long val;
+
+	if (sscanf(buf, "%lx", &val) != 1)
+		return -EINVAL;
+
+	drvdata->mem_size = val;
+	return size;
+}
+static DEVICE_ATTR(mem_size, S_IRUGO | S_IWUSR,
+		   tmc_etr_show_mem_size, tmc_etr_store_mem_size);
+
 static struct attribute *tmc_attrs[] = {
 	&dev_attr_trigger_cntr.attr,
 	NULL,
@@ -1322,6 +1363,7 @@ static struct attribute_group tmc_attr_grp = {
 static struct attribute *tmc_etr_attrs[] = {
 	&dev_attr_out_mode.attr,
 	&dev_attr_byte_cntr_value.attr,
+	&dev_attr_mem_size.attr,
 	NULL,
 };
 

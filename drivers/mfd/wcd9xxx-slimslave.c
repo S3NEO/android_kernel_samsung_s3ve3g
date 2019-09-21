@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -62,6 +62,11 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx, u8 wcd9xxx_pgd_la,
 		goto err;
 	}
 
+	if (!rx_num || rx_num > wcd9xxx->num_rx_port) {
+		pr_err("%s: invalid rx num %d\n", __func__, rx_num);
+		return -EINVAL;
+	}
+ 
 	if (wcd9xxx->rx_chs) {
 		wcd9xxx->num_rx_port = rx_num;
 		for (i = 0; i < rx_num; i++) {
@@ -84,6 +89,10 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx, u8 wcd9xxx_pgd_la,
 			wcd9xxx->num_rx_port);
 	}
 
+	if (!tx_num || tx_num > wcd9xxx->num_tx_port) {
+		pr_err("%s: invalid tx num %d\n", __func__, tx_num);
+		return -EINVAL;
+	}
 	if (wcd9xxx->tx_chs) {
 		wcd9xxx->num_tx_port = tx_num;
 		for (i = 0; i < tx_num; i++) {
@@ -499,7 +508,8 @@ EXPORT_SYMBOL_GPL(wcd9xxx_rx_vport_validation);
 
 /* This function is called with mutex acquired */
 int wcd9xxx_tx_vport_validation(u32 vtable, u32 port_id,
-				struct wcd9xxx_codec_dai_data *codec_dai)
+				struct wcd9xxx_codec_dai_data *codec_dai,
+				u32 num_codec_dais)
 {
 	struct wcd9xxx_ch *ch;
 	int ret = 0;
@@ -508,18 +518,25 @@ int wcd9xxx_tx_vport_validation(u32 vtable, u32 port_id,
 	pr_debug("%s: vtable 0x%x port_id %u size %d\n", __func__,
 		 vtable, port_id, size);
 	for_each_set_bit(index, (unsigned long *)&vtable, size) {
-		list_for_each_entry(ch,
-				    &codec_dai[index].wcd9xxx_ch_list,
-				    list) {
-			pr_debug("%s: index %u ch->port %u vtable 0x%x\n",
-				 __func__, index, ch->port, vtable);
-			if (ch->port == port_id) {
-				pr_err("%s: TX%u is used by AIF%u_CAP Mixer\n",
-					__func__, port_id + 1,
-					(index + 1)/2);
-				ret = -EINVAL;
-				break;
+		if (index < num_codec_dais) {
+			list_for_each_entry(ch,
+					&codec_dai[index].wcd9xxx_ch_list,
+					list) {
+				pr_debug("%s: index %u ch->port %u vtable 0x%x\n",
+						__func__, index, ch->port,
+						vtable);
+				if (ch->port == port_id) {
+					pr_err("%s: TX%u is used by AIF%u_CAP Mixer\n",
+							__func__, port_id + 1,
+							(index + 1)/2);
+					ret = -EINVAL;
+					break;
+				}
 			}
+		} else {
+			pr_err("%s: Invalid index %d of codec dai",
+					__func__, index);
+			ret = -EINVAL;
 		}
 		if (ret)
 			break;

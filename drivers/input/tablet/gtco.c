@@ -108,6 +108,7 @@ struct gtco {
 
 	struct input_dev  *inputdevice; /* input device struct pointer  */
 	struct usb_device *usbdev; /* the usb device for this device */
+	struct usb_interface *intf;	/* the usb interface for this device */
 	struct urb        *urbinfo;	 /* urb for incoming reports      */
 	dma_addr_t        buf_dma;  /* dma addr of the data buffer*/
 	unsigned char *   buffer;   /* databuffer for reports */
@@ -202,6 +203,7 @@ struct hid_descriptor
 static void parse_hid_report_descriptor(struct gtco *device, char * report,
 					int length)
 {
+    struct device *ddev = &device->intf->dev;
 	int   x, i = 0;
 
 	/* Tag primitive vars */
@@ -232,13 +234,17 @@ static void parse_hid_report_descriptor(struct gtco *device, char * report,
 
 	/* Walk  this report and pull out the info we need */
 	while (i < length) {
-		prefix = report[i];
-
-		/* Skip over prefix */
-		i++;
+		prefix = report[i++];
 
 		/* Determine data size and save the data in the proper variable */
-		size = PREF_SIZE(prefix);
+		size = (1U << PREF_SIZE(prefix)) >> 1;
+		if (i + size > length) {
+			dev_err(ddev,
+				"Not enough data (need %d, have %d)\n",
+				i + size, length);
+			break;
+		}
+
 		switch (size) {
 		case 1:
 			data = report[i];
@@ -246,8 +252,7 @@ static void parse_hid_report_descriptor(struct gtco *device, char * report,
 		case 2:
 			data16 = get_unaligned_le16(&report[i]);
 			break;
-		case 3:
-			size = 4;
+		case 4:
 			data32 = get_unaligned_le32(&report[i]);
 			break;
 		}
@@ -714,8 +719,9 @@ static void gtco_urb_callback(struct urb *urbinfo)
 				 * the rest as 0
 				 */
 				val = device->buffer[5] & MASK_BUTTON;
-				dbg("======>>>>>>REPORT 1: val 0x%X(%d)",
-				    val, val);
+				dev_dbg(&device->intf->dev,
+					"======>>>>>>REPORT 1: val 0x%X(%d)\n",
+					val, val);
 
 				/*
 				 * We don't apply any meaning to the button
@@ -808,7 +814,8 @@ static void gtco_urb_callback(struct urb *urbinfo)
  resubmit:
 	rc = usb_submit_urb(urbinfo, GFP_ATOMIC);
 	if (rc != 0)
-		err("usb_submit_urb failed rc=0x%x", rc);
+		dev_err(&device->intf->dev,
+			"usb_submit_urb failed rc=0x%x\n", rc);
 }
 
 /*
@@ -847,7 +854,7 @@ static int gtco_probe(struct usb_interface *usbinterface,
 	gtco->inputdevice = input_dev;
 
 	/* Save interface information */
-	gtco->usbdev = usb_get_dev(interface_to_usbdev(usbinterface));
+	gtco->intf = usbinterface;
 
 	/* Allocate some data for incoming reports */
 	gtco->buffer = usb_alloc_coherent(gtco->usbdev, REPORT_MAX_SIZE,
@@ -864,6 +871,14 @@ static int gtco_probe(struct usb_interface *usbinterface,
 		err("Failed to allocate URB");
 		error = -ENOMEM;
 		goto err_free_buf;
+	}
+
+	/* Sanity check that a device has an endpoint */
+	if (usbinterface->altsetting[0].desc.bNumEndpoints < 1) {
+		dev_err(&usbinterface->dev,
+			"Invalid number of endpoints\n");
+		error = -EINVAL;
+		goto err_free_urb;
 	}
 
 	/*
@@ -887,7 +902,7 @@ static int gtco_probe(struct usb_interface *usbinterface,
 	 * HID report descriptor
 	 */
 	if (usb_get_extra_descriptor(usbinterface->cur_altsetting,
-				     HID_DEVICE_TYPE, &hid_desc) != 0){
+				     HID_DEVICE_TYPE, &hid_desc) != 0) {
 		err("Can't retrieve exta USB descriptor to get hid report descriptor length");
 		error = -EIO;
 		goto err_free_urb;

@@ -50,7 +50,7 @@
  * log
  ******************************************************************************/
 
-#if defined(CONFIG_SEC_FACTORY)
+#ifndef CONFIG_SEC_DEBUG
 /* shown at FACTORY */
 #define FELICA_PR_ERR(A,...) pr_err("[FELICA]"A,##__VA_ARGS__)
 
@@ -589,8 +589,12 @@ static ssize_t snfc_rfs_read(struct file *file, char __user *buf, \
 #define SNFC_UART_NAME					"snfc_uart"
 #if defined(CONFIG_ARCH_EXYNOS)
 #define UART_DEV_NAME					"/dev/ttySAC1"
-#elif defined(CONFIG_ARCH_APQ8064) || defined(CONFIG_ARCH_MSM8974) || defined(CONFIG_ARCH_MSM8974PRO)
+#elif defined(CONFIG_ARCH_APQ8064)
 #define UART_DEV_NAME					"/dev/ttyHSL2"
+#elif defined(CONFIG_MACH_KLTE_DCM) || defined(CONFIG_MACH_KLTE_KDI) || defined(CONFIG_MACH_KLTE_SBM)
+#define UART_DEV_NAME					"/dev/ttyHSL2"
+#elif defined(CONFIG_MACH_HLTEDCM)	|| defined(CONFIG_MACH_HLTEKDI) || defined(CONFIG_MACH_JS01LTEDCM)
+#define UART_DEV_NAME					"/dev/ttyHSL1"
 #endif
 
 /* function prototype */
@@ -676,6 +680,8 @@ static unsigned int uartcc_is_idle_status(void);
 #define UICC_POWER_ON		_IO(UICC_MAGIC, 1)
 #define UICC_POWER_OFF		_IO(UICC_MAGIC, 2)
 #define UICC_POWER_SPS_PMIC	_IO(UICC_MAGIC, 3)
+#define UICC_POWER_UIM_MON	_IO(UICC_MAGIC, 4)
+
 
 #define UICC_ERROR		1
 #define UICC_SUCCESS	2

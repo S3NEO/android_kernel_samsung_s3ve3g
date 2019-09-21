@@ -42,7 +42,7 @@
 
 #define CALIBRATION_FILE_PATH           "/efs/accel_calibration_data"
 #define CALIBRATION_DATA_AMOUNT         20
-#define MAX_ACCEL_1G			1024
+#define MAX_ACCEL_1G                    1024
 
 #define BMA255_DEFAULT_DELAY            200000000LL
 #define BMA255_CHIP_ID                  0xFA
@@ -105,6 +105,7 @@ struct bma255_p {
 	int sda_gpio;
 	int scl_gpio;
 	int time_count;
+	u64 timestamp;
 };
 
 static int bma255_open_calibration(struct bma255_p *);
@@ -113,12 +114,19 @@ static int bma255_i2c_recovery(struct bma255_p *data)
 {
 	int ret, i;
 	struct gpiomux_setting old_config[2];
+#if defined(CONFIG_SEC_AFYON_PROJECT)
+	static struct gpiomux_setting recovery_config = {
+		.func = GPIOMUX_FUNC_3,
+		.drv = GPIOMUX_DRV_2MA,
+		.pull = GPIOMUX_PULL_NONE,
+	};
+#else
 	struct gpiomux_setting recovery_config = {
 		.func = GPIOMUX_FUNC_GPIO,
 		.drv = GPIOMUX_DRV_8MA,
 		.pull = GPIOMUX_PULL_NONE,
 	};
-
+#endif
 	if ((data->sda_gpio < 0) || (data->scl_gpio < 0)) {
 		pr_info("[SENSOR]: %s - no sda, scl gpio\n", __func__);
 		return -1;
@@ -205,7 +213,7 @@ exit:
 }
 
 static int bma255_i2c_read(struct bma255_p *data,
-		unsigned char reg_addr, unsigned char *buf)
+		unsigned char reg_addr, unsigned char *buf, unsigned int len)
 {
 	int ret, retries = 0;
 	struct i2c_msg msg[2];
@@ -217,9 +225,8 @@ static int bma255_i2c_read(struct bma255_p *data,
 
 	msg[1].addr = data->client->addr;
 	msg[1].flags = I2C_M_RD;
-	msg[1].len = 1;
+	msg[1].len = len;
 	msg[1].buf = buf;
-
 	do {
 		ret = i2c_transfer(data->client->adapter, msg, 2);
 		if (ret < 0)
@@ -274,8 +281,8 @@ static int bma255_set_mode(struct bma255_p *data, unsigned char mode)
 
 	mutex_lock(&data->mode_mutex);
 
-	ret = bma255_i2c_read(data, BMA255_MODE_CTRL_REG, &buf1);
-	ret += bma255_i2c_read(data, BMA255_LOW_NOISE_CTRL_REG, &buf2);
+	ret = bma255_i2c_read(data, BMA255_MODE_CTRL_REG, &buf1, 1);
+	ret += bma255_i2c_read(data, BMA255_LOW_NOISE_CTRL_REG, &buf2, 1);
 
 	switch (mode) {
 	case BMA255_MODE_NORMAL:
@@ -325,7 +332,7 @@ static int bma255_set_mode(struct bma255_p *data, unsigned char mode)
 		break;
 	}
 
-	pr_info("[SENSOR]: %s - change mode %u\n", __func__, mode);
+	pr_info("[SENSOR]: %s - mode = %u, ret = %d\n", __func__, mode, ret);
 	mutex_unlock(&data->mode_mutex);
 
 	return ret;
@@ -336,7 +343,7 @@ static int bma255_set_range(struct bma255_p *data, unsigned char range)
 	int ret = 0 ;
 	unsigned char buf;
 
-	ret = bma255_i2c_read(data, BMA255_RANGE_SEL_REG, &buf);
+	ret = bma255_i2c_read(data, BMA255_RANGE_SEL_REG, &buf, 1);
 
 	switch (range) {
 	case BMA255_RANGE_2G:
@@ -370,24 +377,20 @@ static int bma255_set_bandwidth(struct bma255_p *data,
 	if (bandwidth <= 7 || bandwidth >= 16)
 		bandwidth = BMA255_BW_250HZ;
 
-	ret = bma255_i2c_read(data, BMA255_BANDWIDTH__REG, &buf);
+	ret = bma255_i2c_read(data, BMA255_BANDWIDTH__REG, &buf, 1);
 	buf = BMA255_SET_BITSLICE(buf, BMA255_BANDWIDTH, bandwidth);
 	ret += bma255_i2c_write(data, BMA255_BANDWIDTH__REG, buf);
 
-	pr_info("[SENSOR]: %s - change bandwidth %u\n", __func__, bandwidth);
+	pr_info("[SENSOR]: %s - bandwidth = %u, ret = %d\n", __func__, bandwidth, ret);
 	return ret;
 }
 
 static int bma255_read_accel_xyz(struct bma255_p *data,	struct bma255_v *acc)
 {
-	int ret = 0, i;
+	int ret = 0;
 	unsigned char buf[READ_DATA_LENTH];
 
-	for (i = 0; i < READ_DATA_LENTH; i++) {
-		ret += bma255_i2c_read(data,
-				BMA255_ACC_X12_LSB__REG + i, &buf[i]);
-	}
-
+	ret = bma255_i2c_read(data,	BMA255_ACC_X12_LSB__REG, buf, READ_DATA_LENTH);
 	if (ret < 0)
 		goto exit;
 
@@ -439,18 +442,37 @@ static void bma255_work_func(struct work_struct *work)
 	int ret;
 	struct bma255_v acc;
 	struct bma255_p *data = container_of(work, struct bma255_p, work);
+	struct timespec ts;
+	int time_hi, time_lo;
+
+	ts = ktime_to_timespec(alarm_get_elapsed_realtime());
+	data->timestamp = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+	time_lo = (int)(data->timestamp & TIME_LO_MASK);
+	time_hi = (int)((data->timestamp & TIME_HI_MASK) >> TIME_HI_SHIFT);
 
 	ret = bma255_read_accel_xyz(data, &acc);
-	if (ret < 0)
+	if (ret < 0){
+		pr_err("read accel data failed\n");
 		goto exit;
+	}
 
-	data->accdata.x = acc.x - data->caldata.x;
-	data->accdata.y = acc.y - data->caldata.y;
-	data->accdata.z = acc.z - data->caldata.z;
+	data->accdata = acc;
+	acc.x = acc.x - data->caldata.x;
+	acc.y = acc.y - data->caldata.y;
+	acc.z = acc.z - data->caldata.z;
 
-	input_report_rel(data->input, REL_X, data->accdata.x);
-	input_report_rel(data->input, REL_Y, data->accdata.y);
-	input_report_rel(data->input, REL_Z, data->accdata.z);
+	// 0 value is ignored using input_report_rel.
+	acc.x = (acc.x >= 0) ? (acc.x + 1) : (acc.x - 1);
+	acc.y = (acc.y >= 0) ? (acc.y + 1) : (acc.y - 1);
+	acc.z = (acc.z >= 0) ? (acc.z + 1) : (acc.z - 1);
+	time_hi = (time_hi >= 0) ? (time_hi + 1) : (time_hi - 1);
+	time_lo = (time_lo >= 0) ? (time_lo + 1) : (time_lo - 1);
+
+	input_report_rel(data->input, REL_X, acc.x);
+	input_report_rel(data->input, REL_Y, acc.y);
+	input_report_rel(data->input, REL_Z, acc.z);
+	input_report_rel(data->input, REL_DIAL, time_hi);
+	input_report_rel(data->input, REL_MISC, time_lo);
 	input_sync(data->input);
 
 exit:
@@ -656,7 +678,7 @@ static int bma255_do_calibrate(struct bma255_p *data, int enable)
 		else
 			bma255_set_mode(data, BMA255_MODE_NORMAL);
 
-		msleep(300);
+		usleep_range(300000, 301000);
 
 		for (cnt = 0; cnt < CALIBRATION_DATA_AMOUNT; cnt++) {
 			bma255_read_accel_xyz(data, &acc);
@@ -779,7 +801,7 @@ static void bma255_set_int_enable(struct bma255_p *data,
 {
 	unsigned char reg;
 
-	bma255_i2c_read(data, BMA255_INT_ENABLE1_REG, &reg);
+	bma255_i2c_read(data, BMA255_INT_ENABLE1_REG, &reg, 1);
 
 	switch (InterruptType) {
 	case SLOPE_X_INT:
@@ -807,16 +829,16 @@ static void bma255_slope_enable(struct bma255_p *data,
 	unsigned char reg;
 
 	if (enable == ON) {
-		bma255_i2c_read(data, BMA255_EN_INT1_PAD_SLOPE__REG, &reg);
+		bma255_i2c_read(data, BMA255_EN_INT1_PAD_SLOPE__REG, &reg, 1);
 		reg = BMA255_SET_BITSLICE(reg, BMA255_EN_INT1_PAD_SLOPE, ON);
 		bma255_i2c_write(data, BMA255_EN_INT1_PAD_SLOPE__REG, reg);
 
-		bma255_i2c_read(data, BMA255_INT_MODE_SEL__REG, &reg);
+		bma255_i2c_read(data, BMA255_INT_MODE_SEL__REG, &reg, 1);
 		reg = BMA255_SET_BITSLICE(reg, BMA255_INT_MODE_SEL, 0x01);
 		bma255_i2c_write(data, BMA255_INT_MODE_SEL__REG, reg);
 
 		if (factory_mode == OFF) {
-			bma255_i2c_read(data, BMA255_SLOPE_DUR__REG, &reg);
+			bma255_i2c_read(data, BMA255_SLOPE_DUR__REG, &reg, 1);
 			reg = BMA255_SET_BITSLICE(reg, BMA255_SLOPE_DUR,
 					SLOPE_DURATION_VALUE);
 			bma255_i2c_write(data, BMA255_SLOPE_DUR__REG, reg);
@@ -828,7 +850,7 @@ static void bma255_slope_enable(struct bma255_p *data,
 			bma255_set_int_enable(data, SLOPE_Y_INT, ON);
 			bma255_set_int_enable(data, SLOPE_Z_INT, ON);
 		} else {
-			bma255_i2c_read(data, BMA255_SLOPE_DUR__REG, &reg);
+			bma255_i2c_read(data, BMA255_SLOPE_DUR__REG, &reg, 1);
 			reg = BMA255_SET_BITSLICE(reg, BMA255_SLOPE_DUR, 0x01);
 			bma255_i2c_write(data, BMA255_SLOPE_DUR__REG, reg);
 
@@ -839,7 +861,7 @@ static void bma255_slope_enable(struct bma255_p *data,
 			bma255_set_bandwidth(data, BMA255_BW_250HZ);
 		}
 	} else if (enable == OFF) {
-		bma255_i2c_read(data, BMA255_EN_INT1_PAD_SLOPE__REG, &reg);
+		bma255_i2c_read(data, BMA255_EN_INT1_PAD_SLOPE__REG, &reg, 1);
 		reg = BMA255_SET_BITSLICE(reg, BMA255_EN_INT1_PAD_SLOPE, OFF);
 		bma255_i2c_write(data, BMA255_EN_INT1_PAD_SLOPE__REG, reg);
 
@@ -990,6 +1012,8 @@ static int bma255_input_init(struct bma255_p *data)
 	input_set_capability(dev, EV_REL, REL_X);
 	input_set_capability(dev, EV_REL, REL_Y);
 	input_set_capability(dev, EV_REL, REL_Z);
+	input_set_capability(dev, EV_REL, REL_DIAL); /* time_hi */
+	input_set_capability(dev, EV_REL, REL_MISC); /* time_lo */
 	input_set_drvdata(dev, data);
 
 	ret = input_register_device(dev);
@@ -1048,6 +1072,7 @@ static int bma255_parse_dt(struct bma255_p *data, struct device *dev)
 	return 0;
 }
 
+#ifndef CONFIG_MACH_MS01_EUR_3G
 static int sensor_regulator_onoff(struct device *dev, bool onoff)
 {
 	struct regulator *sensor_vcc, *sensor_lvs1;
@@ -1079,6 +1104,7 @@ static int sensor_regulator_onoff(struct device *dev, bool onoff)
 
 	return 0;
 }
+#endif
 
 static int bma255_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
@@ -1094,10 +1120,11 @@ static int bma255_probe(struct i2c_client *client,
 		goto exit;
 	}
 
+#ifndef CONFIG_MACH_MS01_EUR_3G
 	ret = sensor_regulator_onoff(&client->dev, true);
 	if (ret < 0)
 		pr_err("[SENSOR]: %s - No regulator\n", __func__);
-
+#endif
 	data = kzalloc(sizeof(struct bma255_p), GFP_KERNEL);
 	if (data == NULL) {
 		pr_err("[SENSOR]: %s - kzalloc error\n", __func__);
@@ -1125,7 +1152,6 @@ static int bma255_probe(struct i2c_client *client,
 		       "reactive_wake_lock");
 
 	/* read chip id */
-	bma255_set_mode(data, BMA255_MODE_NORMAL);
 	for (i = 0; i < CHIP_ID_RETRIES; i++) {
 		ret = i2c_smbus_read_word_data(client, BMA255_CHIP_ID_REG);
 		if ((ret & 0x00ff) != BMA255_CHIP_ID) {

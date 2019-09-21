@@ -48,6 +48,7 @@
 #define IST30XXB_REG_EEPRDAT        IST30XXB_DA_ADDR(0x4000700C)
 #define IST30XXB_REG_EEPISPEN       IST30XXB_DA_ADDR(0x40007010)
 #define IST30XXB_REG_CHKSMOD        IST30XXB_DA_ADDR(0x40007014)
+#define IST30XXB_REG_EEPPWRCTRL     IST30XXB_DA_ADDR(0x4000701C)
 #define IST30XXB_REG_CHKSDAT        IST30XXB_DA_ADDR(0x40007038)
 
 #define IST30XXB_REG_CHIPID         IST30XXB_DA_ADDR(0x40000000)
@@ -75,6 +76,7 @@
 #define IST30XX_FW_VER1         (0x00010000)
 #define IST30XX_FW_VER2         (0x00020000)
 #define IST30XX_FW_VER3         (0x00030000)
+#define IST30XX_FW_VER4         (0x00040000)
 
 #define IST30XX_FW_UPDATE_RETRY (3)
 
@@ -96,6 +98,7 @@
 
 #define FLAG_FW                 (1)
 #define FLAG_PARAM              (2)
+#define FLAG_SUB                (3)
 
 #define TAGS_PARSE_OK           (0)
 

@@ -169,6 +169,9 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_Terminate(void)
 /*
 ** Called by the real-time loop to set PWM_MAG duty cycle
 */
+#ifdef CONFIG_VIBRATOR_UPDATE
+static bool g_bOutputDataBufferEmpty = 1;
+#endif
 IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_SetSamples(VibeUInt8 nActuatorIndex, VibeUInt16 nOutputSignalBitDepth, VibeUInt16 nBufferSizeInBytes, VibeInt8* pForceOutputBuffer)
 {
     VibeInt8 nForce = 0;
@@ -176,6 +179,15 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_SetSamples(VibeUInt8 nActuatorIndex
     //int cnt = 0;
     //unsigned char I2C_data[2];
     //int ret = VIBE_S_SUCCESS;
+
+#ifdef CONFIG_VIBRATOR_UPDATE
+	if (g_bOutputDataBufferEmpty) {
+		nActuatorIndex = 0;
+		nOutputSignalBitDepth = 8;
+		nBufferSizeInBytes = 1;
+		pForceOutputBuffer[0] = 0;
+	}
+#endif
 
     switch (nOutputSignalBitDepth)
     {
