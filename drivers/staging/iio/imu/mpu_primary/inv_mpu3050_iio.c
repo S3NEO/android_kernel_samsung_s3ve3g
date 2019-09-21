@@ -30,7 +30,7 @@
 #define MPU3050_NACK_MIN_TIME (2 * 1000)
 #define MPU3050_NACK_MAX_TIME (3 * 1000)
 
-#define MPU3050_ONE_MPU_TIME 20
+#define MPU3050_ONE_MPU_TIME 20000
 #define MPU3050_BOGUS_ADDR  0x7F
 int __attribute__((weak)) inv_register_mpu3050_slave(struct inv_mpu_state *st)
 {
@@ -83,7 +83,7 @@ int set_3050_bypass(struct inv_mpu_state *st, bool enable)
 		* 3) wait for up to one MPU cycle then restore the slave
 		*    address
 		*/
-		msleep(MPU3050_ONE_MPU_TIME);
+		usleep_range(MPU3050_ONE_MPU_TIME, MPU3050_ONE_MPU_TIME + 1000);
 
 		result = inv_i2c_single_write(st, REG_3050_SLAVE_ADDR,
 			st->plat_data.secondary_i2c_addr);
@@ -130,7 +130,7 @@ int inv_switch_3050_gyro_engine(struct inv_mpu_state *st, bool en)
 			return result;
 		p = data;
 		result = inv_i2c_single_write(st, reg->pwr_mgmt_1, p);
-		msleep(SENSOR_UP_TIME);
+		usleep_range(SENSOR_UP_TIME, SENSOR_UP_TIME + 1000);
 	} else {
 		p = BITS_3050_GYRO_STANDBY;
 		result = inv_i2c_single_write(st, reg->pwr_mgmt_1, p);
@@ -257,7 +257,7 @@ int set_power_mpu3050(struct inv_mpu_state *st, bool power_on)
 			return result;
 	}
 	if (power_on) {
-		msleep(POWER_UP_TIME);
+		usleep_range(POWER_UP_TIME, POWER_UP_TIME + 1000);
 		if (st->slave_accel) {
 			result = st->slave_accel->resume(st);
 			if (result)

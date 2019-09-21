@@ -77,7 +77,7 @@ extern struct inet6_ifaddr      *ipv6_get_ifaddr(struct net *net,
 						 int strict);
 
 extern int			ipv6_dev_get_saddr(struct net *net,
-					       struct net_device *dev,
+					       const struct net_device *dev,
 					       const struct in6_addr *daddr,
 					       unsigned int srcprefs,
 					       struct in6_addr *saddr);
@@ -171,6 +171,9 @@ extern int ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
 extern void ipv6_ac_destroy_dev(struct inet6_dev *idev);
 
 u32 addrconf_rt_table(const struct net_device *dev, u32 default_table);
+
+u32 addrconf_rt_table(const struct net_device *dev, u32 default_table);
+extern void ipv6_ac_destroy_dev(struct inet6_dev *idev);
 
 
 /* Device notifier */

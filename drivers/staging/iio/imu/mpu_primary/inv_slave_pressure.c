@@ -258,7 +258,7 @@ static int inv_setup_bmp280(struct inv_mpu_state *st)
 	r = inv_aux_write(BMP280_RESET_REG, BMP280_SOFT_RESET);
 	if (r)
 		return r;
-	msleep(100);
+	usleep_range(100000, 101000);
 	r = inv_aux_read(BMP280_CHIPID_REG, 1, d);
 	if (r)
 		return r;

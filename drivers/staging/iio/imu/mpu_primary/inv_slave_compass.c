@@ -587,7 +587,7 @@ static int inv_read_mlx_z_axis(struct inv_mpu_state *st, s16 *z)
 	result = inv_write_mlx_cmd(st, 0x39);
 	if (result)
 		return result;
-	msleep(100);
+	usleep_range(100000, 101000);
 	/* read z axis */
 	result = inv_i2c_write_mlx(st, addr, 0x49);
 	if (result)
@@ -672,7 +672,7 @@ static int inv_check_mlx_self_test(struct inv_mpu_state *st)
 	result = inv_i2c_write_mlx_reg(st, addr, 0, r_val);
 	if (result)
 		return result;
-	msleep(200);
+	usleep_range(200000, 201000);
 	result = inv_read_mlx_z_axis(st, &meas_coil);
 	if (result)
 		return result;

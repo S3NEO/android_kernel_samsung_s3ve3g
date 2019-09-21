@@ -132,7 +132,8 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
 
 	BT_DBG("sk %p", sk);
 
-	if (!addr || addr->sa_family != AF_BLUETOOTH)
+	if (!addr || alen < offsetofend(struct sockaddr, sa_family) ||
+	    addr->sa_family != AF_BLUETOOTH)
 		return -EINVAL;
 
 	memset(&la, 0, sizeof(la));
@@ -200,7 +201,7 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 	BT_DBG("sk %p type %d mode %d state %d", sk, sk->sk_type,
 		l2cap_pi(sk)->mode, sk->sk_state);
 
-	if (!addr || alen < sizeof(addr->sa_family) ||
+	if (!addr || alen < offsetofend(struct sockaddr, sa_family) ||
 		addr->sa_family != AF_BLUETOOTH)
 		return -EINVAL;
 
@@ -404,6 +405,7 @@ static int l2cap_sock_getname(struct socket *sock, struct sockaddr *addr, int *l
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
+	memset(la, 0, sizeof(struct sockaddr_l2));
 	addr->sa_family = AF_BLUETOOTH;
 	*len = sizeof(struct sockaddr_l2);
 
@@ -762,7 +764,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 				break;
 			}
 
-			if (smp_conn_security(conn, sec.level))
+			if (smp_conn_security(conn->hcon, sec.level))
 				break;
 
 			err = 0;
@@ -1035,7 +1037,7 @@ static int l2cap_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct ms
 
 		l2cap_pi(sk)->conf_state |= L2CAP_CONF_REQ_SENT;
 		l2cap_send_cmd(conn, l2cap_get_ident(conn), L2CAP_CONF_REQ,
-				l2cap_build_conf_req(sk, buf), buf);
+				l2cap_build_conf_req(sk, buf, sizeof(buf)), buf);
 		l2cap_pi(sk)->num_conf_req++;
 
 		release_sock(sk);

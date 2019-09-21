@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,10 +37,6 @@ module_param_array(rmnet_dev_names, charp, NULL, S_IRUGO | S_IWUSR);
 #define ACM_CTRL_CTS		BIT(1)
 #define ACM_CTRL_RI		BIT(2)
 #define ACM_CTRL_CD		BIT(3)
-
-/* polling interval for Interrupt ep */
-#define HS_INTERVAL		7
-#define FS_LS_INTERVAL		3
 
 /*echo modem_wait > /sys/class/hsicctl/hsicctlx/modem_wait*/
 static ssize_t modem_wait_store(struct device *d, struct device_attribute *attr,
@@ -560,8 +556,13 @@ static int rmnet_ctl_open(struct inode *inode, struct file *file)
 	if (!dev)
 		return -ENODEV;
 
-	if (test_bit(RMNET_CTRL_DEV_OPEN, &dev->status))
+	mutex_lock(&dev->dev_lock);
+	if (test_bit(RMNET_CTRL_DEV_OPEN, &dev->status)) {
+		mutex_unlock(&dev->dev_lock);
 		goto already_opened;
+	}
+	set_bit(RMNET_CTRL_DEV_OPEN, &dev->status);
+	mutex_unlock(&dev->dev_lock);
 
 	if (dev->mdm_wait_timeout &&
 			!test_bit(RMNET_CTRL_DEV_READY, &dev->status)) {
@@ -572,10 +573,15 @@ static int rmnet_ctl_open(struct inode *inode, struct file *file)
 		if (retval == 0) {
 			dev_err(dev->devicep, "%s: Timeout opening %s\n",
 						__func__, dev->name);
-			return -ETIMEDOUT;
-		} else if (retval < 0) {
+			retval = -ETIMEDOUT;
+		} else if (retval < 0)
 			dev_err(dev->devicep, "%s: Error waiting for %s\n",
 						__func__, dev->name);
+
+		if (retval < 0) {
+			mutex_lock(&dev->dev_lock);
+			clear_bit(RMNET_CTRL_DEV_OPEN, &dev->status);
+			mutex_unlock(&dev->dev_lock);
 			return retval;
 		}
 	}
@@ -583,10 +589,12 @@ static int rmnet_ctl_open(struct inode *inode, struct file *file)
 	if (!test_bit(RMNET_CTRL_DEV_READY, &dev->status)) {
 		dev_dbg(dev->devicep, "%s: Connection timedout opening %s\n",
 					__func__, dev->name);
+		mutex_lock(&dev->dev_lock);
+		clear_bit(RMNET_CTRL_DEV_OPEN, &dev->status);
+		mutex_unlock(&dev->dev_lock);
 		return -ETIMEDOUT;
 	}
 
-	set_bit(RMNET_CTRL_DEV_OPEN, &dev->status);
 
 	file->private_data = dev;
 
@@ -621,7 +629,9 @@ static int rmnet_ctl_release(struct inode *inode, struct file *file)
 	}
 	spin_unlock_irqrestore(&dev->rx_lock, flag);
 
+	mutex_lock(&dev->dev_lock);
 	clear_bit(RMNET_CTRL_DEV_OPEN, &dev->status);
+	mutex_unlock(&dev->dev_lock);
 
 	time = usb_wait_anchor_empty_timeout(&dev->tx_submitted,
 			UNLINK_TIMEOUT_MS);
@@ -692,6 +702,7 @@ ctrl_read:
 
 	list_elem = list_first_entry(&dev->rx_list,
 				     struct ctrl_pkt_list_elem, list);
+	list_del(&list_elem->list);
 	bytes_to_read = (uint32_t)(list_elem->cpkt.data_size);
 	if (bytes_to_read > count) {
 		spin_unlock_irqrestore(&dev->rx_lock, flags);
@@ -708,11 +719,11 @@ ctrl_read:
 			dev_err(dev->devicep,
 				"%s: copy_to_user failed for %s\n",
 				__func__, dev->name);
+		spin_lock_irqsave(&dev->rx_lock, flags);
+		list_add(&list_elem->list, &dev->rx_list);
+		spin_unlock_irqrestore(&dev->rx_lock, flags);
 		return -EFAULT;
 	}
-	spin_lock_irqsave(&dev->rx_lock, flags);
-	list_del(&list_elem->list);
-	spin_unlock_irqrestore(&dev->rx_lock, flags);
 
 	kfree(list_elem->cpkt.data);
 	kfree(list_elem);
@@ -941,9 +952,7 @@ int rmnet_usb_ctrl_probe(struct usb_interface *intf,
 		dev->intf->cur_altsetting->desc.bInterfaceNumber;
 	dev->in_ctlreq->wLength = cpu_to_le16(DEFAULT_READ_URB_LENGTH);
 
-	interval = max((int)int_in->desc.bInterval,
-			(udev->speed == USB_SPEED_HIGH) ? HS_INTERVAL
-							: FS_LS_INTERVAL);
+	interval = int_in->desc.bInterval;
 
 	usb_fill_int_urb(dev->inturb, udev,
 			 dev->int_pipe,
@@ -1020,7 +1029,7 @@ static ssize_t rmnet_usb_ctrl_read_stats(struct file *file, char __user *ubuf,
 		for (n = 0; n < insts_per_dev; n++) {
 			dev = &ctrl_devs[i][n];
 			temp += scnprintf(buf + temp, DEBUG_BUF_SIZE - temp,
-					"\n#ctrl_dev: %p     Name: %s#\n"
+					"\n#ctrl_dev: %pK     Name: %s#\n"
 					"snd encap cmd cnt         %u\n"
 					"resp avail cnt:           %u\n"
 					"get encap resp cnt:       %u\n"
@@ -1187,12 +1196,13 @@ int rmnet_usb_ctrl_init(int no_rmnet_devs, int no_rmnet_insts_per_dev)
 						     "%s%d", rmnet_dev_names[i],
 						     n);
 			if (IS_ERR(dev->devicep)) {
+				long status = PTR_ERR(dev->devicep);
 				pr_err("%s: device_create() returned %ld\n",
-					__func__, PTR_ERR(dev->devicep));
+					__func__, status);
 				cdev_del(&dev->cdev);
 				destroy_workqueue(dev->wq);
 				kfree(dev);
-				return PTR_ERR(dev->devicep);
+				return status;
 			}
 
 			/*create /sys/class/hsicctl/hsicctlx/modem_wait*/
