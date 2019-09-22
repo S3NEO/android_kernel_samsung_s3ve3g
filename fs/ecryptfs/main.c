@@ -188,6 +188,7 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
        ecryptfs_opt_enable_cc,
 #endif
+       ecryptfs_opt_base, ecryptfs_opt_type, ecryptfs_opt_label,
        ecryptfs_opt_err };
 
 static const match_table_t tokens = {
@@ -211,6 +212,9 @@ static const match_table_t tokens = {
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	{ecryptfs_opt_enable_cc, "ecryptfs_enable_cc"},
 #endif
+	{ecryptfs_opt_base, "base=%s"},
+	{ecryptfs_opt_type, "type=%s"},
+	{ecryptfs_opt_label, "label=%s"},
 	{ecryptfs_opt_err, NULL}
 };
 
@@ -250,6 +254,14 @@ static void ecryptfs_init_mount_crypt_stat(
 	INIT_LIST_HEAD(&mount_crypt_stat->global_auth_tok_list);
 	mutex_init(&mount_crypt_stat->global_auth_tok_list_mutex);
 	mount_crypt_stat->flags |= ECRYPTFS_MOUNT_CRYPT_STAT_INITIALIZED;
+}
+
+static void ecryptfs_init_propagate_stat(
+	struct ecryptfs_propagate_stat *propagate_stat)
+{
+	memset((void *)propagate_stat, 0,
+			sizeof(struct ecryptfs_propagate_stat));
+	propagate_stat->propagate_type = TYPE_E_NONE;
 }
 
 #ifdef CONFIG_WTL_ENCRYPTION_FILTER
@@ -335,6 +347,8 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 	int fn_cipher_key_bytes_set = 0;
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat =
 		&sbi->mount_crypt_stat;
+	struct ecryptfs_propagate_stat *propagate_stat =
+		&sbi->propagate_stat;
 	substring_t args[MAX_OPT_ARGS];
 	int token;
 	char *sig_src;
@@ -346,6 +360,11 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 	char *fnek_src;
 	char *cipher_key_bytes_src;
 	char *fn_cipher_key_bytes_src;
+	char *base_path_src;
+	char *base_path_dst;
+	char *propagate_type;
+	char *label_src;
+	char *label_dst;
 	u8 cipher_code;
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	char cipher_mode[ECRYPTFS_MAX_CIPHER_MODE_SIZE] = ECRYPTFS_AES_ECB_MODE;
@@ -358,6 +377,7 @@ static int ecryptfs_parse_options(struct ecryptfs_sb_info *sbi, char *options,
 		goto out;
 	}
 	ecryptfs_init_mount_crypt_stat(mount_crypt_stat);
+	ecryptfs_init_propagate_stat(propagate_stat);
 	while ((p = strsep(&options, ",")) != NULL) {
 		if (!*p)
 			continue;
@@ -662,9 +682,12 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 	ecryptfs_set_superblock_private(s, sbi);
 	s->s_bdi = &sbi->bdi;
 
+	if (sbi->propagate_stat.propagate_type != TYPE_E_NONE)
+		s->s_op = &ecryptfs_multimount_sops;
+	else
+		s->s_op = &ecryptfs_sops;
 	/* ->kill_sb() will take care of sbi after that point */
 	sbi = NULL;
-	s->s_op = &ecryptfs_sops;
 	s->s_d_op = &ecryptfs_dops;
 
 	err = "Reading sb failed";
