@@ -7,7 +7,7 @@ obj-$(CONFIG_CRYPTO_FIPS) += first_file.o
 obj-$(CONFIG_CRYPTO_FIPS) += fips_integrity.o
 
 obj-$(CONFIG_CRYPTO) += crypto.o
-crypto-y := api.o cipher.o compress.o memneq.o
+crypto-y := api.o cipher.o compress.o
 
 obj-$(CONFIG_CRYPTO_WORKQUEUE) += crypto_wq.o
 
@@ -104,6 +104,5 @@ obj-$(CONFIG_CRYPTO_USER_API_SKCIPHER) += algif_skcipher.o
 obj-$(CONFIG_XOR_BLOCKS) += xor.o
 obj-$(CONFIG_ASYNC_CORE) += async_tx/
 obj-$(CONFIG_CRYPTO_ABLK_HELPER) += ablk_helper.o
-
 #Keep this at the bottom
 obj-$(CONFIG_CRYPTO_FIPS) += last_file.o
